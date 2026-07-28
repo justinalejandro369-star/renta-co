@@ -426,8 +426,23 @@ class Reclasificacion:
         return avisos
 
 
-def _clave_de(fecha: str, monto: str, moneda: str, fuente: str) -> tuple:
-    return (fecha, monto, moneda, fuente)
+def _clave_de(fecha: str, monto: str, moneda: str, fuente: str,
+              descripcion: str = "") -> tuple:
+    """Lo que identifica un movimiento con independencia de su categoría.
+
+    La DESCRIPCIÓN entra porque es lo único que distingue dos filas que
+    coinciden en fecha, monto, moneda y archivo. Sin ella, el desempate
+    quedaba solo en el ordinal, y el ordinal se corre: si el usuario borra
+    en Excel lo que parece un duplicado, la clasificación de la fila que
+    dejó se la lleva OTRO movimiento y el reporte dice «1 conservada».
+    Aplicar la categoría al movimiento equivocado y reportar éxito es peor
+    que perderla.
+
+    Se normaliza —sin espacios repetidos y en minúscula— porque Excel y los
+    bancos cambian el espaciado sin cambiar el movimiento.
+    """
+    desc = " ".join(str(descripcion or "").split()).lower()
+    return (fecha, monto, moneda, fuente, desc)
 
 
 def _monto_canonico(texto) -> str:
@@ -485,6 +500,7 @@ def leer_clasificacion_previa(ruta: Path) -> tuple[dict[tuple, str], list[str]]:
                         _monto_canonico(fila["monto_origen"]),
                         fila["moneda"],
                         fila["fuente"],
+                        fila.get("descripcion", ""),
                     )
                 except (KeyError, TypeError, ValueError) as e:
                     ilegibles.append(f"línea {n}: {e}")
@@ -515,7 +531,7 @@ def aplicar_clasificacion_previa(
     repetidas: dict[tuple, int] = {}
     for m in sorted(ledger.movimientos, key=lambda x: x.fecha):
         base = _clave_de(m.fecha.isoformat(), f"{m.monto_origen:.2f}",
-                         m.moneda, m.fuente)
+                         m.moneda, m.fuente, m.descripcion)
         ordinal = repetidas.get(base, 0)
         repetidas[base] = ordinal + 1
         anterior = pendientes.pop(base + (ordinal,), None)
@@ -535,8 +551,9 @@ def aplicar_clasificacion_previa(
     for clave, categoria in pendientes.items():
         if categoria == "desconocido":
             continue
-        fecha, monto, moneda, fuente, _ = clave
-        resultado.perdidas.append(f"{fecha} {monto} {moneda} de {fuente} → {categoria}")
+        fecha, monto, moneda, fuente, desc, _ = clave
+        resultado.perdidas.append(
+            f"{fecha} {monto} {moneda} de {fuente} ({desc[:30]}) → {categoria}")
     return resultado
 
 

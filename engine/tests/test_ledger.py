@@ -269,6 +269,24 @@ class TestCaminoNegativoDeLaReclasificacion(unittest.TestCase):
                          ["traslado", "costo"])
         self.assertEqual(r.conservadas, 2)
 
+    def test_dos_filas_IDENTICAS_conservan_cada_una_su_categoria(self):
+        """Con la descripción en la llave, el ordinal solo decide cuando las
+        filas son indistinguibles en los cinco campos. Ahí sigue siendo lo
+        único que queda, y sin él el `dict` se quedaba con la última y se la
+        imponía a las dos."""
+        destino = self._escribir(
+            self._mov(14, 1_500_000, "traslado", desc="TRANSFERENCIA"),
+            self._mov(14, 1_500_000, "costo", desc="TRANSFERENCIA"),
+        )
+        nuevo = Ledger([
+            self._mov(14, 1_500_000, "desconocido", desc="TRANSFERENCIA"),
+            self._mov(14, 1_500_000, "desconocido", desc="TRANSFERENCIA"),
+        ]).convertir(None)
+        r = aplicar_clasificacion_previa(nuevo, *leer_clasificacion_previa(destino))
+        self.assertEqual([m.categoria for m in nuevo.movimientos],
+                         ["traslado", "costo"])
+        self.assertEqual(r.conservadas, 2)
+
     def test_un_ledger_guardado_en_locale_espanol_se_sigue_leyendo(self):
         """Excel reescribe 1500000.00 como 1500000,00 según la configuración
         regional de la máquina. `float()` reventaba y el `continue` se tragaba
@@ -310,6 +328,28 @@ class TestCaminoNegativoDeLaReclasificacion(unittest.TestCase):
             previas, ilegibles = leer_clasificacion_previa(destino)
             self.assertEqual(len(previas), 1, f"{etiqueta}: {ilegibles}")
             self.assertEqual(ilegibles, [], etiqueta)
+
+    def test_borrar_una_fila_repetida_no_mueve_la_clasificacion_a_otra(self):
+        """La llave no incluía la descripción, así que el desempate quedaba
+        solo en el ordinal — y el ordinal se corre. Si el usuario borra en
+        Excel lo que parece un duplicado, la categoría de la fila que dejó se
+        la llevaba OTRO movimiento, y el reporte decía «1 conservada».
+        Aplicarla al movimiento equivocado y reportar éxito es peor que
+        perderla."""
+        destino = self._escribir(
+            self._mov(14, 1_500_000, "traslado", desc="giro A"),
+            self._mov(14, 1_500_000, "costo", desc="giro B"),
+        )
+        lineas = destino.read_text(encoding="utf-8").splitlines(True)
+        destino.write_text(lineas[0] + lineas[2], encoding="utf-8")
+
+        nuevo = Ledger([
+            self._mov(14, 1_500_000, "desconocido", desc="giro A"),
+            self._mov(14, 1_500_000, "desconocido", desc="giro B"),
+        ]).convertir(None)
+        aplicar_clasificacion_previa(nuevo, *leer_clasificacion_previa(destino))
+        self.assertEqual([m.categoria for m in nuevo.movimientos],
+                         ["desconocido", "costo"])
 
     def test_el_resumen_habla_tambien_cuando_no_se_conservo_nada(self):
         """El caso que importa: cero conservadas tiene que decirse. El

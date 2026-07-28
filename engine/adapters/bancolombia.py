@@ -16,7 +16,7 @@ import csv
 from pathlib import Path
 
 from ..ledger import Movimiento
-from .generico import (abrir_csv, aviso_de_filas_saltadas,
+from .generico import (_saltar_preambulo, abrir_csv, aviso_de_filas_saltadas,
                        convencion_del_archivo, convencion_de_fecha,
                        moneda_de, parse_fecha, parse_monto)
 
@@ -79,6 +79,7 @@ def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
     avisos = avisos if avisos is not None else []
     movimientos = []
     with abrir_csv(ruta, avisos) as f:
+        _saltar_preambulo(f)
         lector = csv.DictReader(f)
         campos = {c.lower().strip(): c for c in (lector.fieldnames or [])}
 

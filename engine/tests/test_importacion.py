@@ -564,6 +564,40 @@ class TestConvencionDeFecha(unittest.TestCase):
         self.assertTrue(avisos)
 
 
+class TestPreambuloDelBanco(unittest.TestCase):
+    """`leer_cabeceras` —que decide el adaptador— salta las líneas vacías y
+    `csv.DictReader` no. La detección veía las columnas y la importación
+    veía `[]`, con un mensaje que se contradecía con lo que el despachador
+    acababa de leer. Más de un banco colombiano encabeza el extracto con un
+    preámbulo."""
+
+    def test_una_linea_en_blanco_antes_de_la_cabecera(self):
+        ruta = csv_temporal("bancolombia.csv",
+                            "\nFecha,Documento,Descripcion,Valor\n"
+                            "14/03/2025,001,ABONO,1.500.000\n")
+        movs, _ = adapters.importar(ruta)
+        self.assertEqual(len(movs), 1)
+        self.assertEqual(movs[0].monto_origen, 1_500_000)
+
+    def test_un_preambulo_del_banco_antes_de_la_cabecera(self):
+        ruta = csv_temporal("bancolombia.csv",
+                            "BANCOLOMBIA S.A. - EXTRACTO\n"
+                            "Cuenta: ****7931\n"
+                            "\n"
+                            "Fecha,Documento,Descripcion,Valor\n"
+                            "14/03/2025,001,ABONO,1.500.000\n")
+        movs, _ = adapters.importar(ruta)
+        self.assertEqual(len(movs), 1)
+
+    def test_un_csv_normal_no_pierde_su_primera_fila(self):
+        """El control: saltar de más se comería un movimiento."""
+        ruta = csv_temporal("banco.csv",
+                            "fecha,descripcion,valor\n"
+                            "14/03/2025,uno,1.000.000\n"
+                            "15/03/2025,dos,2.000.000\n")
+        self.assertEqual(len(generico.importar(ruta)), 2)
+
+
 class TestCodificaciones(unittest.TestCase):
     """latin-1 acepta cualquier byte, así que nunca falla y el respaldo con
     `errors="replace"` es inalcanzable. Eso no es código muerto inofensivo:

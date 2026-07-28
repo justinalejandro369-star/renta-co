@@ -292,6 +292,25 @@ MUTACIONES = [
     ("M73-iban-no-se-ve", "scripts/escanear_privacidad.py",
      '("IBAN", re.compile(r"\\b[A-Z]{2}\\d{2}[A-Z0-9]{10,30}\\b"), "alta"),',
      ""),
+    # ---- ronda 6, tercera tanda ------------------------------------
+    # No hay M75. `.privacidadignore` dejó de aplicarse en `--staged`
+    # BORRANDO el filtrado, y este arnés muta código que existe: "alguien lo
+    # vuelve a agregar" no se expresa como un cambio de una línea. La
+    # conducta la cubre
+    # `test_privacidadignore_no_puede_apagar_el_hook`, que monta un repo con
+    # un glob estrecho y plausible y exige que el hook siga bloqueando.
+    ("M76-llave-sin-descripcion", "engine/ledger.py",
+     '    desc = " ".join(str(descripcion or "").split()).lower()',
+     '    desc = ""'),
+    ("M77-cache-rechaza-el-export-oficial", "engine/trm.py",
+     '                   or campos.get("vigenciadesde"))',
+     "                   or None)"),
+    ("M78-duplicado-gana-el-ultimo", "engine/trm.py",
+     "            if fecha in serie and serie[fecha] != valor:",
+     "            if False:"),
+    ("M79-preambulo-rompe-la-importacion", "engine/adapters/generico.py",
+     "        if linea.strip() and linea.count(\",\") + linea.count(\";\") >= 1:",
+     "        if True:"),
 ]
 
 

@@ -103,7 +103,13 @@ def leer_cache(ruta: Path) -> tuple[dict[date, float], list[str]]:
     with open(ruta, newline="", encoding="utf-8-sig", errors="replace") as f:
         lector = csv.DictReader(f)
         campos = {c.lower().strip(): c for c in (lector.fieldnames or [])}
-        c_fecha = campos.get("fecha") or campos.get("date")
+        # `vigenciadesde` es la columna del export CRUDO de datos.gov.co, que
+        # es exactamente el archivo al que mandan los mensajes de SinTRM
+        # ("descarga la serie manualmente de ... y guárdala como CSV"). Se
+        # rechazaba por no llamarse "fecha", así que el remedio que la
+        # herramienta ofrece no funcionaba.
+        c_fecha = (campos.get("fecha") or campos.get("date")
+                   or campos.get("vigenciadesde"))
         c_trm = campos.get("trm") or campos.get("valor") or campos.get("value")
         if not c_fecha or not c_trm:
             return {}, [
@@ -124,6 +130,17 @@ def leer_cache(ruta: Path) -> tuple[dict[date, float], list[str]]:
                 avisos.append(
                     f"{ruta.name} línea {n}: TRM {valor} fuera del rango "
                     f"plausible ({TRM_MINIMA:.0f}–{TRM_MAXIMA:.0f}). Se descarta."
+                )
+                continue
+            if fecha in serie and serie[fecha] != valor:
+                # Ganaba la última sin decir nada, y las dos son plausibles:
+                # nada delata cuál es la buena. Se conserva la primera y se
+                # avisa, porque una TRM equivocada multiplica un ingreso.
+                avisos.append(
+                    f"{ruta.name} línea {n}: {fecha} aparece dos veces con "
+                    f"valores distintos ({serie[fecha]} y {valor}). Se conserva "
+                    f"el primero. Revisa el caché: una TRM equivocada multiplica "
+                    f"el ingreso de ese día."
                 )
                 continue
             serie[fecha] = valor

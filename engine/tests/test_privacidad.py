@@ -585,6 +585,25 @@ class TestHookDePreCommit(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout)
         self.assertIn("NOMBRE DEL ARCHIVO", r.stdout)
 
+    def test_privacidadignore_no_puede_apagar_el_hook(self):
+        """Ese archivo existe para bajarle el ruido a un escaneo informativo
+        del árbol de trabajo. Lo que está en el ÍNDICE es otra cosa: es
+        exactamente lo que se va a publicar. Una línea plausible —la que
+        cualquiera escribiría pensando «eso ya está gitignored»— lo apagaba
+        entero, y el límite acumulado del 40% no dispara porque el glob es
+        legítimamente estrecho."""
+        import subprocess
+
+        (self.repo / ".privacidadignore").write_text("datos/*\n", encoding="utf-8")
+        (self.repo / "datos").mkdir()
+        (self.repo / "datos" / "cliente.csv").write_text(
+            "cedula: 1016086781\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=self.repo, check=True,
+                       capture_output=True)
+        r = self._correr("--staged")
+        self.assertEqual(r.returncode, 1,
+                         f".privacidadignore apagó el hook:\n{r.stdout}")
+
     def test_fuera_de_un_repositorio_no_finge_que_reviso(self):
         import shutil
 

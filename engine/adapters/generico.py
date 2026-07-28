@@ -465,6 +465,34 @@ def detecta(cabeceras: list[str], nombre: str = "") -> bool:
 MOJIBAKE = re.compile(r"[ÃÂ][\x80-\xbf]|ï»¿|â€")
 
 
+def _saltar_preambulo(f) -> None:
+    """Deja el archivo posicionado en la línea de la CABECERA.
+
+    `leer_cabeceras` —que decide qué adaptador reclama el archivo— salta las
+    líneas vacías; `csv.DictReader` no. Con una línea en blanco arriba, la
+    detección veía `['Fecha','Documento','Descripcion','Valor']` y la
+    importación veía `[]`, y el mensaje de error decía «no tiene columnas
+    reconocibles. Columnas: []» — contradiciéndose con lo que el propio
+    despachador acababa de leer.
+
+    No es un caso raro: más de un banco colombiano encabeza el extracto con
+    un preámbulo ("BANCOLOMBIA S.A. - EXTRACTO", "Cuenta: ...") seguido de
+    una línea vacía.
+    """
+    while True:
+        pos = f.tell()
+        linea = f.readline()
+        if not linea:                 # archivo vacío: que falle más adelante
+            f.seek(0)
+            return
+        if linea.strip() and linea.count(",") + linea.count(";") >= 1:
+            f.seek(pos)
+            return
+        if not linea.strip():
+            continue
+        # Línea con texto pero sin separadores: preámbulo del banco.
+
+
 def abrir_csv(ruta: Path, avisos: list[str] | None = None):
     """Abre un CSV probando codificaciones, en vez de mutilar el texto.
 
@@ -558,6 +586,7 @@ def importar(ruta: Path, mapa: dict[str, str] | None = None,
              avisos: list[str] | None = None) -> list[Movimiento]:
     avisos = avisos if avisos is not None else []
     with abrir_csv(ruta, avisos) as f:
+        _saltar_preambulo(f)
         lector = csv.DictReader(f)
         cols = mapa or _mapear(lector.fieldnames or [])
         if "fecha" not in cols or "monto" not in cols:

@@ -783,6 +783,38 @@ class TestGuardasDeTRM(unittest.TestCase):
         self.assertIn("no cubre", str(ctx.exception))
 
 
+class TestCacheDeTRM(unittest.TestCase):
+    def _escribir(self, contenido: str) -> Path:
+        import tempfile
+
+        ruta = Path(tempfile.mkdtemp()) / "trm-cache.csv"
+        ruta.write_text(contenido, encoding="utf-8")
+        return ruta
+
+    def test_se_acepta_el_export_crudo_de_datos_gov_co(self):
+        """Los mensajes de SinTRM mandan a descargar la serie de esa fuente
+        y guardarla como CSV. El archivo que el usuario obtiene tiene
+        columnas `valor,vigenciadesde` y se rechazaba: el remedio que la
+        herramienta ofrece no funcionaba."""
+        from engine.trm import leer_cache
+
+        serie, avisos = leer_cache(self._escribir(
+            "valor,vigenciadesde,vigenciahasta\n4409.15,2025-01-02,2025-01-02\n"))
+        self.assertEqual(serie[date(2025, 1, 2)], 4409.15)
+        self.assertEqual(avisos, [])
+
+    def test_una_fecha_duplicada_con_valores_distintos_avisa(self):
+        """Ganaba la última, en silencio, y las dos son plausibles: nada
+        delata cuál es la buena. Una TRM equivocada multiplica el ingreso de
+        ese día."""
+        from engine.trm import leer_cache
+
+        serie, avisos = leer_cache(self._escribir(
+            "fecha,trm\n2025-01-02,4409.15\n2025-01-02,3000.00\n"))
+        self.assertEqual(serie[date(2025, 1, 2)], 4409.15)
+        self.assertTrue(any("dos veces" in a for a in avisos), avisos)
+
+
 class TestEntradasPorFuente(unittest.TestCase):
     """Alimenta la cifra de consignaciones del umbral de IVA. Si cuenta las
     SALIDAS, el numerador del art. 437 par. 3 num. 6 se infla con dinero que

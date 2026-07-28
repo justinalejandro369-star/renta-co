@@ -42,6 +42,7 @@ class ErrorSinRespaldo(ValueError):
 
 def leer_cabeceras(ruta: Path) -> list[str]:
     with generico.abrir_csv(ruta) as f:
+        generico._saltar_preambulo(f)
         for fila in csv.reader(f):
             if fila and any(c.strip() for c in fila):
                 return [c.strip() for c in fila]

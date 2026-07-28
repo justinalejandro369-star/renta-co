@@ -701,18 +701,21 @@ def main(argv=None) -> int:
         except SinIndice as e:
             print(f"✗ {e}")
             return 1
-        globs = globs_ignorados(raiz_repo, args.estricto)
-        if globs:
-            antes = len(resultados)
-            rutas = [Path(r) for r, _ in resultados]
-            conservadas, avisos_globs = aplicar_ignorados(rutas, globs, raiz_repo)
-            conservadas = {str(x) for x in conservadas}
-            resultados = [(r, h) for r, h in resultados if r in conservadas]
-            for aviso in avisos_globs:
-                print(f"⚠ {aviso}")
-            if antes - len(resultados):
-                print(f"({antes - len(resultados)} archivo(s) del índice omitidos "
-                      f"por {ARCHIVO_IGNORADOS})")
+        # `.privacidadignore` NO se aplica acá, a propósito.
+        #
+        # Ese archivo existe para bajarle el ruido a un ESCANEO informativo
+        # sobre un árbol de trabajo. Lo que está en el índice es otra cosa:
+        # es exactamente lo que se va a publicar. Permitir excluir algo de
+        # ahí es permitir apagar el guardián en la única puerta que importa,
+        # y una línea plausible —`expediente/*`, que cualquiera escribiría
+        # pensando «eso ya está gitignored»— lo apagaba entero.
+        #
+        # Si un archivo del índice da un falso positivo, la salida es
+        # `git commit --no-verify`, que deja rastro de la decisión, y no un
+        # archivo de configuración que la vuelve permanente y silenciosa.
+        if globs_ignorados(raiz_repo, args.estricto):
+            print(f"({ARCHIVO_IGNORADOS} NO se aplica a --staged: lo que está "
+                  f"en el índice es lo que se va a publicar.)")
     else:
         archivos = archivos_de(args.objetivos or ["."])
         globs = globs_ignorados(raiz_repo, args.estricto)
