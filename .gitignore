@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────
+# DATOS PERSONALES — nunca deben entrar a control de versiones
+# ─────────────────────────────────────────────────────────────
+expediente/
+perfil.toml
+!templates/perfil.ejemplo.toml
+!expediente.ejemplo/**
+
+# Documentos que casi siempre son soportes reales
+*.pdf
+*.xlsx
+*.xls
+*.zip
+*.rar
+!expediente.ejemplo/**/*.csv
+
+# Salidas del motor
+ledger*.csv
+escenarios*.csv
+trm-cache.csv
+!expediente.ejemplo/**
+
+# ─────────────────────────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# ─────────────────────────────────────────────────────────────
+# Sistema y editores
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
