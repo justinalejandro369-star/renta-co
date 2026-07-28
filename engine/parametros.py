@@ -57,13 +57,17 @@ class Parametros:
         return uvt * self.uvt
 
     def fuente(self, ruta: str) -> str:
-        """Devuelve la fuente citada del bloque que contiene esa ruta."""
+        """Fuente citada del bloque que contiene esa ruta.
+
+        Solo sube UN nivel: hasta el bloque que declara el valor. Subiendo
+        hasta la raíz devolvía la fuente de un bloque padre para una cifra
+        que el hijo cambió, o sea citaba una norma que no la respalda.
+        """
         partes = ruta.split(".")
-        while partes:
-            f = self.get(".".join(partes) + ".fuente")
+        if len(partes) > 1:
+            f = self.get(".".join(partes[:-1]) + ".fuente")
             if f:
                 return f
-            partes.pop()
         return "sin fuente citada"
 
     @property
@@ -102,6 +106,11 @@ def _leer_toml(ruta: Path) -> dict:
         return tomllib.load(f)
 
 
+# Bloques que NUNCA se heredan: su contenido es específico del año y
+# mostrarlo copiado del año anterior no es incompleto, es falso.
+NO_HEREDABLES = {"plazos"}
+
+
 def _fusionar(base: dict, encima: dict, raiz: bool = True) -> tuple[dict, set[str]]:
     """Fusiona `encima` sobre `base`. Devuelve el resultado y qué se heredó.
 
@@ -110,8 +119,11 @@ def _fusionar(base: dict, encima: dict, raiz: bool = True) -> tuple[dict, set[st
     que infla la advertencia y le quita valor a la que sí importa.
     """
     resultado = dict(base)
+    if raiz:
+        for bloque in NO_HEREDABLES:
+            resultado.pop(bloque, None)
     heredados = {
-        k for k in base
+        k for k in resultado
         if k not in encima and not (raiz and k == "meta")
     }
     for clave, valor in encima.items():

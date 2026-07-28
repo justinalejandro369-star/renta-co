@@ -137,6 +137,47 @@ def invariantes(par) -> list[str]:
         if r["mejor_ruta"] == "B" and b > a:
             fallos.append(f"{pid}: eligió B siendo A mejor")
 
+        # Las verificaciones de riesgo y los agregados del comparativo NO se
+        # aseveraban en ninguna capa: una mutación en verificar_obligaciones,
+        # en tarifa_marginal o en el patrimonio pasaba el benchmark entero.
+        ids = {v["id"] for v in r["verificaciones"]}
+        if "OBL-01" not in ids or "R-01" not in ids:
+            fallos.append(f"{pid}: faltan verificaciones básicas (OBL-01/R-01)")
+        for v in r["verificaciones"]:
+            if v["severidad"] not in ("alta", "media", "info"):
+                fallos.append(f"{pid}/{v['id']}: severidad inválida {v['severidad']!r}")
+            if not v.get("estado") or not v.get("detalle"):
+                fallos.append(f"{pid}/{v['id']}: verificación sin estado o detalle")
+
+        marginal = r["tarifa_marginal"]
+        esperada = next(
+            (x["tarifa"] for x in par.exigir("tarifa.rangos")
+             if x["hasta_uvt"] == 0
+             or r["rutas"][r["mejor_ruta"]].renta_liquida / par.uvt <= x["hasta_uvt"]),
+            None,
+        )
+        if marginal != esperada:
+            fallos.append(f"{pid}: tarifa marginal {marginal} != {esperada}")
+
+        if round(r["patrimonio_liquido"]) != round(r["patrimonio_bruto"] - r["pasivos"]):
+            fallos.append(f"{pid}: patrimonio líquido no cuadra con bruto − pasivos")
+
+        # Los renglones son lo que se copia al formulario: si cambian de
+        # etiqueta o de orden, el comparativo deja de ser legible aunque los
+        # totales sigan bien.
+        for ruta in ("A", "B"):
+            L = r["rutas"][ruta]
+            if "SALDO" not in L.renglones[-1].concepto:
+                fallos.append(f"{pid}/{ruta}: el último renglón no es el saldo")
+            if not any("RENTA LÍQUIDA" in x.concepto for x in L.renglones):
+                fallos.append(f"{pid}/{ruta}: falta el renglón de renta líquida")
+            sin_fuente = [
+                x.concepto for x in L.renglones
+                if x.concepto.startswith("−") and not x.fuente and x.valor
+            ]
+            if sin_fuente:
+                fallos.append(f"{pid}/{ruta}: renglones sin fuente: {sin_fuente[:2]}")
+
         # La sensibilidad nunca reporta ahorros no positivos, y viene
         # ordenada DENTRO de cada grupo. El orden entre grupos es
         # deliberado: primero lo que solo exige un papel, después lo que
@@ -172,6 +213,7 @@ CAMPOS = [
     ("impuesto_neto", "impuesto_neto"),
     ("saldo", "saldo"),
     ("tope_conjunto", "tope_conjunto"),
+    ("rechazado_por_tope", "rechazado"),
 ]
 
 
@@ -309,6 +351,23 @@ def main(argv=None) -> int:
                 print(f"    · {f}")
         else:
             print(f"✓ {etiqueta}")
+
+    # El benchmark solo corría AG2025, así que la herencia de parámetros —y
+    # sus validaciones— no se ejercitaban nunca.
+    print()
+    otros = [a for a in P.anios_disponibles() if a != 2025]
+    for anio in otros:
+        try:
+            p_otro = P.cargar(anio)
+            personas_ok = sum(
+                1 for persona in PERSONAS
+                if comparar(construir_perfil(persona), p_otro)["rutas"]["A"].impuesto >= 0
+            )
+            print(f"  ✓ AG{anio} carga y liquida las {personas_ok} personas "
+                  f"(UVT {cop(p_otro.uvt)}, {len(p_otro.advertencias())} advertencia(s))")
+        except Exception as e:
+            print(f"  ✗ AG{anio}: {e.__class__.__name__}: {e}")
+            resultados.append((f"AG{anio}", [str(e)]))
 
     ms = rendimiento(par)
     print()

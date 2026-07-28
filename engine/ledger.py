@@ -206,6 +206,18 @@ class Ledger:
             [m for m in self.movimientos if m.fecha.year == anio], list(self.avisos)
         )
 
+    @staticmethod
+    def _neutralizar(valor: str) -> str:
+        """Evita que Excel interprete una descripción como fórmula.
+
+        El ledger se lo manda el usuario a su contador por correo. Una
+        descripción que empiece por =, +, - o @ la ejecuta la hoja de
+        cálculo al abrir el archivo, y esas descripciones vienen de un CSV
+        de terceros que nadie revisó.
+        """
+        texto = str(valor)
+        return "'" + texto if texto[:1] in ("=", "+", "-", "@", "\t", "\r") else texto
+
     def escribir_csv(self, ruta: Path) -> None:
         ruta.parent.mkdir(parents=True, exist_ok=True)
         with open(ruta, "w", newline="", encoding="utf-8") as f:
@@ -216,7 +228,10 @@ class Ledger:
             ])
             for m in sorted(self.movimientos, key=lambda x: x.fecha):
                 w.writerow([
-                    m.fecha.isoformat(), m.descripcion, m.contraparte, m.moneda,
+                    m.fecha.isoformat(),
+                    self._neutralizar(m.descripcion),
+                    self._neutralizar(m.contraparte),
+                    m.moneda,
                     f"{m.monto_origen:.2f}", f"{m.trm:.2f}" if m.trm else "",
                     m.monto_cop, m.categoria, m.fuente,
                 ])
@@ -229,10 +244,20 @@ class Ledger:
                 "rentas_capital": round(self.total("ingreso_capital")),
             },
             "costos": {
-                "otros": round(abs(self.total("costo"))),
+                # Suma de salidas, no valor absoluto del neto. Con abs() sobre
+                # el total, un reembolso clasificado como costo restaba del
+                # gasto deducible en vez de reducirlo explícitamente, y el
+                # signo del resultado dependía de cuál pesara más.
+                "otros": round(sum(
+                    -m.monto_cop for m in self.movimientos
+                    if m.categoria == "costo" and m.monto_cop < 0
+                )),
             },
             "anticipos": {
-                "retenciones_practicadas": round(abs(self.total("retencion"))),
+                "retenciones_practicadas": round(sum(
+                    abs(m.monto_cop) for m in self.movimientos
+                    if m.categoria == "retencion"
+                )),
             },
             # consignaciones_totales_anio NO se llena desde el ledger: exige
             # separar por origen gravado con IVA y descartar duplicados entre
@@ -296,9 +321,17 @@ def escribir_sugerencia_perfil(ledger: Ledger, destino: Path) -> Path:
 def comparar_trm_diaria_vs_promedio(ledger: Ledger, trm: TRM) -> dict:
     """Cuánta base gravable mueve usar promedio en vez de TRM diaria.
 
+    El promedio se calcula sobre las fechas DEL LEDGER, no sobre el caché
+    entero: el caché puede abarcar varios años y compararlo contra los
+    ingresos de uno solo daba una diferencia inventada.
+    """
+    """Cuánta base gravable mueve usar promedio en vez de TRM diaria.
+
     Sirve para reconciliar cuando el contador usó promedio.
     """
-    prom = trm.promedio()
+    fechas = {m.fecha for m in ledger.movimientos if m.moneda.upper() != "COP"}
+    valores = [trm.serie[f] for f in fechas if f in trm.serie]
+    prom = sum(valores) / len(valores) if valores else trm.promedio()
     diaria = sum(
         m.monto_cop for m in ledger.movimientos
         if m.categoria.startswith("ingreso") and m.moneda.upper() != "COP"

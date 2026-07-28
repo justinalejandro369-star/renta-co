@@ -36,7 +36,7 @@ class ErrorSinRespaldo(ValueError):
 
 
 def leer_cabeceras(ruta: Path) -> list[str]:
-    with open(ruta, newline="", encoding="utf-8-sig", errors="replace") as f:
+    with generico.abrir_csv(ruta) as f:
         for fila in csv.reader(f):
             if fila and any(c.strip() for c in fila):
                 return [c.strip() for c in fila]

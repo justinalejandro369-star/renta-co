@@ -11,24 +11,31 @@ import csv
 from pathlib import Path
 
 from ..ledger import Movimiento
-from .generico import parse_fecha, parse_monto
+from .generico import abrir_csv, parse_fecha, parse_monto
 
 NOMBRE = "Wise"
 
-SENALES = {"wise", "transferwise", "running balance", "exchange from", "exchange to"}
+# "wise" como subcadena reclamaba archivos llamados "otherwise.csv". Se pide
+# la palabra completa.
+SENALES = {"transferwise", "running balance", "exchange from", "exchange to"}
 
+# El orden importa: gana la PRIMERA que coincide. Los ingresos van antes que
+# los traslados porque "Received money from Cliente — converted to COP" trae
+# las dos palabras, y clasificarlo como traslado borra un ingreso del ledger.
 REGLAS = [
-    (("converted", "exchange from", "exchange to", "balance transfer",
+    (("received money from", "incoming payment", "deposit from"), "ingreso_trabajo"),
+    (("exchange from", "exchange to", "balance transfer", "converted",
       "sent money to your", "topped up"), "traslado"),
-    (("fee", "wise charged"), "costo"),
-    (("received money from", "incoming", "deposit"), "ingreso_trabajo"),
+    (("wise charged", "fee for", "transfer fee"), "costo"),
     (("sent money to",), "desconocido"),   # puede ser costo o gasto personal
 ]
 
 
 def detecta(cabeceras: list[str], nombre: str = "") -> bool:
     texto = " ".join(c.lower() for c in cabeceras)
-    if "wise" in nombre.lower():
+    import re as _re
+
+    if _re.search(r"\bwise\b", nombre.lower()):
         return True
     tiene_wise = any(s in texto for s in SENALES)
     tiene_forma = "amount" in texto and ("description" in texto or "reference" in texto)
@@ -45,7 +52,7 @@ def _clasificar(descripcion: str) -> str:
 
 def importar(ruta: Path) -> list[Movimiento]:
     movimientos = []
-    with open(ruta, newline="", encoding="utf-8-sig", errors="replace") as f:
+    with abrir_csv(ruta) as f:
         lector = csv.DictReader(f)
         campos = {c.lower().strip(): c for c in (lector.fieldnames or [])}
 

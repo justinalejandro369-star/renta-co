@@ -100,9 +100,10 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     capital = p.get("ingresos.rentas_capital")
     otras = p.get("ingresos.otras_rentas_no_laborales")
 
-    L._r("Rentas de trabajo (honorarios y compensación por servicios)", trabajo, +1)
-    L._r("Rentas de capital", capital, +1)
-    L._r("Otras rentas no laborales", otras, +1)
+    L._r("Rentas de trabajo (honorarios y compensación por servicios)", trabajo, +1,
+         fuente="ET art. 335 y art. 103")
+    L._r("Rentas de capital", capital, +1, fuente="ET art. 338")
+    L._r("Otras rentas no laborales", otras, +1, fuente="ET art. 340")
     brutos = trabajo + capital + otras
     L._r("= Total ingresos brutos cédula general", brutos)
 
@@ -281,8 +282,14 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
 
     retenciones = p.get("anticipos.retenciones_practicadas")
     saldo_favor_ant = p.get("anticipos.saldo_a_favor_anio_anterior")
-    L._r("− Retenciones practicadas en el año", retenciones, -1)
-    L._r("− Saldo a favor del año anterior", saldo_favor_ant, -1)
+    L._r("− Retenciones practicadas en el año", retenciones, -1,
+         nota="Lo que terceros ya le giraron a la DIAN por cuenta tuya. Se "
+              "imputa al impuesto, no a la base. Suma de los certificados de "
+              "retención de cada pagador.",
+         fuente="ET art. 373")
+    L._r("− Saldo a favor del año anterior", saldo_favor_ant, -1,
+         nota="Solo si no lo pediste en devolución ni lo imputaste ya.",
+         fuente="ET art. 815")
 
     L.saldo = L.impuesto_neto - retenciones - saldo_favor_ant
     L._r("= SALDO A PAGAR" if L.saldo >= 0 else "= SALDO A FAVOR", abs(L.saldo))

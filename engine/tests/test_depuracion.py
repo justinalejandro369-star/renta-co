@@ -743,3 +743,86 @@ class TestRegresionesRonda3(unittest.TestCase):
         self.assertEqual(ledger.total("traslado"), 0)
         self.assertIn("traslado", ledger.resumen())
         self.assertTrue(any("traslados" in a.lower() for a in ledger.validar()))
+
+
+class TestClasificacionYSalidas(unittest.TestCase):
+    """Reglas de clasificación y escritura del ledger."""
+
+    def _ledger(self, movs):
+        from engine.ledger import Ledger
+
+        return Ledger(movs).convertir(None)
+
+    def _mov(self, desc, monto, categoria="desconocido"):
+        from datetime import date as _date
+
+        from engine.ledger import Movimiento
+
+        return Movimiento(_date(2025, 5, 5), desc, monto, "COP", categoria)
+
+    def test_pago_a_tercero_por_nequi_no_es_traslado(self):
+        """"NEQUI" y "TRASLADO" como subcadena convertían en traslado
+        cualquier pago a un tercero, que es como se le paga a medio país."""
+        from engine.adapters.bancolombia import _clasificar
+
+        self.assertNotEqual(_clasificar("PAGO NEQUI A CONTRATISTA"), "traslado")
+        self.assertNotEqual(_clasificar("TRANSFERENCIA NEQUI PROVEEDOR"), "traslado")
+        self.assertEqual(_clasificar("TRASLADO ENTRE CUENTAS PROPIAS"), "traslado")
+
+    def test_ingreso_convertido_sigue_siendo_ingreso(self):
+        """"Received money from Cliente — converted to COP" trae las dos
+        palabras; clasificarlo como traslado borra un ingreso del ledger."""
+        from engine.adapters.wise import _clasificar
+
+        self.assertEqual(
+            _clasificar("Received money from Cliente SAS, converted to COP"),
+            "ingreso_trabajo",
+        )
+
+    def test_wise_no_reclama_otherwise(self):
+        from engine.adapters import wise
+
+        self.assertFalse(wise.detecta(["Fecha", "Valor"], "otherwise.csv"))
+
+    def test_csv_del_ledger_neutraliza_formulas(self):
+        """El ledger se lo manda el usuario a su contador por correo, y las
+        descripciones vienen de un CSV de terceros."""
+        import csv as _csv
+        import tempfile
+
+        ledger = self._ledger([
+            self._mov("=HYPERLINK(\"http://x\",\"pago\")", 1000, "costo"),
+            self._mov("pago normal", 2000, "costo"),
+        ])
+        destino = Path(tempfile.mkdtemp()) / "ledger.csv"
+        ledger.escribir_csv(destino)
+        with open(destino, newline="", encoding="utf-8") as f:
+            filas = list(_csv.DictReader(f))
+        peligrosas = [r for r in filas if r["descripcion"].startswith("=")]
+        self.assertEqual(peligrosas, [], "una descripción quedó como fórmula")
+        self.assertTrue(any(r["descripcion"] == "pago normal" for r in filas))
+
+    def test_costos_suman_salidas_no_el_neto(self):
+        """abs() sobre el total hacía que un reembolso clasificado como costo
+        restara del gasto deducible."""
+        ledger = self._ledger([
+            self._mov("pago a contratista", -5_000_000, "costo"),
+            self._mov("reembolso del contratista", 1_000_000, "costo"),
+        ])
+        self.assertEqual(ledger.a_perfil()["costos"]["otros"], 5_000_000)
+
+    def test_extracto_en_latin1_conserva_las_tildes(self):
+        """Con errors='replace' se perdían las tildes y con ellas las
+        palabras que usan las reglas de clasificación."""
+        import tempfile
+
+        from engine.adapters.generico import abrir_csv
+
+        ruta = Path(tempfile.mkdtemp()) / "extracto.csv"
+        ruta.write_bytes(
+            "fecha,descripcion,valor\n05/05/2025,RETENCIÓN EN LA FUENTE,-1000\n"
+            .encode("latin-1")
+        )
+        with abrir_csv(ruta) as f:
+            contenido = f.read()
+        self.assertIn("RETENCIÓN", contenido)

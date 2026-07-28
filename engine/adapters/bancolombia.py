@@ -16,18 +16,21 @@ import csv
 from pathlib import Path
 
 from ..ledger import Movimiento
-from .generico import parse_fecha, parse_monto
+from .generico import abrir_csv, parse_fecha, parse_monto
 
 NOMBRE = "Bancolombia"
 
 SENALES = {"bancolombia", "sucursal", "descripcion", "descripción", "documento"}
 
+# Gana la PRIMERA que coincide. Los traslados van de últimos y con frases
+# completas: "NEQUI" y "TRASLADO" como subcadenas convertían en traslado
+# cualquier pago a un tercero por Nequi, que es como se le paga a medio país.
 REGLAS = [
     (("gmf", "4x1000", "4 x 1000", "gravamen movimiento"), "gasto_personal"),
     (("retencion", "retención", "rte fte", "retefuente"), "retencion"),
     (("rendimiento", "intereses ganados", "abono intereses"), "ingreso_capital"),
-    (("traslado", "transferencia a cuenta propia", "ahorro a la mano", "nequi"),
-     "traslado"),
+    (("traslado entre cuentas propias", "transferencia a cuenta propia",
+      "traslado a ahorro a la mano", "traslado cuenta propia"), "traslado"),
 ]
 
 
@@ -48,7 +51,7 @@ def _clasificar(descripcion: str) -> str:
 
 def importar(ruta: Path) -> list[Movimiento]:
     movimientos = []
-    with open(ruta, newline="", encoding="utf-8-sig", errors="replace") as f:
+    with abrir_csv(ruta) as f:
         lector = csv.DictReader(f)
         campos = {c.lower().strip(): c for c in (lector.fieldnames or [])}
 

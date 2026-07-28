@@ -20,7 +20,7 @@ import csv
 from pathlib import Path
 
 from ..ledger import Movimiento
-from .generico import parse_fecha, parse_monto
+from .generico import abrir_csv, parse_fecha, parse_monto
 
 NOMBRE = "Deel"
 
@@ -90,7 +90,7 @@ def _clasificar(tipo: str, descripcion: str, monto: float) -> str:
 
 def importar(ruta: Path) -> list[Movimiento]:
     movimientos = []
-    with open(ruta, newline="", encoding="utf-8-sig", errors="replace") as f:
+    with abrir_csv(ruta) as f:
         lector = csv.DictReader(f)
         campos = {c.lower().strip(): c for c in (lector.fieldnames or [])}
 

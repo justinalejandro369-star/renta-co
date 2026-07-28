@@ -210,8 +210,26 @@ def detecta(cabeceras: list[str], nombre: str = "") -> bool:
     return "fecha" in mapa and "monto" in mapa
 
 
+def abrir_csv(ruta: Path):
+    """Abre un CSV probando codificaciones, en vez de mutilar el texto.
+
+    Con `errors="replace"` un extracto en latin-1 —que es lo que exporta más
+    de un banco colombiano— perdía todas las tildes y con ellas las palabras
+    que usan las reglas de clasificación. Peor: la detección del adaptador
+    fallaba y el archivo caía al genérico.
+    """
+    for encoding in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            with open(ruta, newline="", encoding=encoding) as f:
+                f.read()
+            return open(ruta, newline="", encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+    return open(ruta, newline="", encoding="utf-8", errors="replace")
+
+
 def importar(ruta: Path, mapa: dict[str, str] | None = None) -> list[Movimiento]:
-    with open(ruta, newline="", encoding="utf-8-sig", errors="replace") as f:
+    with abrir_csv(ruta) as f:
         lector = csv.DictReader(f)
         cols = mapa or _mapear(lector.fieldnames or [])
         if "fecha" not in cols or "monto" not in cols:
@@ -221,6 +239,7 @@ def importar(ruta: Path, mapa: dict[str, str] | None = None) -> list[Movimiento]
                 f"importar(ruta, {{'fecha': 'MiColumnaFecha', 'monto': 'MiColumnaValor'}})"
             )
         movimientos = []
+        descartadas = 0
         for i, fila in enumerate(lector, start=2):
             crudo = (fila.get(cols["fecha"]) or "").strip()
             if not crudo:
@@ -231,6 +250,11 @@ def importar(ruta: Path, mapa: dict[str, str] | None = None) -> list[Movimiento]
             except ValueError as e:
                 raise ValueError(f"{ruta.name} línea {i}: {e}") from e
             if monto == 0:
+                # Las filas en cero se descartan, pero no en silencio: si un
+                # extracto entero sale vacío, saber cuántas se botaron es la
+                # diferencia entre "no había movimientos" y "se leyó mal la
+                # columna de monto".
+                descartadas += 1
                 continue
             movimientos.append(Movimiento(
                 fecha=fecha,
@@ -241,4 +265,10 @@ def importar(ruta: Path, mapa: dict[str, str] | None = None) -> list[Movimiento]
                 categoria="desconocido",
                 fuente=ruta.name,
             ))
+    if descartadas and not movimientos:
+        raise ValueError(
+            f"{ruta.name}: las {descartadas} filas con datos tienen monto cero. "
+            f"Probablemente se identificó mal la columna de monto — columnas "
+            f"disponibles: {cols}."
+        )
     return movimientos
