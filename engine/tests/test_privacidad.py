@@ -200,3 +200,28 @@ class TestRepositorio(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestUmbralAcumulado(unittest.TestCase):
+    """Medir cada glob contra el total dejaba pasar varios globs pequeños
+    que juntos apagaban el escáner."""
+
+    def _archivos(self, n=100, dirs=4):
+        return [Path(f"dir{i % dirs}/a{i}.txt") for i in range(n)]
+
+    def test_varios_globs_pequenos_no_apagan_el_escaner(self):
+        archivos = self._archivos()
+        quedan, avisos = esc.aplicar_ignorados(
+            archivos, ["dir0/*", "dir1/*", "dir2/*", "dir3/*"]
+        )
+        self.assertGreater(len(quedan), len(archivos) * 0.5,
+                           "cuatro globs del 25% vaciaron el escaneo")
+        self.assertGreaterEqual(len(avisos), 3)
+
+    def test_excepciones_puntuales_siguen_funcionando(self):
+        archivos = self._archivos()
+        quedan, avisos = esc.aplicar_ignorados(
+            archivos, ["dir0/a0.txt", "dir1/a1.txt"]
+        )
+        self.assertEqual(len(quedan), 98)
+        self.assertEqual(avisos, [])

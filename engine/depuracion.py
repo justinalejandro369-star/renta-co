@@ -375,9 +375,28 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         # La cantidad MÍNIMA que alcanza el máximo: perseguir soportes de más
         # no aporta nada y cuesta trámites.
         suficientes = min(n for n, v in por_cantidad.items() if v == mejor_ahorro)
-        extra = (f" Acreditar más de {suficientes} no agrega nada: la vía que "
-                 f"gana en tu caso no depende de cuántos sean."
-                 if suficientes < max_dep else "")
+
+        # El motivo por el que sobran depende del caso, y decir el equivocado
+        # es peor que no decir ninguno: de esa explicación el usuario deduce
+        # qué esperar el año siguiente.
+        alt = p.copia_con(deducciones__dependientes=suficientes)
+        via = liquidar(alt, par, "A").dependientes_via
+        if suficientes < max_dep:
+            motivo = ("la vía que gana en tu caso es la del 10% de la renta de "
+                      "trabajo (art. 387), que no depende de cuántos sean"
+                      if "10%" in via
+                      else "tu base gravable ya llegó al tramo de tarifa 0%, así "
+                           "que restar más no cambia el impuesto")
+            extra = f" Acreditar más de {suficientes} no agrega nada: {motivo}."
+        else:
+            # Con la vía de 72 UVT cada dependiente vale por separado. Quien
+            # solo pueda acreditar uno necesita saber cuánto vale ESE uno, no
+            # solo el total de cuatro.
+            primero = por_cantidad[actuales + 1]
+            extra = (f" Cada dependiente cuenta por separado: el primero vale "
+                     f"{_cop(primero)} y los {suficientes - actuales} juntos, "
+                     f"{_cop(mejor_ahorro)}."
+                     if suficientes > actuales + 1 else "")
         probar(
             f"Acreditar {suficientes} dependiente(s) — hoy tienes {actuales}",
             {"deducciones__dependientes": suficientes},

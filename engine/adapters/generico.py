@@ -10,6 +10,7 @@ que clasifiques a mano antes que adivinar mal el signo de un ingreso.
 from __future__ import annotations
 
 import csv
+import math
 import re
 from datetime import datetime
 from pathlib import Path
@@ -69,35 +70,39 @@ def parse_fecha(texto: str):
 def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
     """Convierte un monto a float. Formato colombiano y anglosajón.
 
-    `sep_decimal` ('.' o ',') elimina la ambigüedad y los adaptadores que
-    conocen su fuente deberían pasarlo siempre. Bancolombia escribe
-    "1.234.567,89"; Deel y Wise escriben "1234567.89".
+    La decisión la toma la ESTRUCTURA del número, no una pista externa:
 
-    Sin pista, se aplica esta heurística, que tiene un caso ambiguo real:
+        Un separador seguido de exactamente TRES dígitos es de miles.
+        Un separador seguido de uno, dos o cuatro o más dígitos es decimal.
+        El decimal solo puede ser el último separador, y solo puede haber uno.
 
-      "1.234,56"  → ambos separadores: decimal es el último       → 1234.56
-      "1,234.56"  → ambos separadores: decimal es el último       → 1234.56
-      "1.234.567" → dos o más puntos: son miles                   → 1234567
-      "3800.00"   → un punto, 2 dígitos detrás: decimal           → 3800.0
-      "1.234"     → un punto, 3 dígitos detrás: se asume MILES    → 1234
-      "1,50"      → una coma, 2 dígitos detrás: decimal           → 1.5
+    Con eso, todo se resuelve sin ambigüedad y en las dos convenciones:
 
-    El ambiguo es "1.234": vale 1.234 en USD y 1234 en COP. Se resuelve a
-    favor de COP porque es lo que domina en extractos colombianos. Pasa
-    `sep_decimal` si tu fuente hace lo contrario.
+        "1.234.567"    → 1234567      tres y tres: miles
+        "1.234.567,89" → 1234567.89   miles, miles, decimal
+        "1,234,567.89" → 1234567.89   igual al revés
+        "3800.00"      → 3800.0       dos dígitos detrás: decimal
+        "1,50"         → 1.5
+        "0.00"         → 0.0
+        "1.2.3"        → error        el primer separador sería decimal y no es el último
+        "12,34,567"    → error        mismo motivo
+        "1..2"         → error
 
-    VALIDACIÓN — por qué se hace ANTES de tocar los separadores
-    ───────────────────────────────────────────────────────────
-    Un intento anterior validaba con una expresión regular al final, sobre
-    el texto ya normalizado. No servía de nada: la normalización es
-    justamente la que fabrica el número creíble. "1.2.3" llegaba al regex
-    convertido en "123" y pasaba como ciento veintitrés.
+    El único caso genuinamente ambiguo —"1.234", que vale mil doscientos
+    treinta y cuatro en Colombia y uno coma doscientos treinta y cuatro en
+    inglés— se resuelve como MILES. Un monto con tres decimales es rarísimo
+    en dinero; un grupo de miles es lo normal.
 
-    Acá se valida la ESTRUCTURA del token original: dígitos ASCII separados
-    por un solo punto o una sola coma, y los grupos de miles de exactamente
-    tres dígitos. Así "1.2.3", "1..2" y "12,34,567" fallan por lo que son —
-    montos malformados— y no se convierten en una cifra que después nadie
-    puede rastrear en la base gravable.
+    `sep_decimal` queda como pista informativa y ya no decide nada. Antes sí
+    decidía, y ahí estaba el problema: con `sep_decimal="."` —que es lo que
+    pasan los adaptadores de Deel y Wise— "1.234.567" se partía por el
+    último punto y salía 1234.567. Un CSV colombiano en pesos reclamado por
+    esos adaptadores perdía un factor de mil, en silencio. La estructura no
+    se deja engañar así.
+
+    Validación: dígitos ASCII únicamente. `float()` acepta dígitos árabes y
+    de ancho completo, y notación científica; nada de eso es un monto que
+    deba entrar callado a un ledger.
     """
     original = str(texto)
     t = original.strip().replace("$", "").replace(" ", "").replace("\xa0", "")
@@ -118,44 +123,37 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
         negativo = t[0] == "-"
         t = t[1:]
 
-    # [0-9] es ASCII a propósito: float() acepta dígitos árabes y de ancho
-    # completo, y "١٢٣" no es un monto que deba entrar callado a un ledger.
     if not _TOKEN.fullmatch(t):
         raise malo("solo se aceptan dígitos separados por un punto o una coma")
 
     grupos = re.split(r"[.,]", t)
-    separadores = [c for c in t if c in ".,"]
+    seps = [c for c in t if c in ".,"]
 
-    if sep_decimal in (".", ","):
-        decimal = sep_decimal in separadores
-    elif "," in separadores and "." in separadores:
-        decimal = True                       # el último separador es el decimal
-    elif len(separadores) == 1:
-        # Un solo separador: es decimal salvo que deje exactamente tres
-        # dígitos detrás, que es la forma de un grupo de miles.
-        decimal = len(grupos[-1]) != 3
+    # Clasificar cada separador por el tamaño del grupo que le sigue.
+    decimales = [i for i, g in enumerate(grupos[1:]) if len(g) != 3]
+    if len(decimales) > 1:
+        raise malo("hay más de un separador decimal")
+    if decimales and decimales[0] != len(seps) - 1:
+        raise malo(
+            f"el separador {seps[decimales[0]]!r} parece decimal pero no es el "
+            f"último: los grupos de miles llevan exactamente tres dígitos"
+        )
+
+    if decimales:
+        entero_grupos, fraccion = grupos[:-1], grupos[-1]
+        seps_miles = seps[:-1]
     else:
-        decimal = False                      # varios separadores iguales: miles
+        entero_grupos, fraccion = grupos, ""
+        seps_miles = seps
 
-    if sep_decimal in (".", ",") and decimal:
-        # Con pista explícita, el decimal es el ÚLTIMO separador de ese tipo.
-        corte = t.rfind(sep_decimal)
-        entero, fraccion = t[:corte], t[corte + 1:]
-    elif decimal:
-        corte = max(t.rfind("."), t.rfind(","))
-        entero, fraccion = t[:corte], t[corte + 1:]
-    else:
-        entero, fraccion = t, ""
+    if seps_miles and len(set(seps_miles)) > 1:
+        raise malo("mezcla puntos y comas como separadores de miles")
+    if len(entero_grupos) > 1 and len(entero_grupos[0]) > 3:
+        raise malo(f"el primer grupo de miles tiene {len(entero_grupos[0])} dígitos")
 
-    partes = [p for p in re.split(r"[.,]", entero) if p != ""] or ["0"]
-    if len(partes) > 1:
-        if len(partes[0]) > 3:
-            raise malo(f"el primer grupo de miles tiene {len(partes[0])} dígitos")
-        for p in partes[1:]:
-            if len(p) != 3:
-                raise malo(f"el grupo de miles {p!r} no tiene tres dígitos")
-
-    valor = float("".join(partes) + ("." + fraccion if fraccion else ""))
+    valor = float("".join(entero_grupos) + ("." + fraccion if fraccion else ""))
+    if not math.isfinite(valor):
+        raise malo("el número es tan grande que no cabe en un float")
     return -valor if negativo else valor
 
 

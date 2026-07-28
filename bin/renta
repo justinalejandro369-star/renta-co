@@ -56,48 +56,61 @@ absolutizar() {
     esac
 }
 
-SUBCOMANDO=$1
+SUBCOMANDO=${1:-}
 [ $# -gt 0 ] && shift
 
-ARGS=""
+# Se reconstruyen los argumentos con `set -- "$@" "$arg"`, que preserva
+# EXACTAMENTE cada uno: espacios, comillas, saltos de línea y cadenas
+# vacías. Una versión anterior los unía con saltos de línea y los volvía a
+# partir con IFS: perdía los argumentos vacíos, partía en dos los que
+# contenían un salto de línea, y como no desactivaba el globbing, un
+# expediente llamado "expediente[2]" se expandía a otro directorio.
+set -f                      # sin expansión de comodines
+TIENE_EXPEDIENTE=0
 ESPERA_RUTA=0
-for arg in "$@"; do
+N=$#
+I=0
+while [ "$I" -lt "$N" ]; do
+    arg=$1
+    shift
     if [ "$ESPERA_RUTA" = "1" ]; then
         arg=$(absolutizar "$arg")
         ESPERA_RUTA=0
-    elif [ "$arg" = "--expediente" ] || [ "$arg" = "--perfil" ]; then
-        ESPERA_RUTA=1
-    elif [ "$SUBCOMANDO" = "privacidad" ]; then
+    else
         case "$arg" in
-            -*) : ;;
-            *) arg=$(absolutizar "$arg") ;;
+            --expediente|--perfil)
+                ESPERA_RUTA=1
+                [ "$arg" = "--expediente" ] && TIENE_EXPEDIENTE=1
+                ;;
+            --expediente=*|--perfil=*)
+                # La forma con "=" también lleva ruta. Omitirla dejaba viva
+                # justo la resolución contra el repo que este bloque existe
+                # para evitar.
+                clave=${arg%%=*}
+                valor=${arg#*=}
+                arg="$clave=$(absolutizar "$valor")"
+                [ "$clave" = "--expediente" ] && TIENE_EXPEDIENTE=1
+                ;;
+            -*)
+                : ;;
+            *)
+                [ "$SUBCOMANDO" = "privacidad" ] && arg=$(absolutizar "$arg")
+                ;;
         esac
     fi
-    ARGS="$ARGS
-$arg"
+    set -- "$@" "$arg"
+    I=$((I + 1))
 done
 
-# Si el subcomando trabaja sobre un expediente y el usuario no pasó
-# --expediente, se inyecta el del directorio DESDE DONDE INVOCÓ, no el del
-# repo. El default de argparse es "./expediente" y se resolvería después del
-# cd, apuntando al expediente del propio repositorio.
+# Si el subcomando trabaja sobre un expediente y no se pasó --expediente, se
+# inyecta el del directorio DESDE DONDE se invocó. El default de argparse es
+# "./expediente" y se resolvería después del cd, apuntando al del repo.
 case "$SUBCOMANDO" in
     calcular|importar|verificar)
-        if [ "$ESPERA_RUTA" = "0" ] && ! printf '%s' "$ARGS" | grep -q -- '--expediente'; then
-            ARGS="$ARGS
---expediente
-$ORIGEN/expediente"
-        fi
+        [ "$TIENE_EXPEDIENTE" = "0" ] && set -- "$@" --expediente "$ORIGEN/expediente"
         ;;
 esac
-
-# Reconstruir los argumentos preservando espacios en las rutas.
-OLDIFS=$IFS
-IFS='
-'
-# shellcheck disable=SC2086
-set -- $ARGS
-IFS=$OLDIFS
+set +f
 
 cd "$RAIZ"
 

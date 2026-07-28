@@ -574,3 +574,72 @@ class TestRegresionesDeLaAuditoria(unittest.TestCase):
             for ruta in ("A", "B"):
                 L = liquidar(p, self.par, ruta)
                 self.assertIn("SALDO", L.renglones[-1].concepto)
+
+
+class TestRegresionesRonda2(unittest.TestCase):
+    """Bugs que introdujeron los arreglos de la ronda anterior."""
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+
+    def test_sep_decimal_no_puede_partir_grupos_de_miles(self):
+        """La regresión más cara del proyecto hasta ahora.
+
+        Con `sep_decimal="."` —lo que pasan los adaptadores de Deel y Wise—
+        "1.234.567" se partía por el último punto y salía 1234.567. Un CSV
+        colombiano en pesos reclamado por esos adaptadores perdía un factor
+        de mil, sin una sola advertencia.
+        """
+        for pista in (None, ".", ","):
+            self.assertEqual(parse_monto("1.234.567", pista), 1_234_567,
+                             f"falla con sep_decimal={pista!r}")
+            self.assertEqual(parse_monto("1.234.567,89", pista), 1_234_567.89)
+            self.assertEqual(parse_monto("1,234,567.89", pista), 1_234_567.89)
+
+    def test_cero_con_decimales_no_tumba_el_adaptador(self):
+        """`0.00` con sep_decimal="," daba error, y como el raise es por
+        archivo, una sola fila en cero degradaba el extracto entero al
+        adaptador genérico y perdía sus reglas de clasificación."""
+        for pista in (None, ".", ","):
+            self.assertEqual(parse_monto("0.00", pista), 0.0)
+            self.assertEqual(parse_monto("1,50", pista), 1.5)
+
+    def test_desbordamiento_no_devuelve_infinito(self):
+        """float() no revienta con 400 dígitos: devuelve inf, que después
+        rompe en Movimiento.convertir() lejos del archivo que lo causó."""
+        for basura in ("9" * 400, "1" + ".000" * 200, "(" + "9" * 400 + ")"):
+            with self.assertRaises(ValueError):
+                parse_monto(basura)
+
+    def test_errores_no_filtran_mensajes_internos_de_float(self):
+        """El usuario debe ver su cadena original, no una mutilada."""
+        for basura in ("1.2.3", "12,34,567", "1..2"):
+            for pista in (None, ".", ","):
+                with self.assertRaises(ValueError) as ctx:
+                    parse_monto(basura, pista)
+                self.assertIn("no es un monto reconocible", str(ctx.exception))
+                self.assertIn(repr(basura), str(ctx.exception))
+
+    def test_razon_de_dependientes_coincide_con_la_via_elegida(self):
+        """El mensaje decía siempre que la vía ganadora 'no depende de
+        cuántos sean'. Es cierto solo para la del 10%; con la de 72 UVT el
+        motivo real es que la base ya llegó al tramo de tarifa 0%."""
+        datos = {
+            "contribuyente": {"anio_gravable": 2025, "residente_fiscal": True},
+            "ingresos": {"rentas_trabajo_honorarios": 40_935_336,
+                         "rentas_capital": 26_091_191},
+            "incrngo": {"aportes_obligatorios_salud_pension": 1_550_827},
+            "costos": {"otros": 12_916_385},
+            "anticipos": {"retenciones_practicadas": 17_209_626},
+        }
+        d, sup = PF._completar(datos)
+        p = PF.Perfil(d, None, sup)
+        r = comparar(p, self.par)
+        fila = next((x for x in r["sensibilidad"] if "dependiente" in x.etiqueta), None)
+        if fila is None or "no agrega nada" not in fila.nota:
+            self.skipTest("este perfil no produce la nota de saturación")
+        via = r["rutas"][r["mejor_ruta"]].dependientes_via
+        if "10%" in via:
+            self.assertIn("10%", fila.nota)
+        else:
+            self.assertIn("tarifa 0%", fila.nota)

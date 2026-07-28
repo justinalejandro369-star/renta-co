@@ -377,14 +377,24 @@ def aplicar_ignorados(archivos: list[Path], globs: list[str]) -> tuple[list[Path
         return archivos, []
 
     avisos = []
-    aceptados = []
+    aceptados: list[str] = []
+    total = len(archivos)
+    limite = total * LIMITE_OMISION
+
+    # El límite es ACUMULADO, no por glob. Medir cada uno contra el total
+    # dejaba pasar cuatro globs del 25% que juntos apagaban el escáner
+    # entero: cada uno quedaba por debajo del umbral y ninguno se rechazaba.
     for g in globs:
-        omitidos = sum(1 for a in archivos if esta_ignorado(a, [g]))
-        if omitidos > len(archivos) * LIMITE_OMISION:
+        candidatos = aceptados + [g]
+        omitidos = sum(1 for a in archivos if esta_ignorado(a, candidatos))
+        if omitidos > limite:
+            solo_este = sum(1 for a in archivos if esta_ignorado(a, [g]))
             avisos.append(
-                f"{ARCHIVO_IGNORADOS}: se RECHAZA el glob '{g}' — dejaría fuera "
-                f"{omitidos} de {len(archivos)} archivos ({omitidos / len(archivos):.0%}). "
-                f"Este archivo es para excepciones puntuales, no para apagar el escáner."
+                f"{ARCHIVO_IGNORADOS}: se RECHAZA el glob '{g}'. Por sí solo deja "
+                f"fuera {solo_este} de {total} archivos, y sumado a los anteriores "
+                f"llegaría a {omitidos} ({omitidos / total:.0%} del árbol). El "
+                f"límite acumulado es {LIMITE_OMISION:.0%}: este archivo es para "
+                f"excepciones puntuales, no para apagar el escáner."
             )
             continue
         aceptados.append(g)
