@@ -75,8 +75,8 @@ Reglas:
 Para desarrollar sobre el repo:
 
 ```bash
-make test        # 64 tests
-make benchmark   # 14 personas, tres capas
+make test        # suite completa
+make benchmark   # 14 personas: invariantes, diferencial y anclas
 make verificar   # todo lo que corre CI
 ```
 

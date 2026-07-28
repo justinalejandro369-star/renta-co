@@ -94,7 +94,7 @@ Diez skills que saben **qué preguntar, en qué orden y por qué**. No un formul
 </td><td width="50%" valign="top">
 
 ### El motor calcula
-Python determinista con 64 tests y un benchmark de 14 personas verificado en tres capas. **El modelo de lenguaje nunca hace la aritmética del impuesto.** Puedes leer `engine/depuracion.py` y recalcularlo a mano.
+Python determinista, con suite de tests y un benchmark de 14 contribuyentes verificado en tres capas. **El modelo de lenguaje nunca hace la aritmética del impuesto.** Puedes leer `engine/depuracion.py` y recalcularlo a mano.
 
 </td></tr>
 <tr><td valign="top">
