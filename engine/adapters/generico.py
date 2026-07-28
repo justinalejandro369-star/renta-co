@@ -91,7 +91,58 @@ def parse_fecha(texto: str):
     raise ValueError(f"Fecha no reconocida: {texto!r}")
 
 
-def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
+def _limpiar(texto: str) -> tuple[str, bool] | None:
+    """Quita adornos y signo. Devuelve (dígitos y separadores, negativo).
+
+    None si la celda está vacía o es un guion de relleno. Lanza ValueError si
+    hay paréntesis Y signo, que es el único adorno genuinamente ambiguo.
+    """
+    original = str(texto)
+    t = original.strip().replace("$", "").replace(" ", "").replace("\xa0", "")
+    if not t or t in {"-", "—", "N/A", "n/a"}:
+        return None
+
+    entre_parentesis = t.startswith("(") and t.endswith(")")
+    if entre_parentesis:
+        t = t[1:-1]
+
+    negativo = entre_parentesis
+    if t.startswith(("-", "+")):
+        if entre_parentesis:
+            raise ValueError(
+                f"{original!r} no es un monto reconocible: tiene paréntesis Y "
+                f"signo, y no se sabe cuál manda."
+            )
+        negativo = t[0] == "-"
+        t = t[1:]
+    return t, negativo
+
+
+def _forma(t: str) -> tuple[list[str], list[str], list[int]] | None:
+    """(grupos, separadores, índices decimales) de un token ya limpio.
+
+    None si el token no tiene la forma de un monto. Un separador seguido de
+    exactamente tres dígitos es de miles; cualquier otro tamaño lo delata
+    como decimal. El decimal solo puede ser el último separador.
+    """
+    if not _TOKEN.fullmatch(t):
+        return None
+    grupos = re.split(r"[.,]", t)
+    seps = [c for c in t if c in ".,"]
+    decimales = [i for i, g in enumerate(grupos[1:]) if len(g) != 3]
+    return grupos, seps, decimales
+
+
+# Monedas cuya unidad mínima hace que un monto de tres cifras con "decimales"
+# sea imposible. El peso colombiano se mueve en miles: un movimiento bancario
+# de "1,234" no son un peso con veintitrés centavos, son mil doscientos
+# treinta y cuatro pesos. Es la misma clase de banda de plausibilidad que
+# TRM_MINIMA/TRM_MAXIMA en trm.py, aplicada al monto en vez de a la tasa.
+SIN_FRACCION_SIGNIFICATIVA = {"COP", "CLP", "PYG", "IDR", "VND", "KRW", "JPY"}
+
+
+def parse_monto(texto: str, sep_decimal: str | None = None,
+                moneda: str | None = None) -> float:
     """Convierte un monto a float. Formato colombiano y anglosajón.
 
     La decisión la toma la ESTRUCTURA del número, no una pista externa:
@@ -112,66 +163,52 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
         "12,34,567"    → error        mismo motivo
         "1..2"         → error
 
-    El único caso genuinamente ambiguo —"1.234", que vale mil doscientos
-    treinta y cuatro en Colombia y uno coma doscientos treinta y cuatro en
-    inglés— se resuelve como MILES. Un monto con tres decimales es rarísimo
-    en dinero; un grupo de miles es lo normal.
+    Queda UN caso genuinamente ambiguo: un solo separador seguido de tres
+    dígitos, con parte entera de una a tres cifras. "1.234" vale mil
+    doscientos treinta y cuatro en Colombia y uno coma doscientos treinta y
+    cuatro en inglés, y la forma no lo dice. Es la forma de casi todo monto
+    colombiano por debajo del millón, así que resolverlo mal no es un caso
+    raro: es la mitad de un extracto.
 
-    `sep_decimal` queda como pista informativa y ya no decide nada. Antes sí
-    decidía, y ahí estaba el problema: con `sep_decimal="."` —que es lo que
-    pasan los adaptadores de Deel y Wise— "1.234.567" se partía por el
-    último punto y salía 1234.567. Un CSV colombiano en pesos reclamado por
-    esos adaptadores perdía un factor de mil, en silencio. La estructura no
-    se deja engañar así.
+    Se resuelve por tres señales, en este orden, y ninguna es una constante
+    del adaptador:
+
+      1. La estructura del propio número — "12500.750" tiene cinco dígitos
+         de parte entera, así que no es un grupo de miles; "0.500" empieza
+         en cero solo, y un grupo de miles no lo hace.
+      2. La MONEDA. Un movimiento en pesos de "1,234" no son un peso con
+         veintitrés centavos. Ver SIN_FRACCION_SIGNIFICATIVA.
+      3. `sep_decimal`, que ahora solo puede venir de
+         `convencion_del_archivo()` —o sea, de lo que el archivo entero
+         PRUEBA— y no de una suposición del adaptador. Esa era la causa
+         raíz: con `sep_decimal="."` fijo, un export de Deel reguardado
+         desde Excel en locale español declaraba "82.000" USD como 82 USD,
+         un factor de mil, sin una sola advertencia. Y en el mismo archivo
+         de Bancolombia, "150,000" salía 150 mientras "2,500,000" salía
+         bien: corrupción parcial que ningún cuadre de totales detecta.
+
+    Si ninguna señal aplica, gana MILES. Un monto con tres decimales es
+    rarísimo en dinero; un grupo de miles es lo normal.
 
     Validación: dígitos ASCII únicamente. `float()` acepta dígitos árabes y
     de ancho completo, y notación científica; nada de eso es un monto que
     deba entrar callado a un ledger.
     """
     original = str(texto)
-    t = original.strip().replace("$", "").replace(" ", "").replace("\xa0", "")
-    if not t or t in {"-", "—", "N/A", "n/a"}:
-        return 0.0
 
     def malo(motivo):
         return ValueError(f"{original!r} no es un monto reconocible: {motivo}.")
 
-    entre_parentesis = t.startswith("(") and t.endswith(")")
-    if entre_parentesis:
-        t = t[1:-1]
+    limpio = _limpiar(original)
+    if limpio is None:
+        return 0.0
+    t, negativo = limpio
 
-    negativo = entre_parentesis
-    if t.startswith(("-", "+")):
-        if entre_parentesis:
-            raise malo("tiene paréntesis Y signo, y no se sabe cuál manda")
-        negativo = t[0] == "-"
-        t = t[1:]
-
-    if not _TOKEN.fullmatch(t):
+    forma = _forma(t)
+    if forma is None:
         raise malo("solo se aceptan dígitos separados por un punto o una coma")
+    grupos, seps, decimales = forma
 
-    grupos = re.split(r"[.,]", t)
-    seps = [c for c in t if c in ".,"]
-
-    # Clasificar cada separador por el tamaño del grupo que le sigue.
-    decimales = [i for i, g in enumerate(grupos[1:]) if len(g) != 3]
-
-    # Caso ambiguo: UN separador seguido de exactamente tres dígitos.
-    # "1.234" vale mil doscientos treinta y cuatro en Colombia y uno coma
-    # doscientos treinta y cuatro en inglés, y la forma no lo dice.
-    #
-    # Pero hay dos señales que sí resuelven, y que la versión anterior
-    # ignoraba — por eso rompía TODO monto de tres decimales:
-    #
-    #   "12500.750" → la parte entera tiene cinco dígitos, así que leerla
-    #                 como grupo de miles es imposible: es decimal.
-    #   "0.500"     → un grupo de miles no empieza en cero. Nadie escribe
-    #                 quinientos como "0.500": es decimal.
-    #
-    # Y solo si ninguna de las dos aplica se consulta `sep_decimal`, que es
-    # su único trabajo legítimo. Ojo: esto NO reabre el bug de la ronda
-    # anterior, porque los casos de varios separadores ya se resolvieron
-    # arriba por estructura y no llegan acá.
     if not decimales and len(seps) == 1:
         entero = grupos[0]
         # `entero == "0"` y no `startswith("0")`: "054.937" es un monto con
@@ -179,6 +216,8 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
         # dividía por mil. Solo el cero solo delata un decimal.
         if len(entero) > 3 or entero == "0":
             decimales = [0]
+        elif (moneda or "").strip().upper() in SIN_FRACCION_SIGNIFICATIVA:
+            pass                              # banda de moneda: es de miles
         elif sep_decimal == seps[0]:
             decimales = [0]
 
@@ -208,6 +247,94 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
     return -valor if negativo else valor
 
 
+def convencion_del_archivo(valores) -> tuple[str | None, list[str]]:
+    """Separador decimal que el ARCHIVO prueba, y los avisos del caso.
+
+    Ninguna celda por separado puede resolver "150,000". El archivo entero
+    sí: si en otra fila aparece "2,500,000" —dos comas seguidas de tres
+    dígitos— entonces la coma es de miles en este archivo, y "150,000" son
+    ciento cincuenta mil. Y al revés: si aparece "3800.00", el punto es
+    decimal y "150.000" son ciento cincuenta.
+
+    Devuelve None cuando el archivo no prueba nada o se contradice. None NO
+    significa "usa el default del adaptador": significa que decide la
+    estructura, que es lo único que no se puede equivocar por convención.
+
+    Los avisos existen porque una lectura ambigua que cambia el resultado por
+    un factor de mil no puede ser silenciosa. La corrupción parcial —unas
+    filas bien y otras mal en el mismo archivo— no la detecta ningún cuadre
+    de totales.
+    """
+    decimales: set[str] = set()
+    miles: set[str] = set()
+    ambiguos = 0
+
+    for crudo in valores:
+        try:
+            limpio = _limpiar(crudo if crudo is not None else "")
+        except ValueError:
+            continue
+        if limpio is None:
+            continue
+        forma = _forma(limpio[0])
+        if forma is None:
+            continue
+        grupos, seps, idx = forma
+        if not seps:
+            continue
+        # Un token malformado no vota: "1.2.3" no dice nada de la convención.
+        if len(idx) > 1 or (idx and idx[0] != len(seps) - 1):
+            continue
+        if idx:
+            decimales.add(seps[-1])
+            miles.update(seps[:-1])
+        elif len(seps) == 1:
+            if len(grupos[0]) > 3 or grupos[0] == "0":
+                decimales.add(seps[0])
+            else:
+                ambiguos += 1
+        else:
+            miles.update(seps)
+
+    avisos: list[str] = []
+    if len(decimales) > 1:
+        avisos.append(
+            "El archivo usa el punto Y la coma como separador decimal en filas "
+            "distintas. No se deduce una convención: los montos ambiguos se "
+            "leen por estructura (un separador con tres dígitos = miles). "
+            "Revisa la columna de monto antes de dar el ledger por bueno."
+        )
+        return None, avisos
+
+    sep = next(iter(decimales)) if decimales else None
+    if sep and sep in miles:
+        avisos.append(
+            f"El archivo usa {sep!r} como separador decimal en unas filas y "
+            f"como separador de miles en otras. Los montos ambiguos se leen "
+            f"por estructura. Revisa la columna de monto."
+        )
+        return None, avisos
+
+    if ambiguos:
+        if sep:
+            avisos.append(
+                f"{ambiguos} monto(s) con un solo {sep!r} seguido de tres "
+                f"dígitos se leyeron como DECIMALES, porque otras filas del "
+                f"mismo archivo prueban que {sep!r} es el separador decimal. "
+                f"Si en realidad eran miles, cada uno quedó dividido por mil: "
+                f"compáralos contra el extracto original."
+            )
+        elif not miles:
+            avisos.append(
+                f"{ambiguos} monto(s) tienen un solo separador seguido de tres "
+                f"dígitos y el archivo no trae ninguna otra fila que diga si es "
+                f"de miles o decimal. Se leyeron como MILES, que es lo normal "
+                f"en un extracto colombiano. Si tu archivo usa decimales de "
+                f"tres cifras, cada uno quedó multiplicado por mil."
+            )
+    return sep, avisos
+
+
 def detecta(cabeceras: list[str], nombre: str = "") -> bool:
     mapa = _mapear(cabeceras)
     return "fecha" in mapa and "monto" in mapa
@@ -231,7 +358,26 @@ def abrir_csv(ruta: Path):
     return open(ruta, newline="", encoding="utf-8", errors="replace")
 
 
-def importar(ruta: Path, mapa: dict[str, str] | None = None) -> list[Movimiento]:
+def aviso_de_filas_saltadas(nombre: str, malas: list[str], leidas: int) -> str:
+    """Mensaje único para las filas que no se pudieron leer.
+
+    Una celda mala en la fila 200 de un export abortaba el archivo entero y
+    borraba doce meses de ingreso. Saltarla es lo correcto, pero saltarla en
+    silencio es peor que abortar: el ledger queda incompleto y cuadra consigo
+    mismo. Por eso el mensaje dice cuántas, cuáles y qué hacer.
+    """
+    muestra = "; ".join(malas[:3])
+    resto = f" (y {len(malas) - 3} más)" if len(malas) > 3 else ""
+    return (
+        f"{nombre}: {len(malas)} fila(s) de {leidas + len(malas)} no se pudieron "
+        f"leer y NO están en el ledger. {muestra}{resto}. Corrígelas en el CSV y "
+        f"vuelve a importar: mientras tanto faltan movimientos."
+    )
+
+
+def importar(ruta: Path, mapa: dict[str, str] | None = None,
+             avisos: list[str] | None = None) -> list[Movimiento]:
+    avisos = avisos if avisos is not None else []
     with abrir_csv(ruta) as f:
         lector = csv.DictReader(f)
         cols = mapa or _mapear(lector.fieldnames or [])
@@ -241,17 +387,29 @@ def importar(ruta: Path, mapa: dict[str, str] | None = None) -> list[Movimiento]
                 f"Columnas: {lector.fieldnames}. Pasa un mapeo explícito: "
                 f"importar(ruta, {{'fecha': 'MiColumnaFecha', 'monto': 'MiColumnaValor'}})"
             )
+        # Se lee el archivo completo antes de convertir un solo monto: la
+        # convención de separadores es una propiedad del ARCHIVO y ninguna
+        # celda por separado la puede resolver.
+        filas = list(lector)
+        sep, avisos_sep = convencion_del_archivo(
+            fila.get(cols["monto"], "") for fila in filas
+        )
+        avisos += [f"{ruta.name}: {a}" for a in avisos_sep]
+
         movimientos = []
         descartadas = 0
-        for i, fila in enumerate(lector, start=2):
+        malas: list[str] = []
+        for i, fila in enumerate(filas, start=2):
             crudo = (fila.get(cols["fecha"]) or "").strip()
             if not crudo:
                 continue
+            moneda = (fila.get(cols.get("moneda", ""), "") or "COP").strip().upper() or "COP"
             try:
                 fecha = parse_fecha(crudo)
-                monto = parse_monto(fila.get(cols["monto"], "0"))
+                monto = parse_monto(fila.get(cols["monto"], "0"), sep, moneda)
             except ValueError as e:
-                raise ValueError(f"{ruta.name} línea {i}: {e}") from e
+                malas.append(f"línea {i}: {e}")
+                continue
             if monto == 0:
                 # Las filas en cero se descartan, pero no en silencio: si un
                 # extracto entero sale vacío, saber cuántas se botaron es la
@@ -263,11 +421,19 @@ def importar(ruta: Path, mapa: dict[str, str] | None = None) -> list[Movimiento]
                 fecha=fecha,
                 descripcion=(fila.get(cols.get("descripcion", ""), "") or "").strip(),
                 monto_origen=monto,
-                moneda=(fila.get(cols.get("moneda", ""), "") or "COP").strip().upper() or "COP",
+                moneda=moneda,
                 contraparte=(fila.get(cols.get("contraparte", ""), "") or "").strip(),
                 categoria="desconocido",
                 fuente=ruta.name,
             ))
+    if malas and not movimientos:
+        raise ValueError(
+            f"{ruta.name}: ninguna de las {len(malas)} filas con datos se pudo "
+            f"leer. La primera dice — {malas[0]}. Casi siempre es la columna de "
+            f"monto o de fecha mal identificada: columnas disponibles {cols}."
+        )
+    if malas:
+        avisos.append(aviso_de_filas_saltadas(ruta.name, malas, len(movimientos)))
     if descartadas and not movimientos:
         raise ValueError(
             f"{ruta.name}: las {descartadas} filas con datos tienen monto cero. "

@@ -11,7 +11,8 @@ import csv
 from pathlib import Path
 
 from ..ledger import Movimiento
-from .generico import abrir_csv, parse_fecha, parse_monto
+from .generico import (abrir_csv, aviso_de_filas_saltadas,
+                       convencion_del_archivo, parse_fecha, parse_monto)
 
 NOMBRE = "Wise"
 
@@ -45,15 +46,24 @@ def detecta(cabeceras: list[str], nombre: str = "") -> bool:
     return tiene_wise and tiene_forma
 
 
-def _clasificar(descripcion: str) -> str:
+# Igual que en deel.py: el texto propone y el signo veta. "Received money
+# from Cliente" con monto negativo no es un ingreso, y clasificarlo como tal
+# mete un ingreso que RESTA de la base gravable.
+ENTRANTES = {"ingreso_trabajo", "ingreso_capital"}
+
+
+def _clasificar(descripcion: str, monto: float = 0.0) -> str:
     blob = descripcion.lower()
     for palabras, categoria in REGLAS:
         if any(p in blob for p in palabras):
+            if categoria in ENTRANTES and monto < 0:
+                return "desconocido"
             return categoria
     return "desconocido"
 
 
-def importar(ruta: Path) -> list[Movimiento]:
+def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
+    avisos = avisos if avisos is not None else []
     movimientos = []
     with abrir_csv(ruta) as f:
         lector = csv.DictReader(f)
@@ -87,15 +97,24 @@ def importar(ruta: Path) -> list[Movimiento]:
                 f"renombra el archivo para que lo tome el adaptador genérico."
             )
 
-        for i, fila in enumerate(lector, start=2):
+        filas = list(lector)
+        sep, avisos_sep = convencion_del_archivo(
+            fila.get(c_monto, "") for fila in filas
+        )
+        avisos += [f"{ruta.name}: {a}" for a in avisos_sep]
+
+        malas: list[str] = []
+        for i, fila in enumerate(filas, start=2):
             crudo = (fila.get(c_fecha) or "").strip()
             if not crudo:
                 continue
+            moneda = (fila.get(c_moneda) or "USD").strip().upper()
             try:
                 fecha = parse_fecha(crudo)
-                monto = parse_monto(fila.get(c_monto, "0"), sep_decimal=".")
+                monto = parse_monto(fila.get(c_monto, "0"), sep, moneda)
             except ValueError as e:
-                raise ValueError(f"{ruta.name} línea {i}: {e}") from e
+                malas.append(f"línea {i}: {e}")
+                continue
             if monto == 0:
                 continue
             desc = (fila.get(c_desc) or "").strip() if c_desc else ""
@@ -103,9 +122,13 @@ def importar(ruta: Path) -> list[Movimiento]:
                 fecha=fecha,
                 descripcion=desc or "movimiento Wise",
                 monto_origen=monto,
-                moneda=(fila.get(c_moneda) or "USD").strip().upper(),
-                categoria=_clasificar(desc),
+                moneda=moneda,
+                categoria=_clasificar(desc, monto),
                 contraparte=((fila.get(c_parte) or "").strip() if c_parte else ""),
                 fuente=ruta.name,
             ))
+    if malas and not movimientos:
+        raise ValueError(f"{ruta.name}: ninguna fila se pudo leer — {malas[0]}")
+    if malas:
+        avisos.append(aviso_de_filas_saltadas(ruta.name, malas, len(movimientos)))
     return movimientos

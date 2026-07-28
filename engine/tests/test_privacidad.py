@@ -198,10 +198,6 @@ class TestRepositorio(unittest.TestCase):
         self.assertEqual(esc.globs_ignorados(RAIZ, estricto=True), [])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestUmbralAcumulado(unittest.TestCase):
     """Medir cada glob contra el total dejaba pasar varios globs pequeños
     que juntos apagaban el escáner."""
@@ -225,3 +221,120 @@ class TestUmbralAcumulado(unittest.TestCase):
         )
         self.assertEqual(len(quedan), 98)
         self.assertEqual(avisos, [])
+
+
+class TestEnmascarar(unittest.TestCase):
+    """La función que evita que el REPORTE del escáner sea él mismo una fuga.
+
+    El escáner imprime lo que encontró. Si `enmascarar` devuelve el número
+    completo, el informe que se pega en un issue publica exactamente el dato
+    que el escáner existe para no publicar. No tenía una sola aserción.
+    """
+
+    def test_una_cedula_nunca_sale_completa(self):
+        for cedula in ("1.016.086.781", "1016086781", "19.122.816", "79483921"):
+            salida = esc.enmascarar(cedula)
+            self.assertNotEqual(salida, cedula)
+            self.assertIn("X", salida)
+            digitos = "".join(c for c in salida if c.isdigit())
+            original = "".join(c for c in cedula if c.isdigit())
+            self.assertLess(len(digitos), len(original),
+                            f"{cedula!r} salió con todos sus dígitos: {salida!r}")
+
+    def test_deja_lo_justo_para_reconocer_el_dato(self):
+        """Sirve para ubicarlo en el archivo, no para reconstruirlo."""
+        self.assertEqual(esc.enmascarar("1016086781"), "1XXXXXX781")
+
+    def test_un_correo_no_sale_con_el_usuario_completo(self):
+        salida = esc.enmascarar("juan.perez@gmail.com")
+        self.assertNotIn("juan.perez", salida)
+        self.assertTrue(salida.endswith("@gmail.com"))
+
+    def test_los_numeros_cortos_se_borran_enteros(self):
+        """Con cuatro dígitos o menos, dejar el primero y los tres últimos
+        sería dejarlo entero."""
+        self.assertEqual(esc.enmascarar("1234"), "XXXX")
+
+
+class TestHookDePreCommit(unittest.TestCase):
+    """`--staged` de punta a punta, con git de verdad.
+
+    El hook que anuncian PRIVACY.md, commands/setup.md y
+    skills/renta-privacidad era un no-op: `bin/renta` hacía `cd` a la raíz
+    del plugin y `git diff --cached` corría contra el repositorio de
+    renta-co, no contra el del usuario. Con una cédula en el índice decía
+    "No hay archivos que escanear" y salía 0.
+
+    Se prueba por el LANZADOR, no llamando al script: `AGENTS.md` manda usar
+    `bin/renta` como interfaz única, y el bug vivía justo en la diferencia.
+    """
+
+    def setUp(self):
+        import shutil
+        import subprocess
+
+        if not shutil.which("git"):
+            self.skipTest("git no disponible")
+        self.repo = Path(tempfile.mkdtemp()) / "repo-usuario"
+        self.repo.mkdir()
+        for orden in (["init", "-q", "."],
+                      ["config", "user.email", "t@t"],
+                      ["config", "user.name", "t"]):
+            subprocess.run(["git", *orden], cwd=self.repo, check=True,
+                           capture_output=True)
+
+    def _correr(self, *args):
+        import subprocess
+
+        return subprocess.run(
+            [str(RAIZ / "bin" / "renta"), "privacidad", *args],
+            cwd=self.repo, capture_output=True, text=True,
+        )
+
+    def test_una_cedula_en_el_indice_rompe_el_commit(self):
+        import subprocess
+
+        (self.repo / "datos.txt").write_text(
+            "cedula: 1.016.086.781\n", encoding="utf-8")
+        subprocess.run(["git", "add", "datos.txt"], cwd=self.repo, check=True,
+                       capture_output=True)
+        r = self._correr("--staged")
+        self.assertEqual(r.returncode, 1, f"salió 0 con una cédula staged:\n{r.stdout}")
+        self.assertIn("datos.txt", r.stdout)
+
+    def test_el_indice_limpio_deja_pasar_el_commit(self):
+        import subprocess
+
+        (self.repo / "notas.md").write_text(
+            "El tope conjunto es de 1.340 UVT.\n", encoding="utf-8")
+        subprocess.run(["git", "add", "notas.md"], cwd=self.repo, check=True,
+                       capture_output=True)
+        r = self._correr("--staged")
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_lo_que_se_revisa_es_el_blob_y_no_el_disco(self):
+        """`git add` con la cédula y después limpiar el archivo en disco: lo
+        que se va a commitear sigue siendo el blob sucio."""
+        import subprocess
+
+        archivo = self.repo / "datos.txt"
+        archivo.write_text("cedula: 1.016.086.781\n", encoding="utf-8")
+        subprocess.run(["git", "add", "datos.txt"], cwd=self.repo, check=True,
+                       capture_output=True)
+        archivo.write_text("sin datos\n", encoding="utf-8")
+        r = self._correr("--staged")
+        self.assertEqual(r.returncode, 1, f"leyó el disco y no el índice:\n{r.stdout}")
+
+    def test_fuera_de_un_repositorio_no_finge_que_reviso(self):
+        import shutil
+
+        vacio = Path(tempfile.mkdtemp())
+        shutil.rmtree(self.repo / ".git")
+        r = self._correr("--staged")
+        self.assertNotEqual(r.returncode, 0,
+                            "salió 0 sin haber podido leer el índice")
+        del vacio
+
+
+if __name__ == "__main__":
+    unittest.main()

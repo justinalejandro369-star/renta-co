@@ -135,10 +135,25 @@ case "$SUBCOMANDO" in
 esac
 set +f
 
+# El escáner de privacidad se ejecuta DESDE DONDE se invocó, no desde la raíz
+# del plugin. Es un script suelto y no importa `engine`, así que no necesita
+# el `cd`, y con el `cd` estaba roto de una forma especialmente mala:
+#
+#   `--staged` corre `git diff --cached` contra el directorio actual. Con el
+#   cd, eso era el repositorio de renta-co en vez del repositorio del usuario,
+#   así que el hook de pre-commit que anuncian PRIVACY.md, commands/setup.md y
+#   skills/renta-privacidad no protegía nada: decía "No hay archivos que
+#   escanear" y salía 0 con una cédula en el índice.
+#
+# También aplica a los objetivos por defecto: `bin/renta privacidad` sin
+# argumentos tiene que escanear el directorio del usuario, no el del plugin.
+if [ "$SUBCOMANDO" = "privacidad" ]; then
+    exec "$PY" "$RAIZ/scripts/escanear_privacidad.py" "$@"
+fi
+
 cd "$RAIZ"
 
 case "$SUBCOMANDO" in
-    privacidad) exec "$PY" "$RAIZ/scripts/escanear_privacidad.py" "$@" ;;
     benchmark)  exec "$PY" -m benchmark.correr "$@" ;;
     "")         exec "$PY" -m engine.cli ;;
     *)          exec "$PY" -m engine.cli "$SUBCOMANDO" "$@" ;;

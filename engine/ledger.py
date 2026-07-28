@@ -184,6 +184,7 @@ class Ledger:
                 f"{sum(abs(m.monto_cop) for m in pendientes):,.0f} COP. "
                 f"Clasifícalos antes de calcular: un ingreso mal clasificado "
                 f"cambia el impuesto."
+                .replace(",", ".")
             )
         # Se cuentan los MOVIMIENTOS, no el total: un retiro y su abono se
         # cancelan y dejaban el total en cero, así que el aviso más
@@ -206,27 +207,47 @@ class Ledger:
             [m for m in self.movimientos if m.fecha.year == anio], list(self.avisos)
         )
 
+    # Signo que le corresponde a cada categoría, y cómo se llama el
+    # movimiento que va al revés. `traslado` y `desconocido` no están: el
+    # traslado es de dos patas por definición, y lo sin clasificar ya tiene
+    # su propio aviso.
+    SIGNO_ESPERADO = {
+        "ingreso_trabajo": (+1, "ingresos de trabajo", "una devolución o una nota crédito"),
+        "ingreso_capital": (+1, "ingresos de capital", "una reversión de rendimientos"),
+        "costo": (-1, "costos", "un reembolso"),
+        "gasto_personal": (-1, "gastos personales", "un reintegro"),
+        "retencion": (-1, "retenciones", "una retención reversada"),
+    }
+
     def avisos_de_signo(self) -> list[str]:
         """Categorías donde entradas y salidas se mezclan.
 
         Un reembolso dentro de los costos, o una retención reversada, netean
         con el resto. Es lo correcto, pero hay que decirlo: la cifra que sale
         no es la suma de los comprobantes, y el contador va a preguntar.
+
+        Antes esto solo miraba `costo` y `retencion`, y ese hueco se componía
+        con el de la clasificación de Deel: un pago SALIENTE clasificado como
+        `ingreso_trabajo` metía 10.000.000 + (−3.000.000) = 7.000.000 y
+        `validar()` devolvía lista vacía. La cifra equivocada llegaba al
+        perfil sin una sola advertencia. Se revisan TODAS las categorías con
+        signo esperado, que es la clase del problema.
         """
         avisos = []
-        for categoria, etiqueta in (("costo", "costos"),
-                                    ("retencion", "retenciones")):
-            entradas = [m for m in self.movimientos
-                        if m.categoria == categoria and m.monto_cop > 0]
-            if entradas:
-                total = sum(m.monto_cop for m in entradas)
-                avisos.append(
-                    f"{len(entradas)} movimiento(s) de {etiqueta} vienen en "
-                    f"POSITIVO por {total:,.0f} COP: se tratan como devoluciones "
-                    f"y netean contra el total. Si en realidad están mal "
-                    f"clasificados, corrígelos antes de calcular."
-                    .replace(",", ".")
-                )
+        for categoria, (signo, etiqueta, ejemplo) in self.SIGNO_ESPERADO.items():
+            contrarios = [m for m in self.movimientos
+                          if m.categoria == categoria and m.monto_cop * signo < 0]
+            if not contrarios:
+                continue
+            total = sum(abs(m.monto_cop) for m in contrarios)
+            sentido = "NEGATIVO" if signo > 0 else "POSITIVO"
+            avisos.append(
+                f"{len(contrarios)} movimiento(s) de {etiqueta} vienen en "
+                f"{sentido} por {total:,.0f} COP: se tratan como {ejemplo} y "
+                f"netean contra el total. Si en realidad están mal "
+                f"clasificados, corrígelos antes de calcular."
+                .replace(",", ".")
+            )
         return avisos
 
     @staticmethod
@@ -291,7 +312,66 @@ class Ledger:
         }
 
 
-def leer_clasificacion_previa(ruta: Path) -> dict[tuple, str]:
+@dataclass
+class Reclasificacion:
+    """Qué pasó al reaplicar las correcciones del ledger anterior.
+
+    Es un objeto y no un entero porque el entero solo sabía contar los
+    éxitos, y el mensaje que lo imprimía estaba dentro de un `if aplicadas`.
+    El caso que importa —CERO conservadas porque el archivo no se pudo
+    leer— era exactamente el que no decía nada.
+    """
+    conservadas: int = 0
+    perdidas: list[str] = field(default_factory=list)
+    ilegibles: list[str] = field(default_factory=list)
+
+    def resumen(self) -> str:
+        partes = [f"{self.conservadas} clasificación(es) conservadas"]
+        if self.perdidas:
+            partes.append(f"{len(self.perdidas)} PERDIDAS")
+        if self.ilegibles:
+            partes.append(f"{len(self.ilegibles)} fila(s) ilegibles")
+        return ", ".join(partes)
+
+    def avisos(self) -> list[str]:
+        avisos = []
+        if self.ilegibles:
+            avisos.append(
+                f"{len(self.ilegibles)} fila(s) del ledger anterior no se "
+                f"pudieron leer, así que sus clasificaciones se perdieron. La "
+                f"primera: {self.ilegibles[0]}. Pasa casi siempre por abrir el "
+                f"CSV en Excel y guardarlo con la configuración regional "
+                f"española, que cambia el separador decimal."
+            )
+        if self.perdidas:
+            muestra = "; ".join(self.perdidas[:3])
+            resto = f" (y {len(self.perdidas) - 3} más)" if len(self.perdidas) > 3 else ""
+            avisos.append(
+                f"{len(self.perdidas)} clasificación(es) que habías corregido a "
+                f"mano NO se pudieron reaplicar porque su movimiento ya no está "
+                f"en el ledger nuevo: {muestra}{resto}. Vuelve a clasificarlas."
+            )
+        return avisos
+
+
+def _clave_de(fecha: str, monto: str, moneda: str, fuente: str) -> tuple:
+    return (fecha, monto, moneda, fuente)
+
+
+def _monto_canonico(texto) -> str:
+    """Monto de origen como cadena comparable, tolerando locales.
+
+    Se usa `parse_monto` en vez de `float()` porque el usuario abre el ledger
+    en Excel para corregir categorías, y Excel lo vuelve a guardar en la
+    configuración regional de la máquina: "1500000,00" reventaba `float()`,
+    el `continue` se lo tragaba y se perdían TODAS las clasificaciones.
+    """
+    from .adapters.generico import parse_monto
+
+    return f"{parse_monto(texto):.2f}"
+
+
+def leer_clasificacion_previa(ruta: Path) -> tuple[dict[tuple, str], list[str]]:
     """Categorías que el usuario ya corrigió a mano en un ledger anterior.
 
     La herramienta le dice «arréglala ahí y vuelve a correr», y hasta ahora
@@ -299,46 +379,87 @@ def leer_clasificacion_previa(ruta: Path) -> dict[tuple, str]:
     sin avisar. Era el único remedio que ofrecía para una clasificación
     equivocada, y no funcionaba.
 
-    La llave es lo que identifica el movimiento con independencia de cómo se
-    haya clasificado: fecha, monto de origen, moneda y archivo de origen.
+    La llave identifica el movimiento con independencia de cómo se haya
+    clasificado: fecha, monto de origen, moneda y archivo de origen. Y lleva
+    además el ORDINAL dentro de su grupo de repetidas, porque dos
+    transferencias del mismo monto el mismo día son lo más común de un
+    extracto y, con la llave sola, el `dict` se quedaba con la última y se la
+    imponía a las dos.
+
+    Devuelve (previas, filas ilegibles). Las ilegibles se devuelven en vez de
+    tragárselas: son clasificaciones perdidas y el usuario tiene que saberlo.
     """
     if not ruta.exists():
-        return {}
+        return {}, []
     previas: dict[tuple, str] = {}
+    ilegibles: list[str] = []
+    repetidas: dict[tuple, int] = {}
     try:
         with open(ruta, newline="", encoding="utf-8") as f:
-            for fila in csv.DictReader(f):
+            for n, fila in enumerate(csv.DictReader(f), start=2):
                 try:
-                    clave = (
+                    base = _clave_de(
                         fila["fecha"],
-                        f'{float(fila["monto_origen"]):.2f}',
+                        _monto_canonico(fila["monto_origen"]),
                         fila["moneda"],
                         fila["fuente"],
                     )
-                except (KeyError, TypeError, ValueError):
+                except (KeyError, TypeError, ValueError) as e:
+                    ilegibles.append(f"línea {n}: {e}")
                     continue
+                ordinal = repetidas.get(base, 0)
+                repetidas[base] = ordinal + 1
                 if fila.get("categoria"):
-                    previas[clave] = fila["categoria"]
-    except OSError:
-        return {}
-    return previas
+                    previas[base + (ordinal,)] = fila["categoria"]
+    except OSError as e:
+        return {}, [f"{ruta.name} no se pudo abrir: {e}"]
+    return previas, ilegibles
 
 
-def aplicar_clasificacion_previa(ledger: Ledger, previas: dict[tuple, str]) -> int:
-    """Reaplica las categorías corregidas a mano. Devuelve cuántas."""
+def aplicar_clasificacion_previa(
+    ledger: Ledger, previas: dict[tuple, str], ilegibles: list[str] | None = None,
+) -> Reclasificacion:
+    """Reaplica las categorías corregidas a mano.
+
+    Recorre el ledger en el mismo orden en que `escribir_csv` lo escribió
+    —ordenado por fecha, y estable dentro del día— para que el ordinal de
+    las repetidas signifique lo mismo de un lado y del otro.
+    """
+    resultado = Reclasificacion(ilegibles=list(ilegibles or []))
     if not previas:
-        return 0
-    aplicadas = 0
-    for m in ledger.movimientos:
-        clave = (m.fecha.isoformat(), f"{m.monto_origen:.2f}", m.moneda, m.fuente)
-        anterior = previas.get(clave)
-        if anterior and anterior in CATEGORIAS and anterior != m.categoria:
-            m.categoria = anterior
-            aplicadas += 1
-    return aplicadas
+        return resultado
+
+    pendientes = dict(previas)
+    repetidas: dict[tuple, int] = {}
+    for m in sorted(ledger.movimientos, key=lambda x: x.fecha):
+        base = _clave_de(m.fecha.isoformat(), f"{m.monto_origen:.2f}",
+                         m.moneda, m.fuente)
+        ordinal = repetidas.get(base, 0)
+        repetidas[base] = ordinal + 1
+        anterior = pendientes.pop(base + (ordinal,), None)
+        if anterior is None:
+            continue
+        if anterior not in CATEGORIAS:
+            resultado.perdidas.append(
+                f"{m.fecha} {m.descripcion[:30]}: categoría {anterior!r} no existe"
+            )
+            continue
+        if anterior != "desconocido":
+            resultado.conservadas += 1
+        m.categoria = anterior
+
+    # Lo que sobró son correcciones cuyo movimiento ya no está. Las que
+    # decían "desconocido" no eran una corrección y no se reportan.
+    for clave, categoria in pendientes.items():
+        if categoria == "desconocido":
+            continue
+        fecha, monto, moneda, fuente, _ = clave
+        resultado.perdidas.append(f"{fecha} {monto} {moneda} de {fuente} → {categoria}")
+    return resultado
 
 
-def escribir_sugerencia_perfil(ledger: Ledger, destino: Path) -> Path:
+def escribir_sugerencia_perfil(ledger: Ledger, destino: Path,
+                               incidencias: list[str] | None = None) -> Path:
     """Escribe las cifras del ledger en formato perfil.toml, para copiar.
 
     NO sobrescribe el perfil del usuario. Ese paso —revisar cada cifra y
@@ -346,6 +467,12 @@ def escribir_sugerencia_perfil(ledger: Ledger, destino: Path) -> Path:
     clasificaciones equivocadas. Antes este puente no existía: el mapeo del
     ledger al perfil quedaba a cargo del modelo, transcribiendo a mano, que
     es exactamente lo que el proyecto dice no hacer.
+
+    `incidencias` son los archivos que no se importaron y las filas que se
+    saltaron. Van en el ENCABEZADO, arriba de todo, porque este archivo es el
+    que alguien abre para copiar cifras al perfil: si el ledger está
+    incompleto, las cifras de acá lo están, y no hay forma de notarlo mirando
+    los números —cuadran entre sí—.
     """
     p = ledger.a_perfil()
     pendientes = ledger.sin_clasificar()
@@ -359,6 +486,23 @@ def escribir_sugerencia_perfil(ledger: Ledger, destino: Path) -> Path:
         "#  equivocada en 02-datos/ledger.csv: arréglala ahí y vuelve a correr.",
         "",
     ]
+    if incidencias:
+        lineas += [
+            "#  ═══════════════════════════════════════════════════════════════",
+            f"#  ⚠ LA IMPORTACIÓN TUVO {len(incidencias)} PROBLEMA(S). Las cifras",
+            "#    de abajo pueden estar INCOMPLETAS, y cuadran entre sí de todos",
+            "#    modos: no hay forma de notarlo mirando los números.",
+            "#",
+        ]
+        for inc in incidencias:
+            lineas.append(f"#    · {inc}")
+        lineas += [
+            "#",
+            "#    Arréglalo y vuelve a correr `renta importar` antes de copiar",
+            "#    nada de aquí al perfil.",
+            "#  ═══════════════════════════════════════════════════════════════",
+            "",
+        ]
     if pendientes:
         lineas += [
             f"#  ⚠ {len(pendientes)} movimiento(s) SIN CLASIFICAR no están sumados",

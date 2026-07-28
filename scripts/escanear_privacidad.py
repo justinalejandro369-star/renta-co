@@ -453,6 +453,16 @@ def archivos_de(objetivos: list[str]) -> list[Path]:
     return rutas
 
 
+class SinIndice(Exception):
+    """No se pudo leer el índice de git.
+
+    Es un error, no un "no hay nada": antes se imprimía un aviso, se
+    devolvía la lista vacía y el proceso salía con 0. Un hook de pre-commit
+    que sale 0 cuando no pudo mirar es peor que no tener hook, porque el
+    usuario cree que lo revisaron.
+    """
+
+
 def escanear_indice(nombres) -> tuple[list[tuple[str, list]], int]:
     """Escanea los BLOBS del índice, no el working tree.
 
@@ -465,9 +475,12 @@ def escanear_indice(nombres) -> tuple[list[tuple[str, list]], int]:
             ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
             capture_output=True, text=True, check=True,
         ).stdout
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("✗ No se pudo leer el índice de git.")
-        return [], 0
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        raise SinIndice(
+            f"No se pudo leer el índice de git desde {Path.cwd()} ({e}). "
+            f"--staged tiene que correr dentro del repositorio cuyo commit se "
+            f"está revisando."
+        ) from e
 
     rutas = [p for p in salida.split("\n") if p.strip()]
     resultados, revisados = [], 0
@@ -514,7 +527,11 @@ def main(argv=None) -> int:
 
     raiz_repo = Path.cwd()
     if args.staged:
-        resultados, revisados = escanear_indice(nombres)
+        try:
+            resultados, revisados = escanear_indice(nombres)
+        except SinIndice as e:
+            print(f"✗ {e}")
+            return 1
         globs = globs_ignorados(raiz_repo, args.estricto)
         if globs:
             antes = len(resultados)
@@ -542,7 +559,14 @@ def main(argv=None) -> int:
         revisados = len(archivos)
 
     if not revisados:
-        print("No hay archivos que escanear.")
+        # El mensaje distingue los dos modos a propósito: "No hay archivos que
+        # escanear" saliendo con 0 fue durante meses la señal de que --staged
+        # estaba mirando el repositorio equivocado, y se leía como éxito.
+        if args.staged:
+            print(f"No hay nada en el índice de git de {Path.cwd()}. "
+                  f"Nada que revisar antes del commit.")
+        else:
+            print("No hay archivos que escanear.")
         return 0
 
     altas = bajas = opacas = 0

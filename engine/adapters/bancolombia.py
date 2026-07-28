@@ -16,7 +16,8 @@ import csv
 from pathlib import Path
 
 from ..ledger import Movimiento
-from .generico import abrir_csv, parse_fecha, parse_monto
+from .generico import (abrir_csv, aviso_de_filas_saltadas,
+                       convencion_del_archivo, parse_fecha, parse_monto)
 
 NOMBRE = "Bancolombia"
 
@@ -46,15 +47,24 @@ def detecta(cabeceras: list[str], nombre: str = "") -> bool:
     return sum(1 for s in SENALES if s in texto) >= 2
 
 
-def _clasificar(descripcion: str) -> str:
+# Igual que en deel.py y wise.py: el texto propone y el signo veta. Un
+# "ABONO INTERESES" en negativo es una reversión, no un rendimiento, y
+# meterlo como ingreso_capital le resta a la base gravable.
+ENTRANTES = {"ingreso_trabajo", "ingreso_capital"}
+
+
+def _clasificar(descripcion: str, monto: float = 0.0) -> str:
     blob = descripcion.lower()
     for palabras, categoria in REGLAS:
         if any(p in blob for p in palabras):
+            if categoria in ENTRANTES and monto < 0:
+                return "desconocido"
             return categoria
     return "desconocido"
 
 
-def importar(ruta: Path) -> list[Movimiento]:
+def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
+    avisos = avisos if avisos is not None else []
     movimientos = []
     with abrir_csv(ruta) as f:
         lector = csv.DictReader(f)
@@ -78,15 +88,27 @@ def importar(ruta: Path) -> list[Movimiento]:
                 f"otros nombres, agrégalos a este adaptador y manda el PR."
             )
 
-        for i, fila in enumerate(lector, start=2):
+        # `sep_decimal=","` fijo hacía que "150,000" saliera 150 mientras
+        # "2,500,000" salía bien: corrupción parcial dentro del MISMO
+        # archivo, que ningún cuadre de totales detecta. La convención la
+        # prueba el archivo entero, y en pesos además manda la moneda.
+        filas = list(lector)
+        sep, avisos_sep = convencion_del_archivo(
+            fila.get(c_monto, "") for fila in filas
+        )
+        avisos += [f"{ruta.name}: {a}" for a in avisos_sep]
+
+        malas: list[str] = []
+        for i, fila in enumerate(filas, start=2):
             crudo = (fila.get(c_fecha) or "").strip()
             if not crudo:
                 continue
             try:
                 fecha = parse_fecha(crudo)
-                monto = parse_monto(fila.get(c_monto, "0"), sep_decimal=",")
+                monto = parse_monto(fila.get(c_monto, "0"), sep, "COP")
             except ValueError as e:
-                raise ValueError(f"{ruta.name} línea {i}: {e}") from e
+                malas.append(f"línea {i}: {e}")
+                continue
             if monto == 0:
                 continue
             desc = (fila.get(c_desc) or "").strip() if c_desc else ""
@@ -95,8 +117,12 @@ def importar(ruta: Path) -> list[Movimiento]:
                 descripcion=desc or "movimiento bancario",
                 monto_origen=monto,
                 moneda="COP",
-                categoria=_clasificar(desc),
+                categoria=_clasificar(desc, monto),
                 contraparte=((fila.get(c_doc) or "").strip() if c_doc else ""),
                 fuente=ruta.name,
             ))
+    if malas and not movimientos:
+        raise ValueError(f"{ruta.name}: ninguna fila se pudo leer — {malas[0]}")
+    if malas:
+        avisos.append(aviso_de_filas_saltadas(ruta.name, malas, len(movimientos)))
     return movimientos

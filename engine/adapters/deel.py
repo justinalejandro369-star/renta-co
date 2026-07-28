@@ -20,7 +20,8 @@ import csv
 from pathlib import Path
 
 from ..ledger import Movimiento
-from .generico import abrir_csv, parse_fecha, parse_monto
+from .generico import (abrir_csv, aviso_de_filas_saltadas,
+                       convencion_del_archivo, parse_fecha, parse_monto)
 
 NOMBRE = "Deel"
 
@@ -84,16 +85,43 @@ def detecta(cabeceras: list[str], nombre: str = "") -> bool:
     return all(normalizadas & alias for alias in COLUMNAS_FORMA)
 
 
+# Categorías cuyo signo esperado es una ENTRADA. Si el texto dice ingreso y
+# el monto es negativo, el texto y el signo se contradicen.
+ENTRANTES = {"ingreso_trabajo", "ingreso_capital"}
+
+
 def _clasificar(tipo: str, descripcion: str, monto: float) -> str:
+    """Categoría tributaria de un movimiento de Deel.
+
+    El texto manda, pero el SIGNO tiene voto de veto. El reordenamiento de
+    las reglas —los ingresos primero, para que "Invoice #002, platform fee
+    deducted" no se fuera a costo— arregló ese caso y abrió cuatro: "Payment
+    to contractor for milestone 2", "Payment to Juan - salary March", "Bonus
+    payment to contractor Ana" y "Withdrawal - invoice #002 payout" son
+    pagos SALIENTES que caen en la primera regla por traer "milestone",
+    "salary", "bonus" e "invoice".
+
+    Entraban como `ingreso_trabajo` con monto negativo, o sea un ingreso que
+    RESTA de la base gravable. Y no lo atrapaba nada más: `avisos_de_signo`
+    solo miraba costos y retenciones, así que 10.000.000 + (−3.000.000) daba
+    7.000.000 y `validar()` devolvía lista vacía.
+
+    Un ingreso no puede ser una salida de dinero. Cuando el texto dice
+    ingreso y el signo dice lo contrario, no se elige uno de los dos: se
+    manda a `desconocido`, que es lo que obliga al usuario a mirarlo.
+    """
     blob = f"{tipo} {descripcion}".lower()
     for palabras, categoria in REGLAS:
         if any(p in blob for p in palabras):
+            if categoria in ENTRANTES and monto < 0:
+                return "desconocido"
             return categoria
     # Sin señal textual no se adivina por el signo: se marca para revisión.
     return "desconocido"
 
 
-def importar(ruta: Path) -> list[Movimiento]:
+def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
+    avisos = avisos if avisos is not None else []
     movimientos = []
     with abrir_csv(ruta) as f:
         lector = csv.DictReader(f)
@@ -130,15 +158,27 @@ def importar(ruta: Path) -> list[Movimiento]:
                 f"renombra el archivo para que lo tome el adaptador genérico."
             )
 
-        for i, fila in enumerate(lector, start=2):
+        # La convención de separadores es del ARCHIVO, no del adaptador. Con
+        # `sep_decimal="."` fijo, un export reguardado desde Excel en locale
+        # español declaraba "82.000" USD como 82 USD.
+        filas = list(lector)
+        sep, avisos_sep = convencion_del_archivo(
+            fila.get(c_monto, "") for fila in filas
+        )
+        avisos += [f"{ruta.name}: {a}" for a in avisos_sep]
+
+        malas: list[str] = []
+        for i, fila in enumerate(filas, start=2):
             crudo = (fila.get(c_fecha) or "").strip()
             if not crudo:
                 continue
+            moneda = (fila.get(c_moneda) or "USD").strip().upper()
             try:
                 fecha = parse_fecha(crudo)
-                monto = parse_monto(fila.get(c_monto, "0"), sep_decimal=".")
+                monto = parse_monto(fila.get(c_monto, "0"), sep, moneda)
             except ValueError as e:
-                raise ValueError(f"{ruta.name} línea {i}: {e}") from e
+                malas.append(f"línea {i}: {e}")
+                continue
             if monto == 0:
                 continue
             tipo = (fila.get(c_tipo) or "").strip() if c_tipo else ""
@@ -147,9 +187,13 @@ def importar(ruta: Path) -> list[Movimiento]:
                 fecha=fecha,
                 descripcion=(desc or tipo or "movimiento Deel"),
                 monto_origen=monto,
-                moneda=(fila.get(c_moneda) or "USD").strip().upper(),
+                moneda=moneda,
                 categoria=_clasificar(tipo, desc, monto),
                 contraparte=((fila.get(c_parte) or "").strip() if c_parte else ""),
                 fuente=ruta.name,
             ))
+    if malas and not movimientos:
+        raise ValueError(f"{ruta.name}: ninguna fila se pudo leer — {malas[0]}")
+    if malas:
+        avisos.append(aviso_de_filas_saltadas(ruta.name, malas, len(movimientos)))
     return movimientos

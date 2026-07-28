@@ -4,7 +4,11 @@ Cada adaptador expone:
 
     NOMBRE      str, para reportes
     detecta(cabeceras: list[str], nombre: str = "") -> bool
-    importar(ruta: Path) -> list[Movimiento]
+    importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]
+
+`avisos` es una lista donde el adaptador APILA lo que el usuario tiene que
+ver aunque la importación no haya fallado: filas que se saltaron, montos
+ambiguos, convenciones de separador contradictorias.
 
 Agregar un banco o plataforma nueva son ~40 líneas. Copia `generico.py`,
 ajusta el mapeo de columnas, regístralo abajo y manda el PR. Incluye siempre
@@ -57,7 +61,7 @@ def elegir(ruta: Path):
     return None
 
 
-def importar(ruta: Path):
+def importar(ruta: Path, avisos: list[str] | None = None):
     """Importa un archivo con el adaptador que lo reconozca.
 
     Si un adaptador específico reclama el archivo y después falla al leerlo,
@@ -65,7 +69,14 @@ def importar(ruta: Path):
     una detección demasiado entusiasta dejaba el archivo inutilizable con un
     mensaje engañoso ("El archivo de Deel X no tiene columnas...") cuando el
     genérico lo habría leído perfecto.
+
+    `avisos` es la lista donde los adaptadores dejan lo que el usuario tiene
+    que ver aunque la importación haya "funcionado": filas saltadas, montos
+    ambiguos, convenciones de separador contradictorias. Todo eso puede dejar
+    un ledger incompleto o con un factor de mil de diferencia, y sin este
+    canal se perdía.
     """
+    avisos = avisos if avisos is not None else []
     adaptador = elegir(ruta)
     if adaptador is None:
         raise ValueError(
@@ -75,12 +86,20 @@ def importar(ruta: Path):
             f"engine/adapters/generico.py."
         )
     try:
-        return adaptador.importar(ruta), adaptador.NOMBRE
+        propios: list[str] = []
+        movs = adaptador.importar(ruta, avisos=propios)
+        avisos += propios
+        return movs, adaptador.NOMBRE
     except ValueError as e:
         if adaptador is generico or getattr(e, "sin_respaldo", False):
             raise
+        # Los avisos del intento fallido no se propagan: describen una lectura
+        # que se descartó, y mezclarlos con los del respaldo haría que el
+        # usuario buscara filas que sí entraron.
+        propios = []
         try:
-            movs = generico.importar(ruta)
+            movs = generico.importar(ruta, avisos=propios)
         except ValueError:
             raise e from None
+        avisos += propios
         return movs, f"{generico.NOMBRE} (respaldo: {adaptador.NOMBRE} falló)"

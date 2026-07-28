@@ -245,13 +245,28 @@ def cmd_importar(args) -> int:
         return 1
 
     print(f"Archivos encontrados: {len(archivos)}\n")
+    # `incidencias` es todo lo que deja el ledger incompleto o dudoso aunque
+    # el comando "funcione": archivos que no se pudieron leer, filas saltadas,
+    # montos ambiguos. Se acumulan para el resumen final, para el encabezado
+    # del sugerido-perfil.toml, y para el código de salida. Antes se imprimía
+    # un ✗ temprano, se seguía, se escribía el ledger con los ingresos de ese
+    # archivo faltando, y se salía 0.
+    incidencias: list[str] = []
+    fallidos: list[str] = []
     for archivo in archivos:
         try:
-            movs, nombre = adapters.importar(archivo)
+            avisos_archivo: list[str] = []
+            movs, nombre = adapters.importar(archivo, avisos=avisos_archivo)
             for m in movs:
                 ledger.agregar(m)
             print(f"  ✓ {archivo.name:<44} {nombre:<14} {len(movs):>4} movimientos")
+            for aviso in avisos_archivo:
+                incidencias.append(aviso)
+                for i, tramo in enumerate(_envolver(aviso, ANCHO - 8)):
+                    print(f"      {'⚠' if i == 0 else ' '} {tramo}")
         except ValueError as e:
+            fallidos.append(archivo.name)
+            incidencias.append(f"{archivo.name} NO se pudo importar: {e}")
             print(f"  ✗ {archivo.name}\n      {e}")
 
     if not ledger.movimientos:
@@ -297,13 +312,21 @@ def cmd_importar(args) -> int:
     # Antes de sobreescribir, se recuperan las clasificaciones que el usuario
     # corrigió a mano en la corrida anterior. Sin esto, el consejo de
     # "arréglala en el ledger y vuelve a correr" era una pérdida de tiempo.
-    reaplicadas = aplicar_clasificacion_previa(
-        ledger, leer_clasificacion_previa(destino)
-    )
+    #
+    # El reporte va SIEMPRE, incluso con cero conservadas. El mensaje viejo
+    # estaba dentro de un `if reaplicadas`, así que el caso que importa —el
+    # ledger anterior no se pudo leer y se perdió TODO— era justo el que no
+    # decía nada.
+    previas, ilegibles = leer_clasificacion_previa(destino)
+    hubo_ledger_previo = destino.exists()
+    reclasificacion = aplicar_clasificacion_previa(ledger, previas, ilegibles)
     ledger.escribir_csv(destino)
-    if reaplicadas:
-        print(f"\n↻ Se conservaron {reaplicadas} clasificación(es) que habías "
-              f"corregido a mano en el ledger anterior.")
+    if hubo_ledger_previo:
+        print(f"\n↻ Ledger anterior: {reclasificacion.resumen()}.")
+        for aviso in reclasificacion.avisos():
+            incidencias.append(aviso)
+            for i, tramo in enumerate(_envolver(aviso, ANCHO - 4)):
+                print(f"  {'⚠' if i == 0 else ' '} {tramo}")
 
     print(f"\nLedger → {destino}\n")
     print("Resumen por categoría:")
@@ -320,7 +343,9 @@ def cmd_importar(args) -> int:
             print(f"  ⚠ {tramo}" if tramo == _envolver(aviso, ANCHO - 4)[0] else f"    {tramo}")
 
     # --- puente al perfil ---------------------------------------------
-    sugerido = escribir_sugerencia_perfil(ledger, exp / "02-datos" / "sugerido-perfil.toml")
+    sugerido = escribir_sugerencia_perfil(
+        ledger, exp / "02-datos" / "sugerido-perfil.toml", incidencias
+    )
     print(f"\nSugerencia de perfil → {sugerido}")
     print("  Revisa cada cifra y cópiala a perfil.toml. NO se sobrescribe tu")
     print("  perfil: ese paso es tuyo, y es donde se atrapan las clasificaciones")
@@ -337,6 +362,25 @@ def cmd_importar(args) -> int:
     for aviso in cons["avisos"]:
         for i, tramo in enumerate(_envolver(aviso, ANCHO - 8)):
             print(f"      {'·' if i == 0 else ' '} {tramo}")
+
+    # --- resumen final y código de salida --------------------------------
+    # Un ledger al que le faltan movimientos cuadra consigo mismo: la suma da
+    # exacta, el CSV se ve bien, y el ingreso de un trimestre entero no está.
+    # Por eso el código de salida NO puede ser 0: es la única señal que ve un
+    # script, un hook o el agente que encadena `importar` con `calcular`.
+    if incidencias:
+        titulo("⚠ EL LEDGER PUEDE ESTAR INCOMPLETO")
+        if fallidos:
+            print(f"  {len(fallidos)} archivo(s) no se importaron: "
+                  f"{', '.join(fallidos)}")
+        for inc in incidencias:
+            for i, tramo in enumerate(_envolver(inc, ANCHO - 4)):
+                print(f"  {'·' if i == 0 else ' '} {tramo}")
+        print()
+        print("  Arréglalo y vuelve a correr `importar` ANTES de calcular. Lo que")
+        print("  falta no aparece por ninguna parte en las cifras de arriba.")
+        print()
+        return 1
     return 0
 
 

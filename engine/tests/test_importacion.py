@@ -1,0 +1,415 @@
+"""Tests de la capa de importación: montos, signo y filas ilegibles.
+
+Por qué existe este archivo
+───────────────────────────
+La ronda 5 midió 28 de 49 mutaciones detectadas y dio veredicto de NO LISTO.
+El núcleo tributario estaba bien; lo que rodea al núcleo podía producir el
+número equivocado en silencio. Tres hallazgos de confianza ALTA vivían acá:
+
+  · `parse_monto` decidiendo el caso ambiguo con una constante del adaptador
+    (`sep_decimal="."`), o sea un factor de mil según quién leyera el archivo.
+  · `_clasificar` de Deel ignorando el signo, y metiendo pagos SALIENTES como
+    `ingreso_trabajo` — un ingreso negativo que RESTA de la base gravable.
+  · Una celda mala abortando el archivo entero, o saltándose en silencio.
+
+Los tres se escriben acá contra la CLASE, no contra el caso: la lección de
+cinco rondas es que la aserción escrita para el caso recién arreglado no
+atrapa al hermano de al lado.
+"""
+
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from engine import adapters
+from engine.adapters import bancolombia, deel, generico, wise
+from engine.adapters.generico import convencion_del_archivo, parse_monto
+
+
+def csv_temporal(nombre: str, contenido: str) -> Path:
+    ruta = Path(tempfile.mkdtemp()) / nombre
+    ruta.write_text(contenido, encoding="utf-8")
+    return ruta
+
+
+# ---------------------------------------------------------------------
+# 1. El ×1000, contra la clase
+# ---------------------------------------------------------------------
+
+def formatear(valor: float, sep_miles: str, sep_dec: str, decimales: int) -> str:
+    """Escribe un monto en una convención dada. Oráculo independiente.
+
+    No usa nada del motor: compone la cadena a mano desde el entero y la
+    fracción, que es lo que hace una hoja de cálculo al exportar.
+    """
+    negativo = valor < 0
+    v = abs(valor)
+    entero = int(v)
+    fraccion = round((v - entero) * (10 ** decimales))
+    if fraccion >= 10 ** decimales:      # el redondeo se llevó una unidad
+        entero += 1
+        fraccion = 0
+    texto = f"{entero:,}".replace(",", "\x00").replace("\x00", sep_miles)
+    if decimales:
+        texto += sep_dec + str(fraccion).zfill(decimales)
+    return ("-" if negativo else "") + texto
+
+
+CONVENCIONES = [
+    (".", ",", 0),   # colombiana sin centavos:  1.234.567
+    (".", ",", 2),   # colombiana con centavos:  1.234.567,89
+    (",", ".", 0),   # anglosajona sin centavos: 1,234,567
+    (",", ".", 2),   # anglosajona con centavos: 1,234,567.89
+    ("", ".", 2),    # sin separador de miles:   1234567.89
+    ("", "", 0),     # entero pelado:            1234567
+]
+
+# Magnitudes reales de un extracto: desde una comisión de mil pesos hasta un
+# giro de cien millones, pasando por TODO lo que cae bajo el millón, que es
+# la forma donde vive la ambigüedad.
+VALORES = [
+    1_234, 8_500, 12_500, 54_937, 82_000, 150_000, 500_000, 897_681,
+    1_000_000, 1_234_567, 2_500_000, 12_345_678, 100_000_000,
+    1_234.56, 82_000.50, 150_000.99, 3_800.00, 12_500.75,
+]
+
+
+class TestMontoRoundTrip(unittest.TestCase):
+    """La propiedad que cierra la clase, no el caso.
+
+    Si un archivo PRUEBA su convención —y todo archivo real de más de dos
+    filas la prueba—, entonces cada monto tiene que volver exactamente al
+    número que lo generó. Un factor de mil en cualquier fila rompe esto.
+    """
+
+    def test_todo_monto_vuelve_a_su_valor_en_toda_convencion(self):
+        for sep_miles, sep_dec, decimales in CONVENCIONES:
+            valores = [v for v in VALORES if decimales or v == int(v)]
+            textos = [formatear(v, sep_miles, sep_dec, decimales) for v in valores]
+            sep, _ = convencion_del_archivo(textos)
+            for esperado, texto in zip(valores, textos):
+                for moneda in ("COP", "USD"):
+                    obtenido = parse_monto(texto, sep, moneda)
+                    self.assertAlmostEqual(
+                        obtenido, esperado, places=2,
+                        msg=(f"{texto!r} en convención miles={sep_miles!r} "
+                             f"dec={sep_dec!r} moneda={moneda} dio {obtenido}, "
+                             f"se esperaba {esperado}"),
+                    )
+
+    def test_ningun_monto_se_desvia_por_un_factor_de_mil(self):
+        """El error específico que apareció dos veces en el historial.
+
+        Se afirma aparte del round-trip porque un fallo de ×1000 es el único
+        que produce un número creíble: 82.000 en vez de 82.000.000 pasa
+        cualquier revisión de vista.
+        """
+        for sep_miles, sep_dec, decimales in CONVENCIONES:
+            valores = [v for v in VALORES if decimales or v == int(v)]
+            textos = [formatear(v, sep_miles, sep_dec, decimales) for v in valores]
+            sep, _ = convencion_del_archivo(textos)
+            for esperado, texto in zip(valores, textos):
+                obtenido = parse_monto(texto, sep, "COP")
+                for factor in (1000, 0.001):
+                    self.assertNotAlmostEqual(
+                        obtenido, esperado * factor, places=2,
+                        msg=f"{texto!r} salió con factor {factor} ({obtenido})",
+                    )
+
+
+class TestConvencionDelArchivo(unittest.TestCase):
+    """La señal que la ronda 5 encontró sin usar: el archivo completo."""
+
+    def test_una_fila_con_dos_separadores_prueba_que_son_miles(self):
+        """'2,500,000' en el mismo archivo dice que '150,000' son 150 mil.
+
+        Este es el caso reproducido de Bancolombia: '150,000' salía 150
+        mientras '2,500,000' salía bien. Corrupción PARCIAL dentro del mismo
+        archivo, que ningún cuadre de totales detecta.
+        """
+        sep, _ = convencion_del_archivo(["2,500,000", "150,000"])
+        self.assertIsNone(sep)
+        self.assertEqual(parse_monto("150,000", sep, "COP"), 150_000)
+
+    def test_una_fila_con_dos_decimales_prueba_el_separador_decimal(self):
+        sep, avisos = convencion_del_archivo(["3800.00", "150.000"])
+        self.assertEqual(sep, ".")
+        self.assertEqual(parse_monto("150.000", sep, "USD"), 150.0)
+        self.assertTrue(any("DECIMALES" in a for a in avisos),
+                        "una lectura de ×1000 no puede ser silenciosa")
+
+    def test_un_archivo_sin_evidencia_avisa_en_vez_de_callar(self):
+        sep, avisos = convencion_del_archivo(["82.000", "3.500"])
+        self.assertIsNone(sep)
+        self.assertTrue(any("MILES" in a for a in avisos))
+
+    def test_convenciones_contradictorias_no_inventan_una(self):
+        sep, avisos = convencion_del_archivo(["1.234,56", "1,234.56"])
+        self.assertIsNone(sep)
+        self.assertTrue(avisos)
+
+    def test_los_tokens_malformados_no_votan(self):
+        """'1.2.3' no es un monto y no puede decidir la convención del archivo."""
+        sep, _ = convencion_del_archivo(["1.2.3", "3800.00"])
+        self.assertEqual(sep, ".")
+
+
+class TestBandaDeMoneda(unittest.TestCase):
+    """Un movimiento en pesos de '1,234' no son un peso con veintitrés
+    centavos. Es la misma idea que TRM_MINIMA/TRM_MAXIMA en trm.py."""
+
+    def test_en_pesos_el_caso_ambiguo_es_siempre_de_miles(self):
+        for texto, esperado in (("150,000", 150_000), ("150.000", 150_000),
+                                ("1.234", 1_234), ("82.000", 82_000)):
+            for pista in (None, ".", ","):
+                self.assertEqual(
+                    parse_monto(texto, pista, "COP"), esperado,
+                    f"{texto!r} con pista {pista!r} no dio {esperado}",
+                )
+
+    def test_en_moneda_extranjera_la_pista_del_archivo_sigue_mandando(self):
+        """No se extiende la banda a todo: 1.234 USD es una comisión real."""
+        self.assertEqual(parse_monto("1.234", ".", "USD"), 1.234)
+        self.assertEqual(parse_monto("1.234", None, "USD"), 1_234)
+
+    def test_la_estructura_sigue_ganandole_a_la_moneda(self):
+        """'0.500' y '12500.750' son decimales por forma, en cualquier moneda."""
+        for moneda in ("COP", "USD", None):
+            self.assertEqual(parse_monto("0.500", ".", moneda), 0.5)
+            self.assertEqual(parse_monto("12500.750", ".", moneda), 12500.75)
+
+
+class TestNingunAdaptadorSuponeLaConvencion(unittest.TestCase):
+    """La causa raíz: una constante del adaptador decidiendo el factor de mil.
+
+    Se prueba por comportamiento y en los CUATRO adaptadores, no en el que se
+    acaba de tocar. Cinco de cinco rondas encontraron que el arreglo aplicado
+    a un solo archivo hermano es el hallazgo más grave de la siguiente.
+    """
+
+    def test_deel_no_divide_por_mil_un_export_reguardado_desde_excel(self):
+        ruta = csv_temporal("deel-marzo.csv",
+                            "Date,Type,Amount,Currency,Counterparty,Description\n"
+                            "2025-03-14,invoice,82.000,USD,Cliente,Payment received\n"
+                            "2025-04-14,invoice,55.500,USD,Cliente,Payment received\n")
+        movs = deel.importar(ruta)
+        self.assertEqual([m.monto_origen for m in movs], [82_000, 55_500])
+
+    def test_wise_no_divide_por_mil_un_extracto_en_pesos(self):
+        ruta = csv_temporal("wise-statement.csv",
+                            "Date,Amount,Currency,Description\n"
+                            "2025-03-14,4.500.000,COP,Received money from Cliente\n"
+                            "2025-03-20,150.000,COP,Received money from Cliente\n")
+        movs = wise.importar(ruta)
+        self.assertEqual([m.monto_origen for m in movs], [4_500_000, 150_000])
+
+    def test_bancolombia_lee_igual_las_filas_grandes_y_las_pequenas(self):
+        ruta = csv_temporal("bancolombia.csv",
+                            "Fecha,Descripcion,Valor,Documento\n"
+                            "14/03/2025,ABONO,\"2,500,000\",1\n"
+                            "15/03/2025,PAGO,\"150,000\",2\n")
+        movs = bancolombia.importar(ruta)
+        self.assertEqual([m.monto_origen for m in movs], [2_500_000, 150_000])
+
+    def test_generico_hace_lo_mismo(self):
+        ruta = csv_temporal("otro-banco.csv",
+                            "fecha,descripcion,valor\n"
+                            "14/03/2025,ABONO,2.500.000\n"
+                            "15/03/2025,PAGO,150.000\n")
+        movs = generico.importar(ruta)
+        self.assertEqual([m.monto_origen for m in movs], [2_500_000, 150_000])
+
+
+# ---------------------------------------------------------------------
+# 2. El signo
+# ---------------------------------------------------------------------
+
+# Las 30 descripciones típicas de un export de Deel, con la categoría que
+# les corresponde. Las cuatro que el reordenamiento de la ronda 4 rompió van
+# marcadas: son pagos SALIENTES cuyo texto trae una palabra de ingreso.
+CASOS_DEEL = [
+    # (tipo, descripción, monto, categoría esperada)
+    ("invoice", "Invoice #001 paid by client", 5000, "ingreso_trabajo"),
+    ("payment", "Payment received from Acme", 4000, "ingreso_trabajo"),
+    ("invoice", "Invoice #002, platform fee deducted", 3800, "ingreso_trabajo"),
+    ("payment", "Contract payment for March", 4200, "ingreso_trabajo"),
+    ("payment", "Payment from Cliente SAS", 3000, "ingreso_trabajo"),
+    ("salary", "Salary March", 2500, "ingreso_trabajo"),
+    ("milestone", "Milestone 3 released", 1500, "ingreso_trabajo"),
+    ("bonus", "Bonus for Q1", 800, "ingreso_trabajo"),
+    ("payment", "Pago recibido de cliente", 2000, "ingreso_trabajo"),
+    ("withdrawal", "Withdraw to bank account", -3000, "traslado"),
+    ("withdrawal", "Retiro a cuenta Bancolombia", -2000, "traslado"),
+    ("payout", "Payout to bank", -1800, "traslado"),
+    ("transfer", "Bank transfer out", -1200, "traslado"),
+    ("transfer", "Transfer to bank", -900, "traslado"),
+    ("transfer", "Internal transfer USD to COP", -500, "traslado"),
+    ("transfer", "Balance transfer", -400, "traslado"),
+    ("transfer", "Move funds to COP balance", -300, "traslado"),
+    ("transfer", "Transferencia interna", -250, "traslado"),
+    ("payment", "Payment to contractor Ana", -1000, "costo"),
+    ("payment", "Contractor payment October", -1100, "costo"),
+    ("payment", "Pago a proveedor", -700, "costo"),
+    ("payout", "Payout to contractor Luis", -650, "costo"),
+    ("fee", "Platform fee", -100, "costo"),
+    ("fee", "Service charge", -50, "costo"),
+    ("fee", "Wise charged a fee", -40, "costo"),
+    ("fee", "Transfer fee", -30, "costo"),
+    ("fee", "Comision de la plataforma", -20, "costo"),
+    # Los cuatro que abrió el reordenamiento: texto de ingreso, dinero que SALE.
+    ("payment", "Payment to contractor for milestone 2", -1000, "desconocido"),
+    ("payment", "Payment to Juan - salary March", -900, "desconocido"),
+    ("payment", "Bonus payment to contractor Ana", -600, "desconocido"),
+    ("withdrawal", "Withdrawal - invoice #002 payout", -1500, "desconocido"),
+]
+
+
+class TestSignoEnLaClasificacion(unittest.TestCase):
+    def test_las_treinta_descripciones_tipicas_de_deel(self):
+        malas = [
+            (desc, esperada, deel._clasificar(tipo, desc, monto))
+            for tipo, desc, monto, esperada in CASOS_DEEL
+            if deel._clasificar(tipo, desc, monto) != esperada
+        ]
+        self.assertEqual(malas, [], f"{len(malas)} de {len(CASOS_DEEL)} mal clasificadas")
+
+    def test_ninguna_categoria_de_ingreso_acepta_un_monto_negativo(self):
+        """La CLASE, en los tres adaptadores que clasifican por texto.
+
+        Un ingreso no puede ser una salida de dinero. Da igual qué diga la
+        descripción: si el texto y el signo se contradicen, va a revisión
+        manual, que es lo único que no produce un número equivocado.
+        """
+        for modulo, llamar in (
+            (deel, lambda d, m: deel._clasificar("", d, m)),
+            (wise, lambda d, m: wise._clasificar(d, m)),
+            (bancolombia, lambda d, m: bancolombia._clasificar(d, m)),
+        ):
+            for palabras, categoria in modulo.REGLAS:
+                if categoria not in {"ingreso_trabajo", "ingreso_capital"}:
+                    continue
+                for palabra in palabras:
+                    self.assertNotIn(
+                        llamar(palabra, -1000),
+                        {"ingreso_trabajo", "ingreso_capital"},
+                        f"{modulo.NOMBRE}: {palabra!r} en negativo entró como ingreso",
+                    )
+
+    def test_el_mismo_texto_en_positivo_sigue_siendo_ingreso(self):
+        """El veto del signo no puede tragarse los ingresos de verdad."""
+        for modulo, llamar in (
+            (deel, lambda d, m: deel._clasificar("", d, m)),
+            (wise, lambda d, m: wise._clasificar(d, m)),
+            (bancolombia, lambda d, m: bancolombia._clasificar(d, m)),
+        ):
+            for palabras, categoria in modulo.REGLAS:
+                if categoria not in {"ingreso_trabajo", "ingreso_capital"}:
+                    continue
+                for palabra in palabras:
+                    self.assertEqual(
+                        llamar(palabra, 1000), categoria,
+                        f"{modulo.NOMBRE}: {palabra!r} en positivo dejó de ser {categoria}",
+                    )
+
+
+class TestAvisosDeSigno(unittest.TestCase):
+    """La segunda mitad del hallazgo del signo.
+
+    Aunque la clasificación falle, el ledger tiene que notarlo. Antes solo
+    miraba costos y retenciones, así que un ingreso negativo neteaba en
+    silencio: 10.000.000 + (−3.000.000) = 7.000.000 y `validar()` devolvía
+    lista vacía.
+    """
+
+    def _ledger(self, categoria, *montos):
+        from datetime import date
+
+        from engine.ledger import Ledger, Movimiento
+
+        return Ledger([
+            Movimiento(date(2025, 3, i + 1), "mov", monto, "COP", categoria)
+            for i, monto in enumerate(montos)
+        ]).convertir(None)
+
+    def test_toda_categoria_con_signo_esperado_avisa_cuando_va_al_reves(self):
+        from engine.ledger import Ledger
+
+        for categoria, (signo, _, _) in Ledger.SIGNO_ESPERADO.items():
+            ledger = self._ledger(categoria, 10_000_000 * signo, -3_000_000 * signo)
+            self.assertTrue(
+                ledger.avisos_de_signo(),
+                f"{categoria}: un movimiento con el signo contrario no avisó",
+            )
+
+    def test_el_aviso_no_se_dispara_cuando_todo_va_en_el_sentido_correcto(self):
+        from engine.ledger import Ledger
+
+        for categoria, (signo, _, _) in Ledger.SIGNO_ESPERADO.items():
+            ledger = self._ledger(categoria, 10_000_000 * signo, 5_000_000 * signo)
+            self.assertEqual(
+                ledger.avisos_de_signo(), [],
+                f"{categoria}: avisó sin que hubiera signos mezclados",
+            )
+
+    def test_un_ingreso_negativo_no_pasa_callado_por_validar(self):
+        ledger = self._ledger("ingreso_trabajo", 10_000_000, -3_000_000)
+        self.assertEqual(ledger.total("ingreso_trabajo"), 7_000_000)
+        self.assertTrue(any("NEGATIVO" in a for a in ledger.validar()))
+
+
+# ---------------------------------------------------------------------
+# 3. Las filas que no se pueden leer
+# ---------------------------------------------------------------------
+
+class TestFilasIlegibles(unittest.TestCase):
+    """Una celda mala en la fila 200 abortaba el archivo entero y borraba
+    doce meses de ingreso. Saltarla es lo correcto; saltarla callado no."""
+
+    def test_una_fila_mala_no_bota_el_resto_del_archivo(self):
+        ruta = csv_temporal("extracto.csv",
+                            "fecha,descripcion,valor\n"
+                            "14/03/2025,uno,1.500.000\n"
+                            "15/03/2025,dos,basura\n"
+                            "16/03/2025,tres,2.500.000\n")
+        avisos: list[str] = []
+        movs = generico.importar(ruta, avisos=avisos)
+        self.assertEqual(len(movs), 2)
+        self.assertEqual(sum(m.monto_origen for m in movs), 4_000_000)
+
+    def test_la_fila_saltada_se_reporta_con_su_numero_de_linea(self):
+        ruta = csv_temporal("extracto.csv",
+                            "fecha,descripcion,valor\n"
+                            "14/03/2025,uno,1.500.000\n"
+                            "15/03/2025,dos,basura\n")
+        avisos: list[str] = []
+        generico.importar(ruta, avisos=avisos)
+        self.assertTrue(avisos, "una fila perdida no puede ser silenciosa")
+        texto = " ".join(avisos)
+        self.assertIn("línea 3", texto)
+        self.assertIn("NO están en el ledger", texto)
+
+    def test_un_archivo_entero_ilegible_si_es_error(self):
+        ruta = csv_temporal("extracto.csv",
+                            "fecha,descripcion,valor\n"
+                            "14/03/2025,uno,basura\n"
+                            "15/03/2025,dos,masbasura\n")
+        with self.assertRaises(ValueError):
+            generico.importar(ruta)
+
+    def test_los_avisos_llegan_al_que_llama_al_despachador(self):
+        """`adapters.importar` es lo que usa el CLI: si los avisos se quedan
+        adentro, el usuario no ve nada y el exit code es 0."""
+        ruta = csv_temporal("deel.csv",
+                            "Date,Type,Amount,Currency,Description\n"
+                            "2025-03-14,invoice,3800.00,USD,Payment received\n"
+                            "2025-03-15,invoice,basura,USD,Payment received\n")
+        avisos: list[str] = []
+        movs, nombre = adapters.importar(ruta, avisos=avisos)
+        self.assertEqual(len(movs), 1)
+        self.assertTrue(any("no se pudieron leer" in a for a in avisos), avisos)
+
+
+if __name__ == "__main__":
+    unittest.main()

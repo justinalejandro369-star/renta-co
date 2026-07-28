@@ -197,8 +197,9 @@ class TestLedger(unittest.TestCase):
         ]).convertir(None)
         destino = Path(tempfile.mkdtemp()) / "ledger.csv"
         ledger.escribir_csv(destino)
-        previas = leer_clasificacion_previa(destino)
+        previas, ilegibles = leer_clasificacion_previa(destino)
         self.assertEqual(len(previas), 2)
+        self.assertEqual(ilegibles, [])
 
     def test_las_correcciones_a_mano_sobreviven_a_reimportar(self):
         """La herramienta dice «arréglala en el ledger y vuelve a correr», y
@@ -213,8 +214,8 @@ class TestLedger(unittest.TestCase):
 
         # Se vuelve a importar el mismo movimiento, sin clasificar.
         nuevo = Ledger([self._mov(314, 1_500_000, "desconocido")]).convertir(None)
-        aplicadas = aplicar_clasificacion_previa(nuevo, leer_clasificacion_previa(destino))
-        self.assertEqual(aplicadas, 1)
+        r = aplicar_clasificacion_previa(nuevo, *leer_clasificacion_previa(destino))
+        self.assertEqual(r.conservadas, 1)
         self.assertEqual(nuevo.movimientos[0].categoria, "traslado")
 
     def test_una_categoria_inventada_en_el_csv_no_se_aplica(self):
@@ -226,10 +227,88 @@ class TestLedger(unittest.TestCase):
             encoding="utf-8",
         )
         nuevo = Ledger([self._mov(314, 1_500_000, "desconocido")]).convertir(None)
-        self.assertEqual(
-            aplicar_clasificacion_previa(nuevo, leer_clasificacion_previa(destino)), 0
-        )
+        r = aplicar_clasificacion_previa(nuevo, *leer_clasificacion_previa(destino))
+        self.assertEqual(r.conservadas, 0)
         self.assertEqual(nuevo.movimientos[0].categoria, "desconocido")
+        self.assertTrue(r.perdidas, "una categoría inventada se descartó en silencio")
+
+
+class TestCaminoNegativoDeLaReclasificacion(unittest.TestCase):
+    """Lo que pasa cuando la reclasificación NO funciona.
+
+    El camino feliz tenía dos tests desde la ronda 4. El negativo no tenía
+    ninguno, y ahí vivían los dos fallos: dos filas con la misma llave se
+    clasificaban las dos con la última categoría, y un ledger guardado desde
+    Excel en locale español perdía TODAS las correcciones sin decir nada —el
+    mensaje `↻` solo se imprimía si el contador daba mayor que cero.
+    """
+
+    def _escribir(self, *movs) -> Path:
+        destino = Path(tempfile.mkdtemp()) / "ledger.csv"
+        Ledger(list(movs)).convertir(None).escribir_csv(destino)
+        return destino
+
+    def _mov(self, dia, monto, categoria, fuente="banco.csv", desc="giro"):
+        return Movimiento(date(2025, 3, dia), desc, monto, "COP", categoria,
+                          fuente=fuente)
+
+    def test_dos_filas_con_la_misma_llave_conservan_cada_una_su_categoria(self):
+        """Dos transferencias del mismo monto el mismo día es lo más común
+        de un extracto. Con la llave sola, el dict se quedaba con la última
+        y `aplicar` se la imponía a las dos."""
+        destino = self._escribir(
+            self._mov(14, 1_500_000, "traslado", desc="giro A"),
+            self._mov(14, 1_500_000, "costo", desc="giro B"),
+        )
+        nuevo = Ledger([
+            self._mov(14, 1_500_000, "desconocido", desc="giro A"),
+            self._mov(14, 1_500_000, "desconocido", desc="giro B"),
+        ]).convertir(None)
+        r = aplicar_clasificacion_previa(nuevo, *leer_clasificacion_previa(destino))
+        self.assertEqual([m.categoria for m in nuevo.movimientos],
+                         ["traslado", "costo"])
+        self.assertEqual(r.conservadas, 2)
+
+    def test_un_ledger_guardado_en_locale_espanol_se_sigue_leyendo(self):
+        """Excel reescribe 1500000.00 como 1500000,00 según la configuración
+        regional de la máquina. `float()` reventaba y el `continue` se tragaba
+        la excepción: se perdían todas las clasificaciones."""
+        destino = self._escribir(self._mov(14, 1_500_000, "traslado"))
+        destino.write_text(
+            destino.read_text(encoding="utf-8").replace("1500000.00", '"1500000,00"'),
+            encoding="utf-8",
+        )
+        nuevo = Ledger([self._mov(14, 1_500_000, "desconocido")]).convertir(None)
+        r = aplicar_clasificacion_previa(nuevo, *leer_clasificacion_previa(destino))
+        self.assertEqual(r.conservadas, 1)
+        self.assertEqual(nuevo.movimientos[0].categoria, "traslado")
+
+    def test_una_fila_ilegible_se_reporta_en_vez_de_desaparecer(self):
+        destino = self._escribir(self._mov(14, 1_500_000, "traslado"))
+        destino.write_text(
+            destino.read_text(encoding="utf-8").replace("1500000.00", "no-es-numero"),
+            encoding="utf-8",
+        )
+        nuevo = Ledger([self._mov(14, 1_500_000, "desconocido")]).convertir(None)
+        r = aplicar_clasificacion_previa(nuevo, *leer_clasificacion_previa(destino))
+        self.assertEqual(r.conservadas, 0)
+        self.assertTrue(r.ilegibles)
+        self.assertTrue(any("no se pudieron leer" in a for a in r.avisos()))
+
+    def test_el_resumen_habla_tambien_cuando_no_se_conservo_nada(self):
+        """El caso que importa: cero conservadas tiene que decirse. El
+        mensaje viejo vivía dentro de un `if aplicadas`."""
+        vacio = Ledger([]).convertir(None)
+        r = aplicar_clasificacion_previa(vacio, {}, [])
+        self.assertIn("0 clasificación(es) conservadas", r.resumen())
+
+    def test_una_correccion_cuyo_movimiento_desaparecio_se_reporta(self):
+        destino = self._escribir(self._mov(14, 1_500_000, "traslado"))
+        nuevo = Ledger([self._mov(20, 999, "desconocido")]).convertir(None)
+        r = aplicar_clasificacion_previa(nuevo, *leer_clasificacion_previa(destino))
+        self.assertEqual(r.conservadas, 0)
+        self.assertTrue(r.perdidas)
+        self.assertTrue(any("NO se pudieron reaplicar" in a for a in r.avisos()))
 
 
 class TestImportacionCompleta(unittest.TestCase):
