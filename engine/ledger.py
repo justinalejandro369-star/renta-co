@@ -90,13 +90,70 @@ class Ledger:
     def sin_clasificar(self) -> list[Movimiento]:
         return [m for m in self.movimientos if m.categoria == "desconocido"]
 
-    def consignaciones(self) -> float:
-        """Todo lo que ENTRÓ a las cuentas, incluidos traslados.
+    def entradas_por_fuente(self) -> dict[str, float]:
+        """Entradas positivas agrupadas por archivo de origen."""
+        por_fuente: dict[str, float] = {}
+        for m in self.movimientos:
+            if m.monto_cop > 0:
+                por_fuente[m.fuente] = por_fuente.get(m.fuente, 0) + m.monto_cop
+        return por_fuente
 
-        Es la base del umbral de 3.500 UVT del art. 437 par. 3 ET, y NO es lo
-        mismo que el ingreso propio.
+    def consignaciones(self) -> dict:
+        """Insumo para el umbral de 3.500 UVT — NO un número listo para usar.
+
+        El art. 437 par. 3 num. 6 ET no habla de "todo lo que entró". Habla de
+        «consignaciones bancarias, depósitos o inversiones financieras
+        PROVENIENTES DE ACTIVIDADES GRAVADAS CON EL IMPUESTO SOBRE LAS
+        VENTAS -IVA». Ese calificador decide el caso y se omite con
+        frecuencia:
+
+          · Un traslado entre cuentas propias no proviene de una actividad
+            gravada.
+          · Un préstamo recibido tampoco.
+          · Si la actividad es exportación de servicios (art. 481 lit. c) o
+            está excluida, el numerador puede ser CERO aunque por la cuenta
+            pasen cientos de millones.
+
+        Y hay un problema aritmético además del legal: si se importan el
+        export de la plataforma Y el extracto bancario donde aterrizó ese
+        mismo giro, el dinero se cuenta dos veces. Es el flujo que la propia
+        herramienta recomienda, así que la duplicación es el caso normal, no
+        el excepcional.
+
+        Por eso esto devuelve un desglose con sus advertencias, y no un total
+        que invite a compararlo con el umbral sin pensar.
         """
-        return sum(m.monto_cop for m in self.movimientos if m.monto_cop > 0)
+        por_fuente = self.entradas_por_fuente()
+        bruto = sum(por_fuente.values())
+
+        avisos = []
+        if len(por_fuente) > 1:
+            avisos.append(
+                "Hay entradas de más de un archivo. Si importaste el export de "
+                "la plataforma Y el extracto del banco donde aterrizó ese mismo "
+                "giro, el dinero está contado dos veces. Revisa el desglose por "
+                "fuente antes de comparar contra el umbral."
+            )
+        if self.total("traslado"):
+            avisos.append(
+                "Hay traslados entre cuentas propias. Consignan, pero NO "
+                "provienen de una actividad gravada con IVA, así que no cuentan "
+                "para el umbral del art. 437 par. 3 num. 6."
+            )
+        avisos.append(
+            "Del total de arriba, para el umbral solo cuenta lo PROVENIENTE DE "
+            "ACTIVIDADES GRAVADAS CON IVA. Si tu actividad es exportación de "
+            "servicios (art. 481 lit. c) o está excluida, esa porción puede ser "
+            "cero. Sepáralo con tu contador antes de concluir nada."
+        )
+
+        return {
+            "entradas_brutas": round(bruto),
+            "por_fuente": {k: round(v) for k, v in por_fuente.items()},
+            "traslados": round(abs(self.total("traslado"))),
+            "avisos": avisos,
+            "listo_para_el_umbral": False,
+        }
 
     def validar(self) -> list[str]:
         avisos = list(self.avisos)
@@ -153,9 +210,9 @@ class Ledger:
             "anticipos": {
                 "retenciones_practicadas": round(abs(self.total("retencion"))),
             },
-            "verificaciones": {
-                "consignaciones_totales_anio": round(self.consignaciones()),
-            },
+            # consignaciones_totales_anio NO se llena desde el ledger: exige
+            # separar por origen gravado con IVA y descartar duplicados entre
+            # fuentes. Lo pone el usuario con su contador. Ver consignaciones().
         }
 
 

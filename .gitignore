@@ -1,10 +1,26 @@
 # ─────────────────────────────────────────────────────────────
 # DATOS PERSONALES — nunca deben entrar a control de versiones
 # ─────────────────────────────────────────────────────────────
+#
+# Regla de diseño: acá NO se usan negaciones amplias (`!carpeta/**`).
+# Una negación amplia reactiva TODOS los patrones de abajo dentro de esa
+# carpeta, y convierte el directorio de ejemplo —el único que la gente
+# copia para "probar con mis datos"— en el único sitio sin protección.
+# Cada archivo que sí debe versionarse se lista uno por uno.
+
+# El expediente, se llame como se llame.
 expediente/
+expediente-*/
+expediente_*/
+*-expediente/
+mi-renta/
+renta-20*/
+declaracion/
+declaracion-*/
+
 perfil.toml
 !templates/perfil.ejemplo.toml
-!expediente.ejemplo/**
+!expediente.ejemplo/perfil.toml
 
 # Documentos que casi siempre son soportes reales
 *.pdf
@@ -12,13 +28,32 @@ perfil.toml
 *.xls
 *.zip
 *.rar
-!expediente.ejemplo/**/*.csv
+*.docx
+*.eml
+*.msg
 
-# Salidas del motor
+# Salidas del motor, en cualquier ruta
 ledger*.csv
 escenarios*.csv
 trm-cache.csv
-!expediente.ejemplo/**
+resumen-ingresos.md
+patrimonio.md
+
+# Los CSV son el formato en que se exportan los extractos bancarios.
+# Se bloquean por defecto y se habilitan uno por uno.
+*.csv
+!expediente.ejemplo/00-crudo/movimientos-plataforma.csv
+!benchmark/**/*.csv
+!engine/tests/muestras/*.csv
+
+# El ejemplo versiona solo estos archivos. Todo lo que el motor genere
+# ahí dentro —ledger, caché de TRM, escenarios, entregables— queda fuera
+# por los patrones de arriba, que acá siguen activos.
+expediente.ejemplo/01-soportes/
+expediente.ejemplo/02-datos/
+expediente.ejemplo/03-analisis/
+expediente.ejemplo/04-entregables/
+expediente.ejemplo/05-riesgos/
 
 # ─────────────────────────────────────────────────────────────
 # Python

@@ -79,20 +79,67 @@ url = "https://estatuto.co/336"
 
 [topes.renta_exenta_25]
 porcentaje = 0.25
-tope_mensual_uvt = 240
-meses = 12
-nota = "El resultado además compite dentro del tope conjunto de 40% / 1.340 UVT"
-fuente = "Estatuto Tributario art. 206 num. 10 y par. 5"
-url = "https://estatuto.co/206"
+tope_anual_uvt = 790
+nota = """
+⚠ 790 UVT ANUALES, no 240 UVT mensuales. La Ley 2277 de 2022 art. 2 reemplazó
+el límite mensual de 240 UVT por uno anual de 790 UVT. El texto de los 240 UVT
+mensuales es el de la Ley 1607 de 2012 y sigue circulando en blogs y en
+material de contadores: es la fuente de error más común de esta cédula, y
+sobreestima la exención en 3,6 veces.
+
+La base NO es el ingreso bruto. El inciso 2 del numeral 10 exige calcularla
+'una vez se detraiga del valor total de los pagos laborales los ingresos no
+constitutivos de renta, las deducciones y las rentas exentas diferentes a la
+establecida en el presente numeral'.
+
+El resultado además compite dentro del tope conjunto de 40% / 1.340 UVT.
+"""
+fuente = "Estatuto Tributario art. 206 num. 10, modificado por Ley 2277 de 2022 art. 2"
+url = "https://normograma.dian.gov.co/dian/compilacion/docs/ley_2277_2022.htm"
 
 [topes.dependientes_72uvt]
 uvt_por_dependiente = 72
 maximo_dependientes = 4
 dentro_del_tope_conjunto = false
 requiere_soporte_de_gasto = false
-nota = "Se acredita la CONDICIÓN de dependiente, no un desembolso. Es la deducción más eficiente disponible: no consume el tope del 40%."
-fuente = "Estatuto Tributario art. 336 par., adicionado por Ley 2277 de 2022 art. 7"
-url = "https://normograma.dian.gov.co/dian/compilacion/docs/ley_2277_2022.htm"
+nota = """
+Se acredita la CONDICIÓN de dependiente, no un desembolso. Es la deducción
+más eficiente disponible: no consume el tope del 40%.
+
+Definición de dependiente actualizada por la Ley 2411 de 2024, aplicable
+desde el año gravable 2025:
+  · Hijos hasta 18 años.
+  · Hijos entre 18 y 25 años (antes 23) cuando el contribuyente financia su
+    educación en instituciones de educación superior certificadas por el
+    ICFES, o en programas técnicos de educación no formal acreditados.
+  · Hijos MAYORES DE 18 (antes 23) en situación de dependencia por factores
+    físicos o psicológicos, certificada por el MINISTERIO DE SALUD Y
+    PROTECCIÓN SOCIAL (antes Medicina Legal).
+  · Cónyuge o compañero(a) permanente, y padres y hermanos, en dependencia
+    por ausencia de ingresos o con ingresos anuales inferiores a 260 UVT,
+    certificada por CONTADOR PÚBLICO, o por dependencia física o psicológica.
+"""
+fuente = "ET art. 336 num. 3 inciso 2 (Ley 2277 de 2022 art. 7); definición de dependiente en ET art. 387 par. 2, modificado por Ley 2411 de 2024 art. 2"
+url = "https://normograma.dian.gov.co/dian/compilacion/docs/ley_2411_2024.htm"
+
+[topes.tope_indicativo_costos]
+porcentaje_ingresos_brutos = 0.60
+nota = """
+La Ruta A no tiene un tope que recorte la deducción, pero SÍ tiene un umbral
+con consecuencias, que suele pasarse por alto:
+
+El art. 336-1 estima los costos y gastos deducibles de rentas de trabajo en
+el 60% de los ingresos brutos. Superarlo es legítimo, pero obliga a
+indicarlo EXPRESAMENTE en la declaración marcando la casilla informativa.
+No marcarla acarrea la sanción del art. 651 num. 1 lit. d).
+
+Además exige que esos costos estén soportados con FACTURA ELECTRÓNICA de
+venta, nómina electrónica o documentos equivalentes electrónicos — lo que
+tensiona directamente la estrategia de documento soporte físico del riesgo
+R-03. Quien piense superar el 60% debe mirar los dos requisitos juntos.
+"""
+fuente = "Estatuto Tributario art. 336-1, adicionado por Ley 2277 de 2022 art. 60"
+url = "https://estatuto.co/336-1"
 
 [topes.dependientes_10pct]
 porcentaje_renta_trabajo = 0.10
@@ -114,7 +161,7 @@ url = "https://estatuto.co/119"
 tope_mensual_uvt = 16
 meses = 12
 dentro_del_tope_conjunto = true
-fuente = "Estatuto Tributario art. 387 num. 1"
+fuente = "Estatuto Tributario art. 387, inciso 2 literales a) y b)"
 url = "https://estatuto.co/387"
 
 [topes.aportes_voluntarios]
@@ -138,15 +185,23 @@ porcentaje_compras = 0.01
 tope_uvt = 240
 dentro_del_tope_conjunto = false
 nota = "Exige factura electrónica de venta con el NIT/cédula del contribuyente como adquiriente, y pago por medio electrónico."
-fuente = "Estatuto Tributario art. 336 par. 4"
+fuente = "Estatuto Tributario art. 336 numeral 5"
 url = "https://estatuto.co/336"
+
+[topes.intereses_icetex]
+tope_uvt = 100
+dentro_del_tope_conjunto = true
+implementado = false
+nota = "El art. 119 también permite deducir los intereses de créditos educativos del ICETEX hasta 100 UVT al año. El motor todavía no lo modela: si aplica, súmalo a mano en el memo al contador."
+fuente = "Estatuto Tributario art. 119"
 
 [topes.descuento_donaciones]
 porcentaje_descuento = 0.25
 tope_porcentaje_impuesto = 0.25
-nota = "Es DESCUENTO (resta del impuesto), no deducción. Exige certificación firmada por representante legal y revisor fiscal o contador de una entidad del Régimen Tributario Especial. Una transferencia a una persona o a una colecta informal vale $0."
-fuente = "Estatuto Tributario art. 257"
-url = "https://estatuto.co/257"
+porcentaje_bancos_de_alimentos = 0.37
+nota = "Es DESCUENTO (resta del impuesto), no deducción. Exige certificación firmada por representante legal y revisor fiscal o contador de una entidad del Régimen Tributario Especial. Una transferencia a una persona o a una colecta informal vale $0. El 37% para donaciones a bancos de alimentos (art. 257 par. 1, Ley 2380 de 2024) todavía no está implementado en el motor."
+fuente = "El 25% del valor donado está en el ET art. 257. El límite conjunto del 25% del impuesto, y el traslado del excedente a un período siguiente, están en el ET art. 258."
+url = "https://estatuto.co/258"
 
 # ─────────────────────────────────────────────────────────────────────
 #  Umbrales de obligación
@@ -166,9 +221,29 @@ fuente = "Decreto 1625 de 2016 art. 1.6.1.13.2.7"
 ingresos_brutos_uvt = 3500
 consignaciones_uvt = 3500
 contrato_individual_uvt = 3500
+consignaciones_uvt_contratistas_del_estado = 4000
 maximo_establecimientos = 1
-nota = "⚠ El umbral de CONSIGNACIONES se mide sobre todo lo que entró a la cuenta, no sobre el ingreso propio. Quien recibe dinero de clientes y lo redistribuye puede superarlo sin que su ingreso lo haga. Es la contingencia más subestimada de este perfil."
-fuente = "Estatuto Tributario art. 437 par. 3"
+nota = """
+El umbral de consignaciones tiene un calificador que decide el caso y que se
+omite con frecuencia: el art. 437 par. 3 num. 6 dice «consignaciones
+bancarias, depósitos o inversiones financieras PROVENIENTES DE ACTIVIDADES
+GRAVADAS CON EL IMPUESTO SOBRE LAS VENTAS -IVA».
+
+O sea que NO cuenta todo lo que entró a la cuenta. Un traslado entre cuentas
+propias, un préstamo recibido o dinero de terceros en tránsito no provienen
+de una actividad gravada. Y si la actividad del contribuyente es exportación
+de servicios (art. 481 lit. c) o está excluida, el numerador puede ser cero
+aunque por la cuenta pasen cientos de millones.
+
+Sigue siendo una contingencia real y poco mirada —el umbral se mide sobre
+consignaciones y no sobre el ingreso propio, así que un intermediario puede
+superarlo—, pero cuantificarla exige separar por origen, no sumar entradas.
+
+El par. 5 del mismo artículo eleva el límite a 4.000 UVT para prestadores de
+servicios personas naturales que derivan sus ingresos de contratos con el
+Estado.
+"""
+fuente = "Estatuto Tributario art. 437 par. 3 num. 6 y par. 5"
 url = "https://estatuto.co/437"
 
 [umbrales.agente_retencion_persona_natural]
@@ -215,7 +290,21 @@ fuente = "Estatuto Tributario art. 641"
 [sanciones.inexactitud]
 porcentaje = 1.00
 base = "diferencia entre el saldo a pagar determinado y el declarado"
-fuente = "Estatuto Tributario art. 648"
+fuente = "Estatuto Tributario art. 648 inciso 1"
+
+[sanciones.inexactitud_activos_omitidos]
+porcentaje = 2.00
+base = "mayor valor del impuesto a cargo determinado"
+nota = "El art. 648 num. 1 eleva la sanción al 200% cuando se omiten activos o se incluyen pasivos inexistentes. Es exactamente el escenario del riesgo R-05 (patrimonio subdeclarado, cripto, cuentas en el exterior), así que ese riesgo NO se cuantifica al 100%."
+fuente = "Estatuto Tributario art. 648 num. 1"
+
+[sanciones.no_declarar]
+nota = "Si nunca se presentó la declaración, la sanción aplicable es la del art. 643 (por no declarar), no la del art. 641 (extemporaneidad). Importa para el riesgo R-01: quien pierde la calidad de no responsable de IVA y nunca declaró IVA cae en el 643."
+fuente = "Estatuto Tributario art. 643"
+
+[sanciones.omision_informativa_costos]
+nota = "Art. 336-1 par. 1: no marcar la casilla informativa cuando los costos y gastos superan el tope indicativo del 60% acarrea la sanción del art. 651 num. 1 lit. d)."
+fuente = "Estatuto Tributario arts. 336-1 y 651"
 
 [sanciones.minima]
 uvt = 10

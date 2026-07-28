@@ -37,7 +37,10 @@ TARIFA_241 = [
 TOPE_CONJUNTO_PCT = 0.40          # art. 336 num. 3
 TOPE_CONJUNTO_UVT = 1_340         # art. 336 num. 3
 EXENTA_PCT = 0.25                 # art. 206 num. 10
-EXENTA_TOPE_UVT = 240 * 12        # 240 UVT mensuales
+# 790 UVT ANUALES. La Ley 2277 de 2022 art. 2 reemplazó el límite mensual de
+# 240 UVT (Ley 1607 de 2012) por este. El texto viejo sigue circulando en
+# blogs de contadores y sobreestima la exención en 3,6 veces.
+EXENTA_TOPE_UVT = 790
 DEP_UVT = 72                      # art. 336 par. (Ley 2277/2022 art. 7)
 DEP_MAX = 4
 DEP_10_PCT = 0.10                 # art. 387
@@ -94,13 +97,6 @@ def liquidar(caso: dict, ruta: str) -> dict:
                   + v("costos.arriendo_oficina")
                   + v("costos.otros"))
 
-    exenta = 0.0
-    if ruta == "B":
-        base = trabajo - incrngo
-        if base < 0:
-            base = 0
-        exenta = min(base * EXENTA_PCT, EXENTA_TOPE_UVT * UVT)
-
     gmf = v("deducciones.gmf_pagado") * GMF_PCT
     vivienda = min(v("deducciones.intereses_vivienda"), VIVIENDA_TOPE_UVT * UVT)
     prepagada = min(v("deducciones.medicina_prepagada"), PREPAGADA_TOPE_UVT * UVT)
@@ -118,15 +114,28 @@ def liquidar(caso: dict, ruta: str) -> dict:
     if n_dep > 0:
         dep_10 = min(trabajo * DEP_10_PCT, DEP_10_TOPE_UVT * UVT)
 
-    tope = min(netos * TOPE_CONJUNTO_PCT, TOPE_CONJUNTO_UVT * UVT)
+    tope = max(min(netos * TOPE_CONJUNTO_PCT, TOPE_CONJUNTO_UVT * UVT), 0)
 
     def evaluar(extra_dentro: float, extra_fuera: float):
-        solicitado = dentro_fijo + extra_dentro + exenta
+        deducciones = dentro_fijo + extra_dentro
+
+        # Art. 206 num. 10 inciso 2: la base de la exención se obtiene «una
+        # vez se detraiga del valor total de los pagos laborales los ingresos
+        # no constitutivos de renta, las deducciones y las rentas exentas
+        # diferentes a la establecida en el presente numeral».
+        exenta = 0.0
+        if ruta == "B":
+            base = trabajo - incrngo - deducciones - extra_fuera - fe
+            if base < 0:
+                base = 0
+            exenta = min(base * EXENTA_PCT, EXENTA_TOPE_UVT * UVT)
+
+        solicitado = deducciones + exenta
         aplicado = min(solicitado, tope)
         rl = netos - costos - aplicado - extra_fuera - fe
         if rl < 0:
             rl = 0
-        return rl, impuesto(rl), solicitado - aplicado, aplicado
+        return rl, impuesto(rl), solicitado - aplicado, aplicado, exenta
 
     if n_dep > 0:
         via_72 = evaluar(0.0, dep_72)
@@ -135,7 +144,7 @@ def liquidar(caso: dict, ruta: str) -> dict:
     else:
         elegida, via = evaluar(0.0, 0.0), "sin"
 
-    renta_liquida, imp, rechazado, aplicado = elegida
+    renta_liquida, imp, rechazado, aplicado, exenta = elegida
 
     donado = v("descuentos.donaciones_certificadas_rte")
     descuento = min(donado * DONACION_PCT, imp * DONACION_TOPE_IMPUESTO_PCT)
@@ -151,10 +160,10 @@ def liquidar(caso: dict, ruta: str) -> dict:
         "ingresos_brutos": brutos,
         "ingresos_netos": netos,
         "costos": costos,
-        "renta_exenta": exenta,
         "tope_conjunto": tope,
         "aplicado": aplicado,
         "rechazado": rechazado,
+        "renta_exenta_aplicada": exenta,
         "renta_liquida": round(renta_liquida),
         "impuesto": imp,
         "descuento_donaciones": round(descuento),

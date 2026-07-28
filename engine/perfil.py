@@ -25,6 +25,13 @@ ESQUEMA: dict[str, dict] = {
         "rentas_trabajo_honorarios": 0,
         "rentas_capital": 0,
         "otras_rentas_no_laborales": 0,
+        # Los tres de abajo NO los liquida este motor. Existen para que el
+        # usuario los pueda declarar y el motor lo detecte y se detenga, en
+        # vez de meterlos en la cédula equivocada y dar un número creíble y
+        # equivocado. Ver validar().
+        "rentas_laborales_salario": 0,
+        "rentas_pension": 0,
+        "ganancia_ocasional": 0,
     },
     "incrngo": {
         "aportes_obligatorios_salud_pension": 0,
@@ -123,9 +130,16 @@ class Perfil:
 
     # ---- agregados ---------------------------------------------------
 
+    # Solo los que entran a la cédula general. Salario, pensión y ganancia
+    # ocasional se excluyen a propósito: si aparecen, validar() detiene el
+    # cálculo en vez de sumarlos a una base que no les corresponde.
+    INGRESOS_CEDULA_GENERAL = (
+        "rentas_trabajo_honorarios", "rentas_capital", "otras_rentas_no_laborales",
+    )
+
     @property
     def ingresos_brutos(self) -> float:
-        return sum(self.get(f"ingresos.{k}") for k in ESQUEMA["ingresos"])
+        return sum(self.get(f"ingresos.{k}") for k in self.INGRESOS_CEDULA_GENERAL)
 
     @property
     def total_incrngo(self) -> float:
@@ -153,39 +167,96 @@ def _completar(datos: dict) -> tuple[dict, list[str]]:
         for campo, defecto in campos.items():
             if campo not in resultado[seccion]:
                 resultado[seccion][campo] = defecto
-                if defecto in (0, False):
-                    supuestos.append(f"{seccion}.{campo} = {defecto} (no informado)")
+                # Todos los defectos se registran, no solo los que valen 0 o
+                # False. Los dos que no lo son —anio_gravable y
+                # residente_fiscal— son justamente los que deciden si el
+                # motor aplica: un perfil sin bloque [contribuyente] producía
+                # una liquidación completa de residente sin una sola
+                # advertencia.
+                marca = " ← DECIDE SI ESTE MOTOR APLICA" if seccion == "contribuyente" else ""
+                supuestos.append(f"{seccion}.{campo} = {defecto} (no informado){marca}")
     resultado.setdefault("patrimonio", {})
     resultado["patrimonio"].setdefault("activos", [])
     resultado["patrimonio"].setdefault("pasivos", [])
     return resultado, supuestos
 
 
-def validar(perfil: Perfil) -> list[str]:
+def validar(perfil: Perfil, anios_disponibles: list[int] | None = None) -> list[str]:
     """Errores que impiden calcular. Distinto de 'faltantes', que solo avisan."""
     errores = []
 
-    if not perfil.get("contribuyente.residente_fiscal", True):
-        errores.append(
-            "El perfil dice que NO eres residente fiscal. Un no residente tributa "
-            "por otras reglas (art. 247 ET, tarifa única sobre renta de fuente "
-            "nacional) que este motor no implementa. Consulta con un contador."
-        )
-
+    # --- 1. tipos. Va PRIMERO y corta: el resto de las validaciones hace
+    #        aritmética, y un str en un campo numérico las revienta con un
+    #        traceback justo cuando el usuario descuidado más necesita leer
+    #        los mensajes que ya se habían recolectado.
     for seccion, campos in ESQUEMA.items():
         for campo, defecto in campos.items():
             if not isinstance(defecto, bool) and isinstance(defecto, (int, float)):
                 valor = perfil.get(f"{seccion}.{campo}")
                 if not isinstance(valor, (int, float)) or isinstance(valor, bool):
-                    errores.append(f"{seccion}.{campo} debe ser un número, no {valor!r}")
+                    errores.append(
+                        f"{seccion}.{campo} debe ser un número, no {valor!r}. "
+                        f"En TOML los miles se escriben con guion bajo, como "
+                        f"180_000_000, o sin separador. Nunca con puntos."
+                    )
                 elif valor < 0:
                     errores.append(f"{seccion}.{campo} no puede ser negativo ({valor})")
+    if errores:
+        return errores
 
-    dep = perfil.get("deducciones.dependientes")
-    if isinstance(dep, (int, float)) and dep > 4:
+    # --- 2. alcance del motor ------------------------------------------
+    if not perfil.get("contribuyente.residente_fiscal", True):
         errores.append(
-            f"deducciones.dependientes = {dep}. El art. 336 par. ET permite "
-            f"máximo 4. Corrígelo o el cálculo quedará mal."
+            "FUERA DE ALCANCE: el perfil dice que NO eres residente fiscal. Un "
+            "no residente tributa por otras reglas (art. 247 ET, tarifa única "
+            "sobre renta de fuente nacional) que este motor no implementa. "
+            "Consulta con un contador público."
+        )
+
+    if perfil.get("ingresos.rentas_pension"):
+        errores.append(
+            "FUERA DE ALCANCE: hay renta de pensión. Las pensiones son exentas "
+            "hasta 1.000 UVT mensuales (art. 206 num. 5 ET) y van por una regla "
+            "distinta a la del 25% de rentas de trabajo. Este motor las "
+            "liquidaría de más. Consulta con un contador público."
+        )
+
+    if perfil.get("ingresos.ganancia_ocasional"):
+        errores.append(
+            "FUERA DE ALCANCE: hay ganancia ocasional. Tributa en cédula aparte "
+            "al 15% (art. 314 ET), no en la tabla del art. 241. Meterla como "
+            "renta ordinaria sobreestima el impuesto en decenas de millones. "
+            "Este motor todavía no la calcula: sepárala y llévala al contador."
+        )
+
+    if perfil.get("ingresos.rentas_laborales_salario"):
+        errores.append(
+            "FUERA DE ALCANCE: hay salario de una relación laboral. La opción "
+            "entre costos y renta exenta del art. 336 num. 4 solo ata a quien "
+            "percibe honorarios o compensación por servicios personales; un "
+            "asalariado no detrae costos. Este motor está hecho para el perfil "
+            "de independiente."
+        )
+
+    # --- 3. coherencia --------------------------------------------------
+    dep = perfil.get("deducciones.dependientes")
+    if dep != int(dep):
+        errores.append(
+            f"deducciones.dependientes = {dep} debe ser un número entero."
+        )
+    elif dep > 4:
+        errores.append(
+            f"deducciones.dependientes = {dep}. El art. 336 num. 3 inciso 2 ET "
+            f"permite máximo 4. Corrígelo o el cálculo quedará mal."
+        )
+
+    anio = perfil.anio_gravable
+    if anios_disponibles is not None and anio not in anios_disponibles:
+        errores.append(
+            f"No hay parámetros para el año gravable {anio}. Disponibles: "
+            f"{', '.join(str(a) for a in anios_disponibles)}. Agrega "
+            f"knowledge/ag{anio}/parametros.toml verificando cada cifra contra "
+            f"la norma vigente."
         )
 
     if perfil.ingresos_brutos == 0 and perfil.patrimonio_bruto == 0:
@@ -219,8 +290,17 @@ def cargar(ruta: Path | str) -> Perfil:
             f"No existe {ruta}. Corre /renta:setup, o copia "
             f"templates/perfil.ejemplo.toml y llénalo."
         )
-    with open(ruta, "rb") as f:
-        crudo = tomllib.load(f)
+    try:
+        with open(ruta, "rb") as f:
+            crudo = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise ValueError(
+            f"{ruta} no es TOML válido: {e}\n"
+            f"El error más frecuente es escribir los montos con puntos de "
+            f"miles, como se escriben en Colombia. En TOML eso no es un "
+            f"número: usa guion bajo (180_000_000) o nada. El otro error "
+            f"común es dejar un [encabezado sin cerrar."
+        ) from e
 
     datos, supuestos = _completar(crudo)
     perfil = Perfil(datos, ruta, supuestos)

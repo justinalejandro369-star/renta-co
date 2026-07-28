@@ -224,8 +224,27 @@ ANCLAS = [
         "ruta": "B",
         "campo": "renta_liquida",
         "esperado": 67_500_000,
-        "razon": "Exención del 25% sobre 90.000.000 = 22.500.000, muy por "
-                 "debajo del tope (40% de 90 M = 36 M). 90 M − 22,5 M = 67,5 M.",
+        "razon": "Sin INCRNGO ni deducciones, la base de la exención es el "
+                 "ingreso: 25% de 90.000.000 = 22.500.000. Queda por debajo "
+                 "del tope anual de 790 UVT (39.341.210) y del tope conjunto "
+                 "(40% de 90 M = 36 M). 90 M − 22,5 M = 67,5 M.",
+    },
+    {
+        "id": "P03",
+        "ruta": "B",
+        "campo": "renta_liquida",
+        "esperado": 349_597_382,
+        "razon": "Fija las dos correcciones del art. 206 num. 10 a la vez. "
+                 "Deducciones: GMF 3.000.000 × 50% = 1.500.000, más prepagada "
+                 "capada en 192 UVT = 9.561.408, total 11.061.408. Base de la "
+                 "exención = 400.000.000 − 11.061.408 = 388.938.592 (inciso 2: "
+                 "se detraen las deducciones, no es el 25% del bruto). El 25% "
+                 "de eso son 97.234.648, pero el tope ANUAL de 790 UVT lo "
+                 "recorta a 39.341.210 — con el tope derogado de 240 UVT/mes "
+                 "habrían pasado los 97 M completos. Solicitado 11.061.408 + "
+                 "39.341.210 = 50.402.618, por debajo del tope conjunto de "
+                 "66.730.660, así que se aplica entero. "
+                 "400.000.000 − 50.402.618 = 349.597.382.",
     },
     {
         "id": "P06",

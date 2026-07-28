@@ -42,7 +42,7 @@ def titulo(texto: str) -> None:
 
 def cmd_calcular(args) -> int:
     p = PF.cargar(args.expediente)
-    errores = PF.validar(p)
+    errores = PF.validar(p, P.anios_disponibles())
     if errores:
         print("No se puede calcular todavía:\n")
         for e in errores:
@@ -64,9 +64,19 @@ def cmd_calcular(args) -> int:
     print(f"{'CONCEPTO':<52}{'RUTA A':>15}{'RUTA B':>15}")
     print(f"{'':<52}{'costos':>15}{'25% exento':>15}")
     linea()
+    # Las dos rutas emiten los mismos renglones en el mismo orden, así que
+    # se imprimen por posición. La única fila cuya ETIQUETA puede diferir es
+    # la última: una ruta puede dar saldo a pagar y la otra saldo a favor.
+    # Usar la etiqueta de A para las dos invertía el signo del resultado en
+    # pantalla, justo en el caso más frecuente —retenciones altas—.
     for i, ren in enumerate(a.renglones):
-        print(f"{_recortar(ren.concepto, 52):<52}"
-              f"{cop(ren.valor):>15}{cop(b.renglones[i].valor):>15}")
+        rb = b.renglones[i]
+        if ren.concepto != rb.concepto:
+            etiqueta = "= SALDO (a pagar si es positivo, a favor si es negativo)"
+            va, vb = a.saldo, b.saldo
+        else:
+            etiqueta, va, vb = ren.concepto, ren.valor, rb.valor
+        print(f"{_recortar(etiqueta, 52):<52}{cop(va):>15}{cop(vb):>15}")
     linea()
 
     mejor = r["mejor_ruta"]
@@ -139,7 +149,14 @@ def _escribir_csv(destino: Path, a, b) -> None:
         w = _csv.writer(f)
         w.writerow(["concepto", "ruta_A_costos", "ruta_B_exenta_25", "fuente"])
         for i, ren in enumerate(a.renglones):
-            w.writerow([ren.concepto, ren.valor, b.renglones[i].valor, ren.fuente])
+            rb = b.renglones[i]
+            if ren.concepto != rb.concepto:
+                # Signo explícito: el CSV lo lee un contador, y "SALDO A
+                # PAGAR 6.704.873" cuando son a favor es un error caro.
+                w.writerow(["= SALDO (positivo a pagar, negativo a favor)",
+                            a.saldo, b.saldo, ren.fuente])
+            else:
+                w.writerow([ren.concepto, ren.valor, rb.valor, ren.fuente])
 
 
 def _recortar(texto: str, ancho: int) -> str:
@@ -242,7 +259,7 @@ def cmd_importar(args) -> int:
 
 def cmd_verificar(args) -> int:
     p = PF.cargar(args.expediente)
-    errores = PF.validar(p)
+    errores = PF.validar(p, P.anios_disponibles())
     faltantes = PF.revisar_faltantes(p)
 
     titulo("VERIFICACIÓN DEL PERFIL")
@@ -333,7 +350,7 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     try:
         return args.func(args)
-    except (FileNotFoundError, P.ParametrosNoEncontrados) as e:
+    except (FileNotFoundError, ValueError, P.ParametrosNoEncontrados) as e:
         print(f"✗ {e}")
         return 1
 

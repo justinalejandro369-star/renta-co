@@ -29,7 +29,7 @@ Topes clave del AG 2025 en pesos:
 | Concepto | UVT | COP |
 |---|---|---|
 | Tope conjunto deducciones + rentas exentas (art. 336 num. 3) | 1.340 | $66.730.660 |
-| Renta exenta 25% — tope anual (240 UVT/mes) | 2.880 | $143.421.120 |
+| Renta exenta 25% — tope **anual** | 790 | $39.341.210 |
 | Deducción por dependiente (art. 336 par.) | 72 c/u, máx. 4 | $3.585.528 c/u · $14.342.112 |
 | Deducción 1% compras con factura electrónica | máx. 240 | $11.951.760 |
 | Aportes voluntarios AFP/AFC | máx. 3.800 | $189.236.200 |
@@ -80,10 +80,29 @@ Reglamentado por el **art. 1.2.1.20.5 del Decreto 1625 de 2016**, que recoge la 
 
 | | **Ruta A** — Costos y gastos | **Ruta B** — Renta exenta 25% |
 |---|---|---|
-| Tope | **Ninguno.** Se restan todos los soportados | 25% de la renta de trabajo, tope 240 UVT/mes, **y además** dentro del tope conjunto de 40% / 1.340 UVT |
+| Tope | Sin tope que recorte la deducción, pero superar el **60% de los ingresos brutos** obliga a marcar la casilla informativa del art. 336-1 y exige soporte **electrónico** | 25% de la renta de trabajo, tope **790 UVT anuales**, **y además** dentro del tope conjunto de 40% / 1.340 UVT |
 | Soporte exigido | Factura electrónica o documento soporte por cada erogación | Ninguno |
 | Riesgo de fiscalización | Alto si el soporte es débil | Bajo |
 | Esfuerzo | Alto | Cero |
+
+### Cómo se calcula realmente el 25%
+
+Dos errores muy extendidos, los dos en la misma dirección: sobreestiman la exención.
+
+**1. El tope es de 790 UVT ANUALES, no de 240 UVT mensuales.** La Ley 2277 de 2022 art. 2 reemplazó el límite mensual por uno anual. El texto de los 240 UVT/mes es el de la Ley 1607 de 2012 y sigue circulando en blogs, en plantillas de Excel y en material de contadores. La diferencia es de 3,6 veces: $39.341.210 contra $143.421.120 en AG 2025.
+
+**2. La base no es el ingreso bruto.** El inciso 2 del numeral 10 es explícito:
+
+> «El cálculo de esta renta exenta se efectuará una vez se detraiga del valor total de los pagos laborales recibidos por el trabajador, los ingresos no constitutivos de renta, **las deducciones y las rentas exentas diferentes a la establecida en el presente numeral**.»
+
+Es decir:
+
+```
+base = rentas de trabajo − INCRNGO − deducciones − otras rentas exentas
+exención = min(base × 25%, 790 UVT)
+```
+
+Y el resultado todavía compite dentro del tope conjunto del 40% / 1.340 UVT.
 
 Gerencie.com lo resume: *«Los costos no tienen límites y se pueden declarar tantos como existan y estén debidamente soportados… En cuanto a las deducciones especiales, las que proceden están limitadas al 40% de los ingresos netos y máximo 1.340 UVT.»*
 
@@ -91,11 +110,26 @@ Gerencie.com lo resume: *«Los costos no tienen límites y se pueden declarar ta
 
 > Observación práctica que se repite: mucha gente asume que la Ruta A gana porque «tiene muchos gastos». Pero solo cuentan los gastos **soportados con documento válido**, y el tope de la Ruta B es alto. Con frecuencia la diferencia real entre rutas es menor que el valor de una sola deducción que nadie miró.
 
-### El mito del «2 o más trabajadores por 90 días»
+### La regla de los «2 o más trabajadores por 90 días» — **derogada**
 
-Existe una regla que excluye del beneficio del 25% a quien vincula dos o más trabajadores, **pero está en el art. 383 ET y opera únicamente para la retención en la fuente mensual**, no para la depuración de la declaración anual.
+Mucha gente todavía la aplica, y hay que responderla bien porque circula mal explicada en las dos direcciones.
 
-En la declaración manda el art. 336 num. 4: **la opción entre costos y renta exenta es libre**, tengas el equipo que tengas. Tener contratistas no te saca de la Ruta B; solo te da costos que hacen la Ruta A potencialmente más atractiva.
+La regla **existió** y sí condicionaba la declaración anual: el art. 206 par. 5 ET, en la redacción de la Ley 2010 de 2019, decía que la exención del 25% procedía para honorarios de quien «contrate o vincule por un término inferior a noventa (90) días continuos o discontinuos menos de dos (2) trabajadores o contratistas asociados a la actividad».
+
+**La Ley 2277 de 2022 art. 2 reescribió ese parágrafo y eliminó la condición.** Hoy dice simplemente que la exención procede «en relación con las rentas de trabajo que no provengan de una relación laboral o legal y reglamentaria».
+
+O sea: **tener contratistas ya no te saca de la Ruta B.** La conclusión es la misma que se oye por ahí, pero por una razón distinta —la norma cambió, no es que estuviera en otro artículo—. Si alguien te dice que la regla vive en el art. 383, verifícalo: el art. 383 par. 2 vigente no menciona ni trabajadores ni 90 días.
+
+### El umbral del art. 336-1 que casi nadie menciona
+
+La Ruta A no tiene un tope que recorte la deducción, pero sí tiene un umbral con consecuencias.
+
+**Art. 336-1 ET**, adicionado por la Ley 2277 de 2022 art. 60: los costos y gastos deducibles de rentas de trabajo se estiman en el **60% de los ingresos brutos**. Superarlo es legítimo, pero:
+
+- Obliga a **indicarlo expresamente** en la declaración, marcando la casilla informativa. No hacerlo acarrea la sanción del art. 651 num. 1 lit. d).
+- Exige que esos costos estén soportados con **factura electrónica de venta, nómina electrónica o documento equivalente electrónico**.
+
+Ese segundo requisito choca de frente con la estrategia de documento soporte en físico del punto 6. Quien piense superar el 60% tiene que mirar los dos juntos antes de decidirse por la Ruta A.
 
 Fuentes: [Gerencie — rentas exentas en independientes](https://www.gerencie.com/rentas-exentas-en-trabajadores-independientes.html) · [Gerencie — costos y gastos procedentes](https://www.gerencie.com/costos-y-gastos-procedentes-en-trabajadores-independientes.html) · [ET art. 336](https://estatuto.co/336)
 
@@ -112,10 +146,12 @@ Es lo más eficiente que existe en la depuración: **$3.585.528 por dependiente,
 Cuentan como dependientes (art. 387 par. 2 ET):
 
 - Hijos hasta 18 años.
-- Hijos de 18 a 23 años estudiando, con certificado de la institución.
-- Hijos mayores de 23 en dependencia por factores físicos o psicológicos, certificada por Medicina Legal.
+- Hijos de **18 a 25 años** estudiando, cuando el contribuyente financia su educación en una institución de educación superior certificada por el ICFES o en un programa técnico de educación no formal acreditado. **La Ley 2411 de 2024 subió el límite de 23 a 25 años**, aplicable desde el año gravable 2025.
+- Hijos **mayores de 18** en dependencia por factores físicos o psicológicos, certificada por el **Ministerio de Salud y Protección Social**. La misma ley bajó la edad desde 23 y cambió la entidad certificadora, que antes era Medicina Legal.
 - Cónyuge o compañero(a) permanente en dependencia por ausencia de ingresos, o con ingresos anuales inferiores a 260 UVT ($12.947.740), o por dependencia física o psicológica.
 - **Padres y hermanos** en dependencia por ausencia de ingresos, o con ingresos anuales inferiores a 260 UVT, o por dependencia física o psicológica.
+
+> La dependencia por ausencia de ingresos o por ingresos inferiores a 260 UVT debe ir **certificada por contador público** (art. 387 par. 2 nums. 4 y 5). Es un requisito formal que se olvida y que la DIAN sí exige.
 
 > **La pregunta que hay que hacer siempre, y que casi nadie hace:** ¿tus padres o hermanos tuvieron ingresos anuales por debajo de $12.947.740 y dependen económicamente de ti? Cada uno vale $3.585.528 de deducción. Con cuatro son $14,3 M de base gravable eliminados, sin una sola factura. Para un contribuyente en el tramo del 28% eso son ~$4 M de impuesto.
 >
@@ -180,11 +216,19 @@ Si el subcontratista no cotizó durante los meses en que prestó el servicio, la
 - No celebrar contratos de venta de bienes o prestación de servicios gravados por valor individual ≥ 3.500 UVT
 - **Consignaciones bancarias, depósitos o inversiones financieras del año < 3.500 UVT**
 
-> ⚠ **La contingencia que casi nadie mira.**
+> ⚠ **La contingencia que casi nadie mira, con el calificador que casi nadie cita.**
 >
-> El último requisito se mide sobre **consignaciones**, no sobre ingresos propios. Quien recibe dinero de clientes y lo redistribuye a un equipo, o quien mueve plata entre sus propias cuentas, puede superar los $174.296.500 consignados aunque su ingreso personal esté muy por debajo.
+> El último requisito se mide sobre **consignaciones**, no sobre ingresos propios. Quien recibe dinero de clientes y lo redistribuye a un equipo puede superar los $174.296.500 consignados aunque su ingreso personal esté muy por debajo.
 >
-> Si se supera: se **pierde** la calidad de no responsable de IVA, y aparecen obligación de inscribirse, de facturar, de declarar IVA por período, y sanciones por extemporaneidad de cada declaración omitida. El costo puede superar al propio impuesto de renta.
+> **Pero el texto tiene un calificador que decide el caso:** el art. 437 par. 3 num. 6 habla de consignaciones «**provenientes de actividades gravadas con el impuesto sobre las ventas -IVA**». No de todo lo que entró a la cuenta.
+>
+> Entonces no cuentan: los traslados entre cuentas propias, los préstamos recibidos, ni el dinero de terceros en tránsito. Y si la actividad es **exportación de servicios** (art. 481 lit. c) o está excluida, la cifra relevante puede ser cero aunque por las cuentas pasen cientos de millones.
+>
+> Cuantificarlo exige separar por origen, no sumar entradas. Y cuidado con contar dos veces el mismo giro cuando aparece en el export de la plataforma y en el extracto del banco.
+>
+> El par. 5 del mismo artículo sube el límite a **4.000 UVT** para prestadores de servicios personas naturales con ingresos de contratos con el Estado.
+>
+> Si se supera: se **pierde** la calidad de no responsable de IVA, y aparecen obligación de inscribirse, de facturar y de declarar IVA por período. Si esas declaraciones nunca se presentaron, la sanción aplicable es la del **art. 643 (por no declarar)**, no la del 641 (extemporaneidad). El costo puede superar al propio impuesto de renta.
 >
 > **Cuantifícalo con los extractos completos de todas las cuentas antes de presentar renta, no después.**
 

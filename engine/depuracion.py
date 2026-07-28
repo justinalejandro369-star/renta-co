@@ -128,17 +128,7 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
         fuente="ET art. 336 num. 4",
     )
 
-    # --- 4. renta exenta 25%, solo ruta B ------------------------------
-    renta_exenta = 0.0
-    if ruta == "B":
-        pct = par.exigir("topes.renta_exenta_25.porcentaje")
-        tope_mes = par.exigir("topes.renta_exenta_25.tope_mensual_uvt")
-        meses = par.get("topes.renta_exenta_25.meses", 12)
-        # base: rentas de trabajo depuradas de INCRNGO y deducciones imputables
-        base_exenta = max(trabajo - incrngo, 0)
-        renta_exenta = min(base_exenta * pct, tope_mes * meses * uvt)
-
-    # --- 5. deducciones dentro del tope conjunto ------------------------
+    # --- 4. deducciones dentro del tope conjunto ------------------------
     gmf = p.get("deducciones.gmf_pagado") * par.exigir("topes.gmf.porcentaje_deducible")
     vivienda = min(
         p.get("deducciones.intereses_vivienda"),
@@ -156,7 +146,7 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
         par.exigir("topes.aportes_voluntarios.tope_uvt") * uvt,
     )
 
-    # --- 6. dependientes: dos vías excluyentes, se toma la mejor --------
+    # --- 5. dependientes: dos vías excluyentes, se toma la mejor --------
     n_dep = int(p.get("deducciones.dependientes"))
     max_dep = par.exigir("topes.dependientes_72uvt.maximo_dependientes")
     dep_72 = min(n_dep, max_dep) * par.exigir("topes.dependientes_72uvt.uvt_por_dependiente") * uvt
@@ -171,17 +161,7 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
         )
 
     # La de 72 UVT queda FUERA del tope conjunto; la del 10% queda DENTRO.
-    # Se evalúan las dos combinaciones completas y se toma la de menor impuesto.
-    ded_limitadas_base = gmf + vivienda + prepagada + voluntarios
-
-    def _aplicar_tope(ded_limitadas: float, exenta: float):
-        tope = min(
-            netos * par.exigir("topes.conjunto_deducciones_exentas.porcentaje_ingresos_netos"),
-            par.exigir("topes.conjunto_deducciones_exentas.tope_uvt") * uvt,
-        )
-        solicitado = ded_limitadas + exenta
-        aplicado = min(solicitado, tope)
-        return tope, aplicado, solicitado - aplicado
+    ded_fijas = gmf + vivienda + prepagada + voluntarios
 
     # 1% de compras con factura electrónica — fuera del tope
     fe = min(
@@ -190,35 +170,78 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
         par.exigir("topes.deduccion_1pct_factura_electronica.tope_uvt") * uvt,
     )
 
-    opciones = []
-    for via, dentro, fuera in (
-        ("72 UVT por dependiente (fuera del tope)", 0.0, dep_72),
-        ("10% de la renta de trabajo (dentro del tope)", dep_10, 0.0),
-    ):
-        tope, aplicado, rechazado = _aplicar_tope(ded_limitadas_base + dentro, renta_exenta)
-        rl = max(netos - costos - aplicado - fuera - fe, 0)
-        opciones.append((impuesto_241(rl, par), via, dentro, fuera, tope, aplicado, rechazado, rl))
-
-    if n_dep == 0:
-        opciones = opciones[:1]
-
-    (_, via, dep_dentro, dep_fuera, tope, aplicado, rechazado, renta_liquida) = min(
-        opciones, key=lambda o: o[0]
+    tope = max(
+        min(
+            netos * par.exigir("topes.conjunto_deducciones_exentas.porcentaje_ingresos_netos"),
+            par.exigir("topes.conjunto_deducciones_exentas.tope_uvt") * uvt,
+        ),
+        0,
     )
-    L.dependientes_via = via if n_dep else "sin dependientes"
-    ded_limitadas = ded_limitadas_base + dep_dentro
 
-    # --- 7. renglones de deducciones -----------------------------------
-    L._r("− Renta exenta 25%", renta_exenta, -1,
-         nota=("Tope 240 UVT/mes Y además compite dentro del tope conjunto del 40%."
-               if ruta == "B" else "No aplica en Ruta A."),
-         fuente="ET art. 206 num. 10")
+    def evaluar(dep_dentro: float, dep_fuera: float):
+        """Liquida una de las dos combinaciones de dependientes.
+
+        La renta exenta se calcula ACÁ ADENTRO y no antes, porque su base
+        depende de las deducciones —y las deducciones dependen de qué vía de
+        dependientes se tome—.
+        """
+        ded_limitadas = ded_fijas + dep_dentro
+
+        exenta = 0.0
+        if ruta == "B":
+            # Art. 206 num. 10 inciso 2: la base de la exención se calcula
+            # UNA VEZ SE DETRAIGAN los INCRNGO, las deducciones y las rentas
+            # exentas distintas de esta. No es el 25% del ingreso bruto.
+            base = trabajo - incrngo - ded_limitadas - dep_fuera - fe
+            exenta = min(
+                max(base, 0) * par.exigir("topes.renta_exenta_25.porcentaje"),
+                par.exigir("topes.renta_exenta_25.tope_anual_uvt") * uvt,
+            )
+
+        solicitado = ded_limitadas + exenta
+        aplicado = min(solicitado, tope)
+        rechazado = solicitado - aplicado
+        rl = max(netos - costos - aplicado - dep_fuera - fe, 0)
+        return {
+            "impuesto": impuesto_241(rl, par),
+            "renta_liquida": rl,
+            "exenta": exenta,
+            "dep_dentro": dep_dentro,
+            "dep_fuera": dep_fuera,
+            "aplicado": aplicado,
+            "rechazado": rechazado,
+        }
+
+    opciones = [("72 UVT por dependiente (fuera del tope)", evaluar(0.0, dep_72))]
+    if n_dep > 0:
+        opciones.append(
+            ("10% de la renta de trabajo (dentro del tope)", evaluar(dep_10, 0.0))
+        )
+
+    via, e = min(opciones, key=lambda o: o[1]["impuesto"])
+    L.dependientes_via = via if n_dep else "sin dependientes"
+    renta_liquida = e["renta_liquida"]
+    tope_aplicado, rechazado = e["aplicado"], e["rechazado"]
+
+    # --- 6. renglones de deducciones -----------------------------------
+    # Se emiten SIEMPRE los mismos renglones, en el mismo orden, aunque
+    # valgan cero. El comparativo imprime las dos rutas lado a lado por
+    # posición: un renglón condicional desalinea la columna entera y hace
+    # que un número aparezca bajo la etiqueta de otro.
+    L._r("− Renta exenta 25%", e["exenta"], -1,
+         nota=("Base = rentas de trabajo − INCRNGO − deducciones (art. 206 "
+               "num. 10 inciso 2). Tope 790 UVT ANUALES —no 240 UVT/mes, que "
+               "es el texto derogado— y además compite dentro del tope "
+               "conjunto del 40%." if ruta == "B"
+               else "No aplica en Ruta A: es excluyente con los costos."),
+         fuente="ET art. 206 num. 10, mod. Ley 2277 de 2022 art. 2")
     L._r("− GMF deducible (50% del 4x1000 pagado)", gmf, -1, fuente="ET art. 115")
     L._r("− Intereses de vivienda", vivienda, -1, fuente="ET art. 119")
     L._r("− Medicina prepagada", prepagada, -1, fuente="ET art. 387 num. 1")
     L._r("− Aportes voluntarios AFP / AFC", voluntarios, -1, fuente="ET arts. 126-1 y 126-4")
-    if dep_dentro:
-        L._r("− Dependientes (10% renta de trabajo)", dep_dentro, -1, fuente="ET art. 387")
+    L._r("− Dependientes (10% renta de trabajo)", e["dep_dentro"], -1,
+         nota="Excluyente con la de 72 UVT. Consume el tope del 40%.",
+         fuente="ET art. 387")
 
     L._r("  [tope conjunto 40% / 1.340 UVT]", tope, 0,
          nota="Lo que exceda este tope se pierde.",
@@ -228,10 +251,10 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     L.tope_conjunto = tope
     L.rechazado_por_tope = rechazado
 
-    if dep_fuera:
-        L._r("− Dependientes (72 UVT c/u — FUERA del tope)", dep_fuera, -1,
-             nota="No consume el tope del 40% y no exige factura: solo acreditar la condición.",
-             fuente="ET art. 336 par., Ley 2277 de 2022 art. 7")
+    L._r("− Dependientes (72 UVT c/u — FUERA del tope)", e["dep_fuera"], -1,
+         nota="No consume el tope del 40% y no exige factura: solo acreditar "
+              "la condición. Excluyente con la del 10%.",
+         fuente="ET art. 336 par., Ley 2277 de 2022 art. 7")
     L._r("− Deducción 1% compras con factura electrónica", fe, -1,
          nota="Exige factura electrónica a tu NIT/cédula y pago electrónico.",
          fuente="ET art. 336 par. 4")
@@ -428,38 +451,84 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
     })
 
     # ¿pierde la calidad de no responsable de IVA?
+    #
+    # El art. 437 par. 3 num. 6 no mide "todo lo que entró": mide las
+    # consignaciones PROVENIENTES DE ACTIVIDADES GRAVADAS CON IVA. Omitir ese
+    # calificador convierte una advertencia útil en una alarma falsa que
+    # puede empujar a alguien a inscribirse como responsable de IVA sin que
+    # le corresponda.
     iva = par.get("umbrales.no_responsable_iva", {})
     tope_iva = iva.get("consignaciones_uvt", 3500) * uvt
+    tope_estado = iva.get("consignaciones_uvt_contratistas_del_estado", 4000) * uvt
+
+    calificador = (
+        "El campo consignaciones_totales_anio debe traer SOLO las "
+        "consignaciones provenientes de actividades gravadas con IVA. Los "
+        "traslados entre cuentas propias, los préstamos y el dinero de "
+        "terceros en tránsito no cuentan. Si tu actividad es exportación de "
+        "servicios (art. 481 lit. c) o está excluida, esa cifra puede ser cero "
+        "aunque por tus cuentas pasen cientos de millones."
+    )
+
     if consig == 0:
-        estado, sev = "SIN CUANTIFICAR", "alta"
+        estado, sev = "SIN CUANTIFICAR", "media"
         detalle = (
-            f"No has cargado el total de consignaciones del año. El umbral es "
-            f"{_cop(tope_iva)} y se mide sobre TODO lo que entró a tus cuentas, "
-            f"no sobre tu ingreso propio. Súmalo de los extractos de todas tus "
-            f"cuentas antes de presentar."
+            f"No has cuantificado las consignaciones gravadas del año. El umbral "
+            f"es {_cop(tope_iva)} ({_cop(tope_estado)} si tus ingresos vienen de "
+            f"contratos con el Estado, par. 5). Se mide sobre consignaciones y "
+            f"no sobre tu ingreso propio, así que quien recibe plata de clientes "
+            f"y la redistribuye puede superarlo sin que su ingreso se acerque. "
+            f"{calificador}"
         )
     elif consig > tope_iva:
         estado, sev = "UMBRAL SUPERADO", "alta"
         detalle = (
-            f"Consignaciones {_cop(consig)} > {_cop(tope_iva)}. Pierdes la calidad "
-            f"de no responsable de IVA: obligación de inscribirte, facturar y "
-            f"declarar IVA, más sanciones por cada declaración omitida. Evalúa si "
-            f"tu actividad califica como exportación de servicios exenta "
-            f"(art. 481 lit. c ET). Resuélvelo ANTES de presentar renta."
+            f"Consignaciones gravadas {_cop(consig)} > {_cop(tope_iva)}. Si la "
+            f"cifra está bien construida, pierdes la calidad de no responsable "
+            f"de IVA: inscripción, facturación, declaraciones de IVA por período "
+            f"y sanción por no declarar (art. 643 ET, no el 641, si nunca las "
+            f"presentaste). Antes de aceptarlo, verifica dos cosas: que no estés "
+            f"contando el mismo dinero dos veces —el giro en la plataforma y su "
+            f"abono en el banco son un solo hecho— y que todo lo sumado provenga "
+            f"de actividad gravada. {calificador} Resuélvelo con tu contador "
+            f"ANTES de presentar renta."
         )
     else:
         margen = tope_iva - consig
         estado, sev = "DENTRO DEL UMBRAL", "info"
-        detalle = f"Consignaciones {_cop(consig)}, margen de {_cop(margen)}."
+        detalle = (f"Consignaciones gravadas {_cop(consig)}, margen de "
+                   f"{_cop(margen)}. {calificador}")
 
     checks.append({
         "id": "R-01",
-        "titulo": "Calidad de no responsable de IVA (umbral de consignaciones)",
+        "titulo": "Calidad de no responsable de IVA (consignaciones gravadas)",
         "estado": estado,
         "detalle": detalle,
         "severidad": sev,
-        "fuente": iva.get("fuente", "ET art. 437 par. 3"),
+        "fuente": iva.get("fuente", "ET art. 437 par. 3 num. 6"),
     })
+
+    # ¿supera el tope indicativo de costos del art. 336-1?
+    tope_ind = par.get("topes.tope_indicativo_costos.porcentaje_ingresos_brutos", 0.60)
+    if p.total_costos > p.ingresos_brutos * tope_ind and p.ingresos_brutos:
+        checks.append({
+            "id": "R-09",
+            "titulo": "Costos por encima del tope indicativo del 60%",
+            "estado": f"{p.total_costos / p.ingresos_brutos:.0%} de los ingresos brutos",
+            "detalle": (
+                f"Los costos ({_cop(p.total_costos)}) superan el 60% de los "
+                f"ingresos brutos que el art. 336-1 ET fija como tope indicativo. "
+                f"Superarlo es legítimo, pero obliga a indicarlo EXPRESAMENTE en "
+                f"la declaración marcando la casilla informativa; no hacerlo "
+                f"acarrea la sanción del art. 651 num. 1 lit. d). Además esos "
+                f"costos deben estar soportados con factura electrónica, nómina "
+                f"electrónica o documento equivalente ELECTRÓNICO — lo que choca "
+                f"con la estrategia de documento soporte en físico. Míralo con tu "
+                f"contador antes de decidir la Ruta A."
+            ),
+            "severidad": "alta",
+            "fuente": "ET art. 336-1, adicionado por Ley 2277 de 2022 art. 60",
+        })
 
     # ¿agente de retención?
     ar = par.get("umbrales.agente_retencion_persona_natural", {})

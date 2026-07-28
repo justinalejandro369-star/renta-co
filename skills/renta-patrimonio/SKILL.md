@@ -5,7 +5,7 @@ description: Determina el patrimonio bruto y los pasivos a 31 de diciembre del a
 
 # Patrimonio
 
-No cambia el impuesto de renta, pero **es la parte que más problemas causa después**. Un activo omitido que la DIAN detecte se grava como renta líquida gravable, sin derecho a costo, más sanción por inexactitud (art. 239-1 ET).
+No cambia el impuesto de renta, pero **es la parte que más problemas causa después**. Un activo omitido que la DIAN detecte se grava como renta líquida gravable, sin derecho a costo (art. 239-1 ET), **más sanción por inexactitud del 200%** — no del 100%: el art. 648 num. 1 la duplica justamente cuando se omiten activos o se incluyen pasivos inexistentes.
 
 ## La ecuación patrimonial
 
@@ -27,9 +27,9 @@ A **31 de diciembre del año gravable**, todo, esté donde esté:
 |---|---|---|
 | Cuentas de ahorro y corrientes | Saldo a 31-dic | Certificado de saldo de **cada** banco |
 | Billeteras digitales (Nequi, Daviplata, A la Mano) | Saldo a 31-dic | Certificado o extracto de diciembre |
-| Saldo en plataformas (Deel, Wise, Payoneer, PayPal) | Saldo a 31-dic, **TRM de esa fecha** | Extracto de la plataforma |
+| Saldo en plataformas (Deel, Wise, Payoneer, PayPal) | Saldo a 31-dic, **TRM del reconocimiento inicial de cada partida** (art. 269) | Extracto de la plataforma |
 | Cripto | Valor de mercado a 31-dic | Reporte del exchange o del wallet |
-| Acciones, ETFs, brokers | Valor a 31-dic, TRM de esa fecha | Estado de cuenta anual |
+| Acciones, ETFs, brokers | Valor a 31-dic, TRM del reconocimiento inicial | Estado de cuenta anual |
 | Vehículos | Avalúo del Ministerio de Transporte | Tarjeta de propiedad + tabla de avalúo |
 | Inmuebles | El mayor entre costo fiscal y avalúo catastral | Certificado de tradición, predial |
 | Cuentas por cobrar | Valor nominal | Contrato o soporte |
@@ -59,9 +59,19 @@ Solo los que se puedan probar. Los pasivos con personas naturales exigen documen
 
 Se declaran por el saldo a 31-dic. **El saldo de la tarjeta de crédito a 31-dic es pasivo** y mucha gente lo olvida.
 
-## Moneda extranjera
+## Moneda extranjera — ojo, no es la TRM de cierre
 
-Art. 269 ET: a la **TRM del 31 de diciembre**. No la del día que se consultó, no la promedio.
+Es un error muy extendido, incluido en material que circula entre contadores.
+
+**Art. 269 ET**, modificado por la Ley 1819 de 2016 art. 116:
+
+> «El valor de los activos en moneda extranjera se estiman en moneda nacional **al momento de su reconocimiento inicial a la tasa representativa del mercado**, menos los abonos o pagos medidos a la misma tasa representativa del mercado del reconocimiento inicial.»
+
+O sea: **a la TRM del día en que entró cada partida**, no a la del 31 de diciembre. La regla del cierre es el texto original del Decreto 624 de 1989, derogado en 2016.
+
+Concuerda con el art. 288 inciso 2: «Las fluctuaciones de las partidas del estado de situación financiera… **no tendrán efectos fiscales sino hasta el momento de la enajenación o abono**». La diferencia en cambio no realizada no se reconoce.
+
+Reexpresar a TRM de cierre infla o desinfla el patrimonio y mueve la renta por comparación patrimonial (art. 236 ET) — justo el riesgo R-05.
 
 ## Si falta un certificado
 
