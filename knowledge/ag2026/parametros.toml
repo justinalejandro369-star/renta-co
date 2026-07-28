@@ -1,0 +1,26 @@
+#  Parámetros tributarios — AÑO GRAVABLE 2026 (se declara en 2027)
+#
+#  ⚠ INCOMPLETO. Solo está confirmada la UVT. Los demás parámetros se
+#  heredan de AG2025 hasta que se verifique cada uno contra la norma
+#  vigente para 2026. El motor advierte cuando usa un valor heredado.
+#
+#  Sirve HOY para planeación tributaria 2026: proyectar el impuesto del
+#  año en curso y decidir aportes voluntarios antes del 31 de diciembre,
+#  que es cuando la ventana se cierra.
+
+[meta]
+anio_gravable = 2026
+anio_declaracion = 2027
+revisado = "2026-07-28"
+completo = false
+hereda_de = "ag2025"
+nota = "Verificar reforma tributaria y decretos reglamentarios de 2026 antes de usar para una declaración real."
+
+[uvt]
+valor = 52374
+fuente = "Resolución DIAN 000238 del 15 de diciembre de 2025"
+url = "https://actualicese.com/uvt-2026/"
+
+# Los bloques [tarifa], [topes], [umbrales], [plazos] y [sanciones] se
+# heredan de knowledge/ag2025/parametros.toml mientras no se sobreescriban
+# acá. engine/parametros.py hace la fusión y marca cada valor heredado.

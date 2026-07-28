@@ -1,0 +1,222 @@
+#  Parámetros tributarios — AÑO GRAVABLE 2025 (se declara en 2026)
+#
+#  Cada cifra trae su fuente. Si cambias una, cambia también la fuente.
+#  Este archivo lo lee engine/depuracion.py. No contiene datos de ningún
+#  contribuyente.
+
+[meta]
+anio_gravable = 2025
+anio_declaracion = 2026
+revisado = "2026-07-28"
+
+# ─────────────────────────────────────────────────────────────────────
+[uvt]
+valor = 49799
+fuente = "Resolución DIAN 000193 de 2024"
+url = "https://normograma.dian.gov.co/dian/compilacion/docs/resolucion_dian_0193_2024.htm"
+
+# ─────────────────────────────────────────────────────────────────────
+#  Tarifa del impuesto — art. 241 ET
+#  impuesto_uvt = (base_uvt - desde) * tarifa + adicional_uvt
+# ─────────────────────────────────────────────────────────────────────
+[tarifa]
+fuente = "Estatuto Tributario art. 241"
+url = "https://estatuto.co/241"
+
+[[tarifa.rangos]]
+desde_uvt = 0
+hasta_uvt = 1090
+tarifa = 0.00
+adicional_uvt = 0
+
+[[tarifa.rangos]]
+desde_uvt = 1090
+hasta_uvt = 1700
+tarifa = 0.19
+adicional_uvt = 0
+
+[[tarifa.rangos]]
+desde_uvt = 1700
+hasta_uvt = 4100
+tarifa = 0.28
+adicional_uvt = 116
+
+[[tarifa.rangos]]
+desde_uvt = 4100
+hasta_uvt = 8670
+tarifa = 0.33
+adicional_uvt = 788
+
+[[tarifa.rangos]]
+desde_uvt = 8670
+hasta_uvt = 18970
+tarifa = 0.35
+adicional_uvt = 2296
+
+[[tarifa.rangos]]
+desde_uvt = 18970
+hasta_uvt = 31000
+tarifa = 0.37
+adicional_uvt = 5901
+
+[[tarifa.rangos]]
+desde_uvt = 31000
+hasta_uvt = 0            # 0 = sin tope superior
+tarifa = 0.39
+adicional_uvt = 10352
+
+# ─────────────────────────────────────────────────────────────────────
+#  Topes de la depuración de la cédula general
+# ─────────────────────────────────────────────────────────────────────
+[topes]
+
+[topes.conjunto_deducciones_exentas]
+# Tope conjunto para rentas exentas + deducciones especiales
+porcentaje_ingresos_netos = 0.40
+tope_uvt = 1340
+fuente = "Estatuto Tributario art. 336 num. 3"
+url = "https://estatuto.co/336"
+
+[topes.renta_exenta_25]
+porcentaje = 0.25
+tope_mensual_uvt = 240
+meses = 12
+nota = "El resultado además compite dentro del tope conjunto de 40% / 1.340 UVT"
+fuente = "Estatuto Tributario art. 206 num. 10 y par. 5"
+url = "https://estatuto.co/206"
+
+[topes.dependientes_72uvt]
+uvt_por_dependiente = 72
+maximo_dependientes = 4
+dentro_del_tope_conjunto = false
+requiere_soporte_de_gasto = false
+nota = "Se acredita la CONDICIÓN de dependiente, no un desembolso. Es la deducción más eficiente disponible: no consume el tope del 40%."
+fuente = "Estatuto Tributario art. 336 par., adicionado por Ley 2277 de 2022 art. 7"
+url = "https://normograma.dian.gov.co/dian/compilacion/docs/ley_2277_2022.htm"
+
+[topes.dependientes_10pct]
+porcentaje_renta_trabajo = 0.10
+tope_mensual_uvt = 32
+meses = 12
+dentro_del_tope_conjunto = true
+excluyente_con = "dependientes_72uvt"
+nota = "Excluyente con la deducción de 72 UVT. El motor calcula ambas y toma la mejor."
+fuente = "Estatuto Tributario art. 387"
+url = "https://estatuto.co/387"
+
+[topes.intereses_vivienda]
+tope_uvt = 1200
+dentro_del_tope_conjunto = true
+fuente = "Estatuto Tributario art. 119"
+url = "https://estatuto.co/119"
+
+[topes.medicina_prepagada]
+tope_mensual_uvt = 16
+meses = 12
+dentro_del_tope_conjunto = true
+fuente = "Estatuto Tributario art. 387 num. 1"
+url = "https://estatuto.co/387"
+
+[topes.aportes_voluntarios]
+porcentaje_ingreso = 0.30
+tope_uvt = 3800
+dentro_del_tope_conjunto = true
+nota = "AFP voluntarios y cuentas AFC. La ventana se cierra el 31 de diciembre del año gravable — después no hay nada que hacer. Es la palanca de planeación más grande que existe para este perfil."
+fuente = "Estatuto Tributario arts. 126-1 y 126-4"
+url = "https://estatuto.co/126-1"
+
+[topes.gmf]
+porcentaje_deducible = 0.50
+tope_uvt = 0             # 0 = sin tope propio
+dentro_del_tope_conjunto = true
+nota = "50% del GMF (4x1000) efectivamente pagado, certificado por el banco, tenga o no relación con la actividad."
+fuente = "Estatuto Tributario art. 115"
+url = "https://estatuto.co/115"
+
+[topes.deduccion_1pct_factura_electronica]
+porcentaje_compras = 0.01
+tope_uvt = 240
+dentro_del_tope_conjunto = false
+nota = "Exige factura electrónica de venta con el NIT/cédula del contribuyente como adquiriente, y pago por medio electrónico."
+fuente = "Estatuto Tributario art. 336 par. 4"
+url = "https://estatuto.co/336"
+
+[topes.descuento_donaciones]
+porcentaje_descuento = 0.25
+tope_porcentaje_impuesto = 0.25
+nota = "Es DESCUENTO (resta del impuesto), no deducción. Exige certificación firmada por representante legal y revisor fiscal o contador de una entidad del Régimen Tributario Especial. Una transferencia a una persona o a una colecta informal vale $0."
+fuente = "Estatuto Tributario art. 257"
+url = "https://estatuto.co/257"
+
+# ─────────────────────────────────────────────────────────────────────
+#  Umbrales de obligación
+# ─────────────────────────────────────────────────────────────────────
+[umbrales]
+
+[umbrales.obligado_a_declarar]
+ingresos_brutos_uvt = 1400
+patrimonio_bruto_uvt = 4500
+consumos_tarjeta_credito_uvt = 1400
+compras_y_consumos_uvt = 1400
+consignaciones_uvt = 1400
+nota = "Basta cumplir UNO para quedar obligado. El patrimonio se mide al último día del año gravable; los demás, durante el año."
+fuente = "Decreto 1625 de 2016 art. 1.6.1.13.2.7"
+
+[umbrales.no_responsable_iva]
+ingresos_brutos_uvt = 3500
+consignaciones_uvt = 3500
+contrato_individual_uvt = 3500
+maximo_establecimientos = 1
+nota = "⚠ El umbral de CONSIGNACIONES se mide sobre todo lo que entró a la cuenta, no sobre el ingreso propio. Quien recibe dinero de clientes y lo redistribuye puede superarlo sin que su ingreso lo haga. Es la contingencia más subestimada de este perfil."
+fuente = "Estatuto Tributario art. 437 par. 3"
+url = "https://estatuto.co/437"
+
+[umbrales.agente_retencion_persona_natural]
+uvt = 30000
+medido_sobre_anio = 2024
+uvt_del_anio_medido = 47065
+requiere_calidad_comerciante = true
+nota = "Dos filtros CONCURRENTES: ser comerciante en el sentido del art. 20 C.Co., Y superar 30.000 UVT de patrimonio o ingresos brutos del año anterior. Un profesional independiente que presta servicios NO es comerciante, así que no es agente de retención sin importar el monto."
+fuente = "Estatuto Tributario art. 368-2"
+url = "https://estatuto.co/368-2"
+
+[umbrales.dependiente_ingresos]
+tope_anual_uvt = 260
+nota = "Un padre, hermano, cónyuge o compañero permanente con ingresos anuales por debajo de este umbral califica como dependiente por ausencia de ingresos."
+fuente = "Estatuto Tributario art. 387 par. 2"
+
+# ─────────────────────────────────────────────────────────────────────
+#  Plazos
+# ─────────────────────────────────────────────────────────────────────
+[plazos]
+inicio = "2026-08-12"
+fin = "2026-10-26"
+criterio = "Escalonado por los dos últimos dígitos del NIT o cédula, sin dígito de verificación."
+tabla_cargada = false
+advertencia = """
+La tabla día-por-día NO está incluida porque exige el decreto oficial de plazos
+y no se debe adivinar. Verifica tu fecha exacta en el portal de la DIAN o con
+tu contador antes de tomarla como definitiva. El motor reporta el rango y te
+recuerda verificar.
+"""
+url = "https://www.dian.gov.co/"
+
+# ─────────────────────────────────────────────────────────────────────
+#  Sanciones relevantes (informativo, para el registro de riesgos)
+# ─────────────────────────────────────────────────────────────────────
+[sanciones]
+
+[sanciones.extemporaneidad]
+porcentaje_mensual = 0.05
+tope_porcentaje = 1.00
+base = "impuesto a cargo"
+fuente = "Estatuto Tributario art. 641"
+
+[sanciones.inexactitud]
+porcentaje = 1.00
+base = "diferencia entre el saldo a pagar determinado y el declarado"
+fuente = "Estatuto Tributario art. 648"
+
+[sanciones.minima]
+uvt = 10
+fuente = "Estatuto Tributario art. 639"
