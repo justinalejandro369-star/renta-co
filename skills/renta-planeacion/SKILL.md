@@ -1,0 +1,88 @@
+---
+name: renta-planeacion
+description: Planeación tributaria del año en curso — dónde de verdad se paga menos el año que viene. Úsala después de cerrar una declaración, o cuando el usuario pregunte cómo pagar menos el próximo año, si le conviene el Régimen Simple, o qué debería hacer distinto.
+---
+
+# Planeación del año en curso
+
+La declaración del año pasado ya está escrita: se optimiza en los márgenes. **La del año en curso todavía se puede cambiar entera.**
+
+Esta es la parte que la gente no espera y la que más agradece. Hazla siempre, aunque no la pidan.
+
+## Lo primero: cuántos meses quedan
+
+Calcula cuántos meses faltan para el 31 de diciembre. Casi todo lo que sirve tiene esa fecha límite, y el valor de cada palanca depende de cuánto tiempo queda.
+
+## 1. Aportes voluntarios a AFP o cuenta AFC — la palanca más grande
+
+30% del ingreso, tope 3.800 UVT. Dentro del tope conjunto del 40%.
+
+**La ventana se cierra el 31 de diciembre y no hay prórroga.**
+
+Corre el motor con el año en curso y el ingreso proyectado, con y sin aportes al tope, y muestra la diferencia en pesos. Para un ingreso de tres cifras de millones, suelen ser varios millones de impuesto.
+
+Condiciones que hay que decir completas:
+
+- **AFC**: el retiro antes de 10 años sin destinarlo a vivienda pierde el beneficio y se recupera la retención.
+- **AFP voluntario**: el retiro sin cumplir requisitos de pensión también.
+
+Es plata que se inmoviliza. Dilo, con el número al lado, y que decida.
+
+## 2. Facturación electrónica y documento soporte — habilita todo lo demás
+
+Sin factura electrónica a su nombre:
+
+- No hay deducción del 1% por compras (240 UVT, fuera del tope).
+- Los costos de la Ruta A quedan sin piso.
+
+Qué hacer desde ya:
+
+- Pedir factura electrónica **con su cédula o NIT** en toda compra grande, y pagar por medio electrónico.
+- Si le paga a contratistas: documento soporte al momento del pago, y **pedirle la PILA a cada uno cada mes**, no en julio del año siguiente.
+
+## 3. Seguridad social propia
+
+Cotizar sobre el 40% de los ingresos:
+
+- Los aportes obligatorios son **INCRNGO**: restan antes del tope del 40% y no lo consumen. Es la mejor posición que existe.
+- Cierra la exposición ante la UGPP, que es un frente aparte con sus propias sanciones.
+
+Si viene sin cotizar de años anteriores, decirlo: el problema no se resuelve solo y crece.
+
+## 4. Dependientes — revisar cada año
+
+La condición cambia: un hijo cumple 18, un padre empieza a recibir pensión, un hermano entra a estudiar.
+
+72 UVT por dependiente, fuera del tope, sin factura. **Revisarlo cada año y guardar el soporte en el momento**, no cuando toque declarar.
+
+## 5. Donaciones bien hechas
+
+Si dona, que done a una entidad del **Régimen Tributario Especial** y que **exija el certificado en el momento de donar**. Descuento del 25% del valor donado.
+
+Es la diferencia entre donar y que valga $0, y donar exactamente lo mismo y recuperar el 25%.
+
+## 6. Medicina prepagada
+
+16 UVT/mes, tope 192 UVT. Dentro del tope del 40% — verificar con el motor si el tope ya está saturado antes de recomendarla como palanca fiscal. Si lo está, vale cero fiscalmente y la decisión es de salud, no tributaria.
+
+## 7. Régimen Simple — evaluar con números
+
+Inscripción hasta el **último día hábil de febrero** del año en que se quiere tributar bajo el régimen. No aplica retroactivamente.
+
+Para servicios profesionales las tarifas son altas y **no admiten costos ni deducciones**, así que para el perfil típico de freelance con costos reales suele no convenir. Pero se modela antes de descartarlo: hay casos con márgenes altos, pocos gastos y mucho ICA donde sí gana.
+
+## 8. Umbral de consignaciones — vigilarlo durante el año
+
+Si el año pasado quedó cerca de las 3.500 UVT de consignaciones, este año hay que vigilarlo **antes** de pasarse, no después.
+
+Opciones: separar las cuentas por las que pasa plata de terceros, o inscribirse voluntariamente y estructurar la actividad como exportación de servicios exenta.
+
+## Cierre
+
+Escribe `expediente/04-entregables/planeacion-<año>.md` con:
+
+- **Calendario** con las fechas límite reales, en orden.
+- **Cuánto suma todo**, en pesos, si se ejecuta completo.
+- **Qué hacer este mes**, concreto. No una lista de buenas intenciones: tres acciones con fecha.
+
+Sé específico con las fechas. "Antes de fin de año" no mueve a nadie; "antes del 31 de diciembre, quedan N meses" sí.
