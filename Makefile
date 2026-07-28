@@ -1,16 +1,20 @@
-.PHONY: test ejemplo privacidad verificar limpiar ayuda
+.PHONY: test benchmark ejemplo privacidad verificar limpiar ayuda
 
 ayuda:
 	@echo "renta-co"
 	@echo ""
-	@echo "  make test        corre la suite completa"
+	@echo "  make test        corre la suite de tests"
+	@echo "  make benchmark   14 personas: invariantes + diferencial + anclas"
 	@echo "  make ejemplo     corre el expediente de ejemplo de punta a punta"
 	@echo "  make privacidad  escanea el repo en busca de datos personales"
-	@echo "  make verificar   test + ejemplo + privacidad (lo que corre CI)"
+	@echo "  make verificar   todo lo anterior (lo que corre CI)"
 	@echo "  make limpiar     borra __pycache__ y artefactos"
 
 test:
 	python3 -m unittest discover -s engine/tests -t . -v
+
+benchmark:
+	python3 -m benchmark.correr
 
 ejemplo:
 	python3 -m engine.cli parametros --anio 2025
@@ -19,7 +23,7 @@ ejemplo:
 privacidad:
 	python3 scripts/escanear_privacidad.py .
 
-verificar: test ejemplo privacidad
+verificar: test benchmark ejemplo privacidad
 	@echo ""
 	@echo "✓ Todo verde."
 

@@ -21,6 +21,9 @@ jobs:
       - name: Tests
         run: python -m unittest discover -s engine/tests -t . -v
 
+      - name: Benchmark (invariantes + diferencial + anclas)
+        run: python -m benchmark.correr
+
       - name: Expediente de ejemplo
         run: python -m engine.cli calcular --expediente expediente.ejemplo
 
