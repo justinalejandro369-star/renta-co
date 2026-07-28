@@ -40,6 +40,13 @@ def luhn(numero: str) -> bool:
     return total % 10 == 0 and len(digitos) >= 13
 
 
+# Palabras que, cerca de un número, lo convierten en identificador.
+CONTEXTO_IDENTIFICADOR = re.compile(
+    r"\b(?:c[eé]dula|c\.?c\.?|nit|identificaci[oó]n|documento|pasaporte|"
+    r"cuenta|ahorros|corriente|tarjeta|titular|contribuyente|declarante)\b",
+    re.IGNORECASE,
+)
+
 PATRONES = [
     ("NIT",
      re.compile(r"\b\d{3}[.\s]?\d{3}[.\s]?\d{3}\s?-\s?\d\b"),
@@ -47,8 +54,18 @@ PATRONES = [
     ("tarjeta",
      re.compile(r"\b(?:\d[ -]?){13,19}\b"),
      lambda m: luhn(m)),
+    # Número con separadores de miles. En un expediente tributario esto es
+    # casi siempre un MONTO ("90.000.000"), no una cédula, así que solo se
+    # reporta si hay una palabra de contexto en la línea o si tiene cuatro o
+    # más grupos —una cédula colombiana los tiene, un monto casi nunca—.
     ("cédula",
-     re.compile(r"\b\d{1,3}(?:[.\s]\d{3}){2,3}\b|\b\d{8,10}\b"),
+     re.compile(r"\b\d{1,3}(?:[.\s]\d{3}){2,3}\b"),
+     "contexto"),
+    # Secuencia larga de dígitos SIN separadores. Un monto en prosa casi
+    # siempre lleva separadores; una cédula o un número de cuenta copiados de
+    # un sistema no. Se reporta siempre.
+    ("cédula o documento",
+     re.compile(r"\b\d{8,10}\b"),
      None),
     ("cuenta bancaria",
      re.compile(r"\b\d{9,20}\b"),
@@ -144,11 +161,16 @@ def escanear(ruta: Path, nombres: list[str]) -> list[tuple[int, str, str]]:
     hallazgos = []
     for n, linea in enumerate(texto.splitlines(), start=1):
         limpia = FALSOS_POSITIVOS.sub(" ", linea)
+        hay_contexto = bool(CONTEXTO_IDENTIFICADOR.search(linea))
         vistos_en_linea = set()
         for etiqueta, patron, validador in PATRONES:
             for m in patron.finditer(limpia):
                 bruto = m.group(0).strip()
-                if validador and not validador(bruto):
+                if validador == "contexto":
+                    grupos = len(re.split(r"[.\s]", bruto))
+                    if not hay_contexto and grupos < 4:
+                        continue
+                elif validador and not validador(bruto):
                     continue
                 clave = (bruto, etiqueta)
                 if clave in vistos_en_linea:
