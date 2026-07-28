@@ -114,7 +114,7 @@ El plugin es código. Tu expediente es tuyo y vive en tu proyecto, fuera de git 
 
 ## Por qué existe
 
-La DIAN te manda una **declaración sugerida** armada con lo que terceros reportaron sobre ti. Es cómoda y es sistemáticamente peor que la que te corresponde: no conoce tus dependientes, no conoce tus costos, y no elige la ruta de depuración que te conviene. Un contador cobra entre $300.000 y $1.000.000, y en el caso de quien cobra en dólares muchos no dominan ni la TRM diaria ni el art. 336 num. 4.
+La DIAN te manda una **declaración sugerida** armada con lo que terceros reportaron sobre ti. Como punto de partida es útil —de hecho `renta-co` te manda a bajarla si no guardaste nada del año—, pero como declaración final es sistemáticamente peor que la que te corresponde: no conoce tus dependientes, no conoce tus costos, y no elige la ruta de depuración que te conviene. Un contador cobra entre $300.000 y $1.000.000, y en el caso de quien cobra en dólares muchos no dominan ni la TRM diaria ni el art. 336 num. 4.
 
 Este proyecto ataca el caso más difícil y peor atendido: **el freelance con ingresos del exterior.**
 

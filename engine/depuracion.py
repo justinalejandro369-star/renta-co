@@ -490,14 +490,48 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
     if consig >= u.get("consignaciones_uvt", 1400) * uvt:
         disparadores.append("consignaciones ≥ 1.400 UVT")
 
+    # Con el perfil a medias, "NO obligado" es el titular más peligroso que
+    # puede dar esta herramienta: alguien lo lee, no declara, y la sanción por
+    # extemporaneidad corre. Solo se afirma si están los cuatro insumos.
+    faltan_insumos = [
+        etiqueta for valor, etiqueta in (
+            (p.ingresos_brutos, "ingresos"),
+            (p.patrimonio_bruto, "patrimonio bruto"),
+            (consig, "consignaciones"),
+        ) if not valor
+    ]
+
+    if disparadores:
+        estado = "SÍ"
+        detalle = "Se cumple: " + "; ".join(disparadores)
+        severidad = "info"
+    elif faltan_insumos:
+        estado = "NO SE PUEDE AFIRMAR TODAVÍA"
+        detalle = (
+            f"Ningún umbral se supera con lo cargado, pero falta(n) "
+            f"{', '.join(faltan_insumos)}. Con el perfil a medias esto NO "
+            f"significa que no tengas que declarar. Basta con superar UNO de "
+            f"los cinco umbrales —ingresos, patrimonio, consignaciones, "
+            f"consumos con tarjeta de crédito o compras totales, todos de "
+            f"1.400 UVT salvo patrimonio, que es 4.500— y los dos últimos ni "
+            f"siquiera están en el perfil. Complétalo antes de concluir."
+        )
+        severidad = "media"
+    else:
+        estado = "NO por los datos cargados"
+        detalle = (
+            "Ningún umbral superado. Verifica igual tus consumos con tarjeta de "
+            "crédito y tus compras totales del año: son dos umbrales de 1.400 "
+            "UVT que este motor no modela y que bastan por sí solos."
+        )
+        severidad = "info"
+
     checks.append({
         "id": "OBL-01",
         "titulo": "¿Obligado a declarar renta?",
-        "estado": "SÍ" if disparadores else "NO por los datos cargados",
-        "detalle": ("Se cumple: " + "; ".join(disparadores)) if disparadores
-                   else "Ningún umbral superado con los datos actuales. Verifica "
-                        "también consumos con tarjeta de crédito y compras totales.",
-        "severidad": "info",
+        "estado": estado,
+        "detalle": detalle,
+        "severidad": severidad,
         "fuente": u.get("fuente", ""),
     })
 

@@ -44,7 +44,14 @@ def elegir(ruta: Path):
 
 
 def importar(ruta: Path):
-    """Importa un archivo con el adaptador que lo reconozca."""
+    """Importa un archivo con el adaptador que lo reconozca.
+
+    Si un adaptador específico reclama el archivo y después falla al leerlo,
+    se reintenta con el genérico antes de darse por vencido. Sin ese respaldo,
+    una detección demasiado entusiasta dejaba el archivo inutilizable con un
+    mensaje engañoso ("El archivo de Deel X no tiene columnas...") cuando el
+    genérico lo habría leído perfecto.
+    """
     adaptador = elegir(ruta)
     if adaptador is None:
         raise ValueError(
@@ -53,4 +60,13 @@ def importar(ruta: Path):
             f"explícito, o escribe uno nuevo — son ~40 líneas, ver "
             f"engine/adapters/generico.py."
         )
-    return adaptador.importar(ruta), adaptador.NOMBRE
+    try:
+        return adaptador.importar(ruta), adaptador.NOMBRE
+    except ValueError as e:
+        if adaptador is generico:
+            raise
+        try:
+            movs = generico.importar(ruta)
+        except ValueError:
+            raise e from None
+        return movs, f"{generico.NOMBRE} (respaldo: {adaptador.NOMBRE} falló)"

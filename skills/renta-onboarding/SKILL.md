@@ -142,6 +142,37 @@ Mal: *«Conforme al numeral 4 del artículo 336 del ET, el contribuyente deberá
 
 Bien: *«Tienes que elegir: o restas tus gastos, o restas el 25% exento. No las dos. Lo dice el art. 336 num. 4 ET. Calculé las dos: por gastos pagas $X, por el 25% pagas $Y.»*
 
+## El usuario que no tiene nada
+
+Pasa seguido y es el caso que más fácil se atasca: no tiene certificados, no
+sabe cuánto ganó, no guardó extractos, nunca declaró. Sin datos no se puede
+importar ni calcular, y las salidas de emergencia del resto de esta skill
+—"dile cuánto vale ese papel según la tabla de sensibilidad"— no sirven,
+porque esa tabla solo existe después de calcular.
+
+**No lo mandes a conseguir doce documentos.** Empieza por los dos que
+reconstruyen el año casi solos:
+
+1. **La información exógena.** En el portal de la DIAN, con la cuenta de
+   usuario del contribuyente. Trae lo que terceros —bancos, plataformas,
+   clientes, EPS— reportaron sobre él: ingresos, retenciones, consignaciones,
+   consumos con tarjeta. Es la forma más rápida de saber qué pasó en un año
+   del que no se guardó nada, y además es exactamente lo que la DIAN va a
+   cruzar contra la declaración.
+
+2. **La declaración sugerida.** También en el portal, ya precargada con la
+   exógena. Como declaración es peor que la que le corresponde —no conoce sus
+   dependientes ni sus costos y no elige la ruta que le conviene— pero como
+   **fuente de datos de partida** es excelente y gratis.
+
+Con eso ya hay un punto de partida real. De ahí se sigue el flujo normal:
+clasificar, entrevistar y cerrar los huecos que la exógena no cubre, que son
+justamente los que le suman a favor —dependientes, costos, GMF de bancos que
+no reportaron—.
+
+Si tampoco tiene cuenta en el portal, ese es el primer paso: crearla. Todo lo
+demás depende de eso.
+
 ## Si algo sale mal
 
 - **Un archivo no se puede leer** → dilo, pide otro formato, sigue con el resto. No te bloquees.

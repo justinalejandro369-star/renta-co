@@ -155,8 +155,19 @@ class Ledger:
             "listo_para_el_umbral": False,
         }
 
-    def validar(self) -> list[str]:
+    def validar(self, trm=None) -> list[str]:
         avisos = list(self.avisos)
+        if trm is not None:
+            huecos = trm.huecos_grandes()
+            if huecos:
+                fecha, origen, dias = huecos[0]
+                avisos.append(
+                    f"{len(huecos)} movimiento(s) usaron una TRM de más de 3 días "
+                    f"antes de su fecha (el peor: {fecha} tomó la del {origen}, "
+                    f"{dias} días atrás). El art. 288 exige la TRM de la fecha de "
+                    f"realización: revisa si la serie quedó incompleta antes de "
+                    f"dar el ledger por bueno."
+                )
         pendientes = self.sin_clasificar()
         if pendientes:
             avisos.append(

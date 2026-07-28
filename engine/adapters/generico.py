@@ -10,6 +10,7 @@ que clasifiques a mano antes que adivinar mal el signo de un ingreso.
 from __future__ import annotations
 
 import csv
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -28,6 +29,11 @@ ALIAS = {
     "contraparte": ["contraparte", "beneficiario", "counterparty", "payee",
                     "tercero", "nombre"],
 }
+
+# Lo único que se acepta después de normalizar: dígitos con a lo sumo un
+# punto decimal. Sin notación científica, sin nan/inf, sin separadores
+# sobrantes.
+_NUMERO_LIMPIO = re.compile(r"\d+(?:\.\d+)?")
 
 FORMATOS_FECHA = [
     "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d",
@@ -107,6 +113,21 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
 
     if not t or t == ".":
         return 0.0
+
+    # float() acepta cosas que en un extracto bancario no son un monto y que,
+    # si pasan, contaminan la base gravable sin dejar rastro:
+    #   "1.2.3"  → 123.0     (los puntos se borran y queda un número creíble)
+    #   "1e5"    → 100000.0
+    #   "nan"    → nan       y revienta más tarde, en Movimiento.convertir(),
+    #                        fuera del try/except, con un traceback sin nombre
+    #                        de archivo ni de línea
+    # Mejor fallar acá, donde se sabe qué archivo y qué fila.
+    if not _NUMERO_LIMPIO.fullmatch(t):
+        raise ValueError(
+            f"{texto!r} no es un monto reconocible. Después de normalizar quedó "
+            f"{t!r}, que no es un número decimal simple."
+        )
+
     valor = float(t)
     return -valor if negativo else valor
 

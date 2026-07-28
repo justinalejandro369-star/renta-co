@@ -269,7 +269,7 @@ def cmd_importar(args) -> int:
         print(f"\n⚠ {len(pendientes)} movimiento(s) SIN CLASIFICAR. El agente los "
               f"revisa contigo uno por uno; no se calcula nada hasta cerrarlos.")
 
-    for aviso in ledger.validar():
+    for aviso in ledger.validar(trm):
         for tramo in _envolver(aviso, ANCHO - 4):
             print(f"  ⚠ {tramo}" if tramo == _envolver(aviso, ANCHO - 4)[0] else f"    {tramo}")
 

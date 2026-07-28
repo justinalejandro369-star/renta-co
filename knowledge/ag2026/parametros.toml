@@ -21,6 +21,29 @@ valor = 52374
 fuente = "Resolución DIAN 000238 del 15 de diciembre de 2025"
 url = "https://actualicese.com/uvt-2026/"
 
-# Los bloques [tarifa], [topes], [umbrales], [plazos] y [sanciones] se
-# heredan de knowledge/ag2025/parametros.toml mientras no se sobreescriban
-# acá. engine/parametros.py hace la fusión y marca cada valor heredado.
+# Los bloques [tarifa], [topes] y [sanciones] se heredan de
+# knowledge/ag2025/parametros.toml mientras no se sobreescriban acá.
+# engine/parametros.py hace la fusión y marca cada valor heredado.
+
+# [plazos] NO se hereda: las fechas de ag2025 son para declarar el AÑO
+# GRAVABLE 2025 y mostrarlas acá sería afirmar algo falso, no solo
+# incompleto. Se dejan vacías hasta que salga el decreto correspondiente.
+[plazos]
+inicio = ""
+fin = ""
+criterio = "Escalonado por los dos últimos dígitos del NIT o cédula, sin dígito de verificación."
+tabla_cargada = false
+advertencia = """
+Las fechas para declarar el año gravable 2026 se fijan por decreto, que suele
+salir a finales del año anterior. Todavía no están cargadas acá. No uses las
+de AG2025: son otras.
+"""
+url = "https://www.dian.gov.co/"
+
+[umbrales.agente_retencion_persona_natural]
+uvt = 30000
+medido_sobre_anio = 2025
+uvt_del_anio_medido = 49799
+requiere_calidad_comerciante = true
+nota = "Se mide contra el año inmediatamente anterior, así que para AG2026 la referencia es la UVT de 2025, no la de 2024."
+fuente = "Estatuto Tributario art. 368-2"

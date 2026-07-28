@@ -78,9 +78,11 @@ class Parametros:
             )
         if self.heredados:
             base = self.get("meta.hereda_de", "otro año")
+            bloques = sorted({h.split(".")[0] for h in self.heredados})
             avisos.append(
-                f"{len(self.heredados)} bloque(s) heredados de {base} sin verificar "
-                f"para AG{self.anio_gravable}: {', '.join(sorted(self.heredados))}."
+                f"{len(bloques)} bloque(s) heredados de {base} sin verificar para "
+                f"AG{self.anio_gravable}: {', '.join(bloques)}. Verifícalos contra "
+                f"la norma antes de usar este año para una declaración real."
             )
         if not self.get("plazos.tabla_cargada", False):
             avisos.append(
@@ -95,17 +97,28 @@ def _leer_toml(ruta: Path) -> dict:
         return tomllib.load(f)
 
 
-def _fusionar(base: dict, encima: dict) -> tuple[dict, set[str]]:
-    """Fusiona `encima` sobre `base`. Devuelve el resultado y qué se heredó."""
+def _fusionar(base: dict, encima: dict, raiz: bool = True) -> tuple[dict, set[str]]:
+    """Fusiona `encima` sobre `base`. Devuelve el resultado y qué se heredó.
+
+    `meta` se excluye en la raíz: el meta del hijo siempre reemplaza al del
+    padre, así que reportar sus claves como heredadas es un falso positivo
+    que infla la advertencia y le quita valor a la que sí importa.
+    """
     resultado = dict(base)
-    heredados = {k for k in base if k not in encima and k != "meta"}
+    heredados = {
+        k for k in base
+        if k not in encima and not (raiz and k == "meta")
+    }
     for clave, valor in encima.items():
         if (
             clave in resultado
             and isinstance(resultado[clave], dict)
             and isinstance(valor, dict)
         ):
-            fusionado, sub = _fusionar(resultado[clave], valor)
+            if raiz and clave == "meta":
+                resultado[clave] = valor
+                continue
+            fusionado, sub = _fusionar(resultado[clave], valor, raiz=False)
             resultado[clave] = fusionado
             heredados |= {f"{clave}.{s}" for s in sub}
         else:
