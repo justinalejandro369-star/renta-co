@@ -1,0 +1,27 @@
+Date,Type,Description,Counterparty,Amount,Currency
+2025-01-15,Payment received,Invoice #001 January,Cliente Ficticio LLC,3800.00,USD
+2025-01-20,Withdraw,Payout to bank account,,-3000.00,USD
+2025-02-14,Payment received,Invoice #002 February,Cliente Ficticio LLC,3800.00,USD
+2025-02-18,Payment to contractor,Contractor payment - dev,Contratista A,-1100.00,USD
+2025-02-20,Fee,Platform fee,,-76.00,USD
+2025-03-14,Payment received,Invoice #003 March,Cliente Ficticio LLC,3800.00,USD
+2025-03-19,Payment to contractor,Contractor payment - design,Contratista B,-900.00,USD
+2025-03-25,Withdraw,Payout to bank account,,-2500.00,USD
+2025-04-15,Payment received,Invoice #004 April,Cliente Ficticio LLC,3800.00,USD
+2025-04-22,Internal transfer,Balance transfer USD to COP,,-1500.00,USD
+2025-05-15,Payment received,Invoice #005 May,Cliente Ficticio LLC,3800.00,USD
+2025-05-20,Payment to contractor,Contractor payment - dev,Contratista A,-1100.00,USD
+2025-06-13,Payment received,Invoice #006 June,Cliente Ficticio LLC,3800.00,USD
+2025-06-30,Fee,Platform fee,,-76.00,USD
+2025-07-15,Payment received,Invoice #007 July,Cliente Ficticio LLC,3800.00,USD
+2025-07-21,Payment to contractor,Contractor payment - design,Contratista B,-900.00,USD
+2025-08-14,Payment received,Invoice #008 August,Cliente Ficticio LLC,3800.00,USD
+2025-08-25,Withdraw,Payout to bank account,,-4000.00,USD
+2025-09-15,Payment received,Invoice #009 September,Cliente Ficticio LLC,3800.00,USD
+2025-09-19,Payment to contractor,Contractor payment - dev,Contratista A,-1100.00,USD
+2025-10-15,Payment received,Invoice #010 October,Cliente Ficticio LLC,3800.00,USD
+2025-10-28,Fee,Platform fee,,-76.00,USD
+2025-11-14,Payment received,Invoice #011 November,Cliente Ficticio LLC,3800.00,USD
+2025-11-20,Payment to contractor,Contractor payment - design,Contratista B,-900.00,USD
+2025-12-15,Payment received,Invoice #012 December,Cliente Ficticio LLC,3800.00,USD
+2025-12-22,Withdraw,Payout to bank account,,-5000.00,USD

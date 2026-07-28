@@ -1,0 +1,86 @@
+#  EXPEDIENTE DE EJEMPLO — contribuyente ficticio
+#
+#  Perfil: desarrolladora independiente en Medellín, cliente único en EE.UU.
+#  que le paga vía Deel en USD, subcontrata a dos personas, mantiene a su
+#  madre. Cifras redondas e inventadas.
+#
+#  Sirve para: ver el flujo completo sin exponer nada, y como test de
+#  regresión del motor.
+#
+#      python -m engine.cli calcular --expediente expediente.ejemplo
+#
+#  Fíjate en el resultado: la Ruta A gana por poco, pero la palanca más
+#  grande de la tabla de sensibilidad NO es la elección de ruta.
+
+[contribuyente]
+anio_gravable = 2025
+residente_fiscal = true
+
+# ── Ingresos ──────────────────────────────────────────────────────────
+# En pesos, ya convertidos con TRM diaria por engine/ledger.py.
+[ingresos]
+rentas_trabajo_honorarios = 186_400_000   # USD 44.000 aprox, TRM diaria
+rentas_capital            = 1_240_000     # rendimientos, certificado del banco
+otras_rentas_no_laborales = 0
+
+# ── Ingresos no constitutivos de renta ────────────────────────────────
+# Restan ANTES del tope del 40% y no lo consumen. Es la mejor posición
+# posible para una partida — por eso importa no ponerlos como deducción.
+[incrngo]
+aportes_obligatorios_salud_pension = 21_240_000   # PILA como independiente
+componente_inflacionario           = 690_000      # certificado del banco
+otros                              = 0
+
+# ── Costos y gastos — SOLO se restan en la Ruta A ─────────────────────
+# Cada peso exige factura electrónica o documento soporte. Los pagos a
+# contratistas además exigen verificar sus aportes (art. 108 par. 2 ET).
+[costos]
+pagos_a_contratistas  = 48_000_000
+comisiones_plataforma = 3_720_000
+equipo_tecnologico    = 9_500_000
+internet_software     = 5_400_000
+arriendo_oficina      = 0
+otros                 = 0
+
+# ── Deducciones ───────────────────────────────────────────────────────
+[deducciones]
+gmf_pagado                      = 1_480_000   # total 4x1000; el motor toma el 50%
+intereses_vivienda              = 0
+medicina_prepagada              = 4_200_000
+aportes_voluntarios             = 0           # ventana cerrada el 31-dic-2025
+compras_con_factura_electronica = 0
+dependientes                    = 1           # la madre, ingresos < 260 UVT
+
+# ── Descuentos ────────────────────────────────────────────────────────
+[descuentos]
+donaciones_certificadas_rte = 0   # donó, pero sin certificado del RTE → vale $0
+
+# ── Anticipos ─────────────────────────────────────────────────────────
+[anticipos]
+retenciones_practicadas     = 86_000   # sobre rendimientos financieros
+saldo_a_favor_anio_anterior = 0
+
+# ── Verificaciones de riesgo ──────────────────────────────────────────
+[verificaciones]
+# TODO lo que entró a las cuentas, incluidos traslados propios y plata de
+# clientes que se redistribuyó. NO es lo mismo que el ingreso.
+consignaciones_totales_anio        = 198_000_000
+contratistas_con_pila_verificada   = false   # ← riesgo R-02 abierto
+tiene_documento_soporte_de_pagos   = false   # ← riesgo R-03 abierto
+
+# ── Patrimonio a 31 de diciembre del año gravable ─────────────────────
+[[patrimonio.activos]]
+nombre = "Cuenta de ahorros"
+valor  = 34_500_000
+
+[[patrimonio.activos]]
+nombre = "Saldo en wallet de la plataforma (USD, TRM 31-dic)"
+valor  = 12_800_000
+
+[[patrimonio.activos]]
+nombre = "Vehículo (avalúo)"
+valor  = 42_000_000
+
+[[patrimonio.pasivos]]
+nombre = "Tarjeta de crédito"
+valor  = 5_600_000
