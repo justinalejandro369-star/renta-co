@@ -40,6 +40,67 @@ def titulo(texto: str) -> None:
 
 # ---------------------------------------------------------------------
 
+def _desfase_con_el_ledger(exp: Path, p) -> list[str]:
+    """¿El perfil dice lo mismo que el ledger construido?
+
+    `calcular` nunca miraba `02-datos/ledger.csv`. El usuario corrige una
+    clasificación —que es lo que la herramienta le dice que haga—, vuelve a
+    correr `importar`, la corrección sobrevive… y `calcular` sigue
+    imprimiendo el saldo viejo, porque el paso de copiar las cifras al
+    `perfil.toml` es manual y nadie verifica que se haya hecho.
+
+    Verificado: 15.657.355 COP de ingreso desaparecidos sin una sola
+    advertencia. El propio catálogo llama a eso R-04, severidad ALTA,
+    sanción por inexactitud del 100% (art. 648).
+
+    No se corrige el perfil automáticamente: ese paso es del usuario, y es
+    donde se atrapan las clasificaciones equivocadas. Solo se avisa.
+    """
+    ruta = Path(exp) / "02-datos" / "ledger.csv"
+    if not ruta.exists():
+        return []
+    try:
+        from .adapters.generico import abrir_csv
+        from .ledger import Ledger, Movimiento
+
+        movs = []
+        with abrir_csv(ruta) as f:
+            import csv as _csv
+
+            for fila in _csv.DictReader(f):
+                movs.append(Movimiento(
+                    fecha=date.fromisoformat(fila["fecha"]),
+                    descripcion="", monto_origen=0.0,
+                    moneda=fila.get("moneda", "COP"),
+                    categoria=fila.get("categoria", "desconocido"),
+                    monto_cop=float(fila["monto_cop"]),
+                ))
+        ledger = Ledger(movs)
+    except (OSError, KeyError, ValueError):
+        return [f"No se pudo leer {ruta.name} para contrastarlo con el perfil."]
+
+    del_ledger = ledger.a_perfil()
+    avisos = []
+    for seccion, campos in del_ledger.items():
+        for campo, valor_ledger in campos.items():
+            valor_perfil = p.get(f"{seccion}.{campo}")
+            if round(valor_ledger) == round(valor_perfil):
+                continue
+            avisos.append(
+                f"{seccion}.{campo}: el perfil dice {cop(valor_perfil)} y el "
+                f"ledger suma {cop(valor_ledger)} "
+                f"(diferencia {cop(valor_ledger - valor_perfil)})."
+            )
+    if avisos:
+        avisos.append(
+            "El ledger es la prueba de dónde salió cada cifra si la DIAN "
+            "pregunta. Si lo corregiste y no copiaste las cifras al "
+            "perfil.toml, el borrador de arriba NO refleja tus movimientos. "
+            "Mira 02-datos/sugerido-perfil.toml."
+        )
+    return avisos
+
+
 def cmd_calcular(args) -> int:
     p = PF.cargar(args.expediente)
     errores = PF.validar(p, P.anios_disponibles())
@@ -160,6 +221,15 @@ def cmd_calcular(args) -> int:
         print()
         print("  No venían en el perfil y se asumieron. Si alguno está mal, el")
         print("  resultado completo lo está: confírmalos antes de seguir.")
+        print()
+
+    # --- el perfil contra el ledger ------------------------------------
+    desfase = _desfase_con_el_ledger(Path(args.expediente), p)
+    if desfase:
+        titulo("⚠ EL PERFIL Y EL LEDGER NO DICEN LO MISMO")
+        for aviso in desfase:
+            for i, tramo in enumerate(_envolver(aviso, ANCHO - 4)):
+                print(f"  {'·' if i == 0 else ' '} {tramo}")
         print()
 
     # --- lo que falta -------------------------------------------------
@@ -341,6 +411,12 @@ def cmd_importar(args) -> int:
     for aviso in ledger.validar(trm):
         for tramo in _envolver(aviso, ANCHO - 4):
             print(f"  ⚠ {tramo}" if tramo == _envolver(aviso, ANCHO - 4)[0] else f"    {tramo}")
+
+    # Lo que deja el ledger inutilizable también cuenta para el código de
+    # salida. Antes solo contaban los fallos de archivo, así que un ledger
+    # con el 28% de las entradas sin clasificar salía 0 y el agente que
+    # encadena `importar` con `calcular` recibía luz verde.
+    incidencias += ledger.bloqueantes(trm)
 
     # --- puente al perfil ---------------------------------------------
     sugerido = escribir_sugerencia_perfil(

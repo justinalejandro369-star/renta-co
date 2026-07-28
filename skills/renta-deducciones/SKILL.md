@@ -33,7 +33,7 @@ Soporte según el caso:
 | Hijo de 18 a 25 estudiando | Certificado de la institución de educación superior (certificada por el ICFES) o del programa técnico acreditado |
 | Hijo mayor de 18 con dependencia física o psicológica | Certificado del **Ministerio de Salud y Protección Social** — la Ley 2411 de 2024 cambió la entidad, antes era Medicina Legal |
 | Cónyuge, padres o hermanos con ingresos < 260 UVT | **Certificado de contador público** (art. 387 par. 2 nums. 4 y 5). Es un requisito formal que se olvida y que la DIAN sí exige |
-| Dependencia física o psicológica de cónyuge, padres o hermanos | Certificado del Ministerio de Salud y Protección Social |
+| Dependencia física o psicológica de cónyuge, padres o hermanos | Certificado de **Medicina Legal** (art. 387 par. 2 nums. 4 y 5). La Ley 2411 de 2024 cambió la entidad **solo para los hijos** (nums. 2 y 3): acá sigue siendo Medicina Legal, y un certificado de Minsalud no cumple el requisito |
 
 > Hay una segunda vía por dependientes (10% de la renta de trabajo, tope 384 UVT, art. 387) que es **excluyente** con esta. El motor calcula las dos y toma la mejor. La diferencia clave: la del 10% **sí** consume el tope del 40%, así que solo gana cuando el tope está libre.
 

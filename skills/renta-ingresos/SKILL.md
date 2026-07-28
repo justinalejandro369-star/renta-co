@@ -28,7 +28,21 @@ Un export de Deel o de Wise mezcla, en el mismo archivo:
 
 Sumar todo lo positivo triplica el ingreso. Es el error más común al importar a mano y por eso los adaptadores clasifican por texto, no por signo.
 
-**Pero ojo con la otra cara**: para el umbral de 3.500 UVT de IVA, los traslados **sí** cuentan como consignación. Son dos preguntas distintas sobre el mismo movimiento.
+**Pero ojo con la otra cara, y con el matiz que decide el caso.** Son dos
+preguntas distintas sobre el mismo movimiento, y hay DOS umbrales que se
+confunden:
+
+- **Obligación de declarar renta** (1.400 UVT, Decreto 1625 art. 1.6.1.13.2.7):
+  la norma dice «el valor total acumulado de consignaciones bancarias,
+  depósitos o inversiones financieras», **sin calificador**. Ahí sí entra todo,
+  traslados incluidos.
+- **Responsabilidad de IVA** (3.500 UVT, art. 437 par. 3 num. 6): la norma
+  dice consignaciones «**PROVENIENTES DE ACTIVIDADES GRAVADAS CON IVA**». Un
+  traslado entre cuentas propias NO proviene de una actividad gravada, así que
+  **no** cuenta para este.
+
+El campo `verificaciones.consignaciones_totales_anio` alimenta el segundo, así
+que va con el calificador. Para el primero, súmalo aparte con tu contador.
 
 ## TRM — art. 288 ET
 

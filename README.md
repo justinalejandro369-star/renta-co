@@ -35,6 +35,10 @@ codex plugin marketplace add justinalejandro369-star/renta-co
 codex plugin add renta-co@renta-co
 ```
 
+En Codex los comandos se invocan sin el prefijo del plugin: `renta-setup`,
+`renta-auditar`, `renta-estado`, `renta-privacidad`. Son los mismos cuatro
+que abajo aparecen como `/renta-co:*`.
+
 **Cualquier otro agente** (Cursor, Gemini CLI, OpenCode, Cline — todo lo que lea `AGENTS.md`)
 
 ```bash
@@ -52,7 +56,7 @@ Requiere Python 3.11 o superior. **Cero dependencias externas.**
 /renta-co:setup
 ```
 
-Crea `./expediente/` en tu máquina —ya ignorado por git— y te hace cuatro preguntas.
+Crea `./expediente/` en tu máquina —ya ignorado por git— y te hace cinco preguntas. La quinta es la que detecta si tu caso está fuera de lo que este motor liquida; no se salta.
 
 > Arrastra **todo** a `expediente/00-crudo/`: extractos, certificados, PDFs, ZIPs.
 > **No los ordenes ni los renombres.**

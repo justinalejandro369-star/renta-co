@@ -8,7 +8,8 @@ cifra si la DIAN pregunta.
 Categorías:
     ingreso_trabajo     honorarios, compensación por servicios
     ingreso_capital     rendimientos, dividendos, intereses
-    costo               pago a contratista, comisión, insumo deducible
+    costo_contratista   pago a una persona — exige PILA (art. 108 par. 2)
+    costo               comisión, insumo, otro gasto deducible
     gasto_personal      no deducible; se registra para no confundirlo con costo
     traslado            movimiento entre cuentas propias: NI ingreso NI gasto
     retencion           retención practicada por un tercero
@@ -27,12 +28,29 @@ from .trm import TRM
 CATEGORIAS = {
     "ingreso_trabajo": "Renta de trabajo (honorarios / servicios)",
     "ingreso_capital": "Renta de capital",
-    "costo": "Costo o gasto deducible (solo Ruta A)",
+    # `costo_contratista` existe separado de `costo` porque es el único que
+    # dispara R-02, y R-02 es «el requisito que tumba más deducciones»: el
+    # art. 108 par. 2 exige verificar los aportes a seguridad social de cada
+    # contratista, y si no cotizaron la DIAN puede rechazar la TOTALIDAD del
+    # costo, con lo que la Ruta A pierde su fundamento.
+    #
+    # Estaban fundidos en `costo`, así que `a_perfil()` los mandaba todos a
+    # `costos.otros` y `verificar_obligaciones` —que mira
+    # `costos.pagos_a_contratistas`— nunca emitía R-02 por el flujo que la
+    # propia herramienta documenta. Verificado: dos contratistas y
+    # $79.939.964 de costos, y el riesgo no aparecía en ninguna parte de la
+    # salida. Los adaptadores YA distinguían el pago a contratista de la
+    # comisión de plataforma y tiraban los dos a la misma categoría.
+    "costo_contratista": "Pago a contratista (solo Ruta A — exige PILA, art. 108 par. 2)",
+    "costo": "Otro costo o gasto deducible (solo Ruta A)",
     "gasto_personal": "Gasto personal — NO deducible",
     "traslado": "Traslado entre cuentas propias — ni ingreso ni gasto",
     "retencion": "Retención en la fuente practicada",
     "desconocido": "Sin clasificar",
 }
+
+# Las que se restan como costo en la Ruta A.
+COSTOS = ("costo", "costo_contratista")
 
 # El error más caro y más común del perfil freelance.
 ADVERTENCIA_TRASLADO = (
@@ -202,6 +220,45 @@ class Ledger:
                 )
         return avisos
 
+    def bloqueantes(self, trm=None) -> list[str]:
+        """Los avisos que dejan el ledger INUTILIZABLE para calcular.
+
+        `validar()` mezcla dos cosas distintas: lo que hay que leer y lo que
+        hay que arreglar. La advertencia de traslados, por ejemplo, es
+        pedagógica y sale siempre que haya un traslado — que es lo normal.
+
+        La separación importa porque el código de salida de `importar` es la
+        única señal que ve un agente que encadena `importar` con `calcular`.
+        Estaba cableado solo a los fallos de archivo, así que un ledger con
+        el 28% de las entradas sin clasificar salía 0. Verificado:
+        17.550.000 COP sin clasificar, luz verde.
+        """
+        bloqueos = []
+        pendientes = self.sin_clasificar()
+        if pendientes:
+            bloqueos.append(
+                f"{len(pendientes)} movimiento(s) SIN CLASIFICAR por "
+                f"{sum(abs(m.monto_cop) for m in pendientes):,.0f} COP. No están "
+                f"sumados en ninguna cifra: clasifícalos en el ledger antes de "
+                f"calcular.".replace(",", ".")
+            )
+        bloqueos += self.avisos_de_signo()
+        fechas = [m.fecha for m in self.movimientos]
+        if fechas and len({f.year for f in fechas}) > 1:
+            bloqueos.append(
+                f"El ledger mezcla los años {sorted({f.year for f in fechas})}. "
+                f"Filtra al año gravable antes de calcular."
+            )
+        if trm is not None and trm.huecos_grandes():
+            huecos = trm.huecos_grandes()
+            fecha, origen, dias = huecos[0]
+            bloqueos.append(
+                f"{len(huecos)} movimiento(s) usaron una TRM de más de 3 días "
+                f"antes de su fecha (el peor: {fecha} tomó la del {origen}). El "
+                f"art. 288 exige la TRM de la fecha de realización."
+            )
+        return bloqueos
+
     def filtrar_anio(self, anio: int) -> "Ledger":
         return Ledger(
             [m for m in self.movimientos if m.fecha.year == anio], list(self.avisos)
@@ -215,6 +272,7 @@ class Ledger:
         "ingreso_trabajo": (+1, "ingresos de trabajo", "una devolución o una nota crédito"),
         "ingreso_capital": (+1, "ingresos de capital", "una reversión de rendimientos"),
         "costo": (-1, "costos", "un reembolso"),
+        "costo_contratista": (-1, "pagos a contratistas", "un reembolso"),
         "gasto_personal": (-1, "gastos personales", "un reintegro"),
         "retencion": (-1, "retenciones", "una retención reversada"),
     }
@@ -295,6 +353,13 @@ class Ledger:
                 "rentas_capital": round(self.total("ingreso_capital")),
             },
             "costos": {
+                # Los pagos a contratistas van a SU PROPIO campo, que es el
+                # que dispara R-02. Fundidos en `otros`, el riesgo más caro
+                # de la Ruta A no se emitía nunca por el flujo documentado.
+                "pagos_a_contratistas": round(
+                    -sum(m.monto_cop for m in self.movimientos
+                         if m.categoria == "costo_contratista")
+                ),
                 # Suma de salidas, no valor absoluto del neto. Con abs() sobre
                 # el total, un reembolso clasificado como costo restaba del
                 # gasto deducible en vez de reducirlo explícitamente, y el
@@ -401,8 +466,18 @@ def leer_clasificacion_previa(ruta: Path) -> tuple[dict[tuple, str], list[str]]:
     previas: dict[tuple, str] = {}
     ilegibles: list[str] = []
     repetidas: dict[tuple, int] = {}
+    # `abrir_csv` y no `open(..., encoding="utf-8")`: el usuario abre este
+    # archivo en Excel para corregir categorías —es lo que la herramienta le
+    # dice que haga— y Excel en Windows lo guarda en cp1252, o con BOM si
+    # elige "CSV UTF-8". Las descripciones colombianas siempre traen tildes,
+    # así que el utf-8 duro reventaba con `UnicodeDecodeError`, que el
+    # `except OSError` no atrapa: `importar` moría con un mensaje sin
+    # archivo, sin causa y sin remedio, y moría igual en TODAS las corridas
+    # siguientes. La función que resuelve esto vivía cinco archivos más allá.
+    from .adapters.generico import abrir_csv
+
     try:
-        with open(ruta, newline="", encoding="utf-8") as f:
+        with abrir_csv(ruta) as f:
             for n, fila in enumerate(csv.DictReader(f), start=2):
                 try:
                     base = _clave_de(

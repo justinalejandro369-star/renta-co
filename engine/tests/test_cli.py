@@ -173,15 +173,33 @@ class TestCsvDeEscenarios(unittest.TestCase):
 class TestImportar(unittest.TestCase):
     """El comando por el que pasa todo lo que el usuario carga de verdad."""
 
-    BUENO = ("fecha,descripcion,valor\n"
-             "14/03/2025,Pago cliente,50.000.000\n"
-             "20/06/2025,Pago cliente,30.000.000\n")
+    # Un extracto genérico deja TODO en `desconocido`, así que no es un caso
+    # feliz: es un ledger que no se puede usar para calcular. El caso feliz
+    # necesita movimientos clasificados, y para eso hace falta un adaptador
+    # que sepa leerlos.
+    BUENO = ("Fecha,Documento,Descripcion,Valor\n"
+             "14/03/2025,001,ABONO INTERESES,50.000.000\n"
+             "20/06/2025,002,GMF 4X1000,-30.000\n")
+
+    SIN_CLASIFICAR = ("fecha,descripcion,valor\n"
+                      "14/03/2025,Pago cliente,50.000.000\n"
+                      "20/06/2025,Pago cliente,30.000.000\n")
 
     def test_el_caso_feliz_sale_cero(self):
-        exp = expediente_con(banco__csv=self.BUENO)
+        exp = expediente_con(bancolombia__csv=self.BUENO)
         codigo, salida = correr("importar", "--expediente", str(exp), "--anio", "2025")
         self.assertEqual(codigo, 0, salida)
         self.assertTrue((exp / "02-datos" / "ledger.csv").exists())
+
+    def test_un_ledger_sin_clasificar_NO_sale_cero(self):
+        """El código de salida es la única señal que ve un agente que
+        encadena `importar` con `calcular`. Un ledger con movimientos sin
+        clasificar no está listo para calcular: esas cifras no están sumadas
+        en ninguna parte."""
+        exp = expediente_con(banco__csv=self.SIN_CLASIFICAR)
+        codigo, salida = correr("importar", "--expediente", str(exp), "--anio", "2025")
+        self.assertEqual(codigo, 1, salida)
+        self.assertIn("SIN CLASIFICAR", salida)
 
     def test_un_archivo_que_no_se_pudo_importar_NO_sale_cero(self):
         """Antes: imprimía un ✗ temprano, seguía, escribía el ledger con los
@@ -234,6 +252,77 @@ class TestImportar(unittest.TestCase):
         correr("importar", "--expediente", str(exp), "--anio", "2025")
         _, salida = correr("importar", "--expediente", str(exp), "--anio", "2025")
         self.assertIn("Ledger anterior", salida)
+
+
+class TestLaCosturaLedgerPerfil(unittest.TestCase):
+    """El sitio donde vivían los tres hallazgos ALTA del eje de usuario: el
+    traspaso manual de cifras del ledger al `perfil.toml`."""
+
+    DEEL = ("Date,Type,Amount,Currency,Description,Counterparty\n"
+            "2025-03-14,invoice,10000.00,COP,Payment received,Cliente\n"
+            "2025-04-14,payment,-4000.00,COP,Payment to contractor Ana,Ana\n"
+            "2025-05-14,fee,-200.00,COP,Platform fee,Deel\n")
+
+    def test_un_pago_a_contratista_llega_a_su_propio_campo_del_perfil(self):
+        """`a_perfil()` mandaba TODO costo a `costos.otros`, y R-02 —«el
+        requisito que tumba más deducciones»— solo mira
+        `costos.pagos_a_contratistas`. Por el flujo documentado, el riesgo
+        más caro de la Ruta A no se emitía nunca."""
+        exp = expediente_con(deel__csv=self.DEEL)
+        correr("importar", "--expediente", str(exp), "--anio", "2025")
+        sugerido = (exp / "02-datos" / "sugerido-perfil.toml").read_text(encoding="utf-8")
+        self.assertIn("pagos_a_contratistas = 4_000", sugerido)
+        self.assertIn("otros = 200", sugerido)
+
+    def test_y_con_eso_R02_si_se_emite(self):
+        """La prueba que de verdad importa: el riesgo llega a la salida."""
+        from engine import parametros as P
+        from engine import perfil as PF
+        from engine.depuracion import verificar_obligaciones
+
+        exp = expediente_con(deel__csv=self.DEEL)
+        correr("importar", "--expediente", str(exp), "--anio", "2025")
+        (exp / "perfil.toml").write_text(
+            "[contribuyente]\nanio_gravable = 2025\nresidente_fiscal = true\n"
+            "[ingresos]\nrentas_trabajo_honorarios = 10_000\n"
+            "[costos]\npagos_a_contratistas = 4_000\n",
+            encoding="utf-8",
+        )
+        p = PF.cargar(exp)
+        checks = verificar_obligaciones(p, P.cargar(2025))
+        self.assertIn("R-02", [c["id"] for c in checks])
+
+    def test_calcular_avisa_cuando_el_perfil_no_dice_lo_mismo_que_el_ledger(self):
+        """El usuario corrige el ledger —que es lo que la herramienta le dice
+        que haga—, no re-transcribe el perfil, y `calcular` seguía imprimiendo
+        el saldo viejo. Verificado en la ronda 6: 15.657.355 COP de ingreso
+        desaparecidos sin una sola advertencia."""
+        exp = expediente_con(deel__csv=self.DEEL)
+        correr("importar", "--expediente", str(exp), "--anio", "2025")
+        (exp / "perfil.toml").write_text(
+            "[contribuyente]\nanio_gravable = 2025\nresidente_fiscal = true\n"
+            "[ingresos]\nrentas_trabajo_honorarios = 999_999\n",
+            encoding="utf-8",
+        )
+        codigo, salida = correr("calcular", "--expediente", str(exp))
+        self.assertEqual(codigo, 0, salida)
+        self.assertIn("NO DICEN LO MISMO", salida)
+        self.assertIn("rentas_trabajo_honorarios", salida)
+
+    def test_y_no_avisa_cuando_si_coinciden(self):
+        """El control: sin esto, un aviso incondicional pasaría el test."""
+        exp = expediente_con(deel__csv=self.DEEL)
+        correr("importar", "--expediente", str(exp), "--anio", "2025")
+        (exp / "perfil.toml").write_text(
+            "[contribuyente]\nanio_gravable = 2025\nresidente_fiscal = true\n"
+            "[ingresos]\nrentas_trabajo_honorarios = 10_000\n"
+            "rentas_capital = 0\n"
+            "[costos]\npagos_a_contratistas = 4_000\notros = 200\n"
+            "[anticipos]\nretenciones_practicadas = 0\n",
+            encoding="utf-8",
+        )
+        _, salida = correr("calcular", "--expediente", str(exp))
+        self.assertNotIn("NO DICEN LO MISMO", salida)
 
 
 class TestParametros(unittest.TestCase):

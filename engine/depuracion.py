@@ -175,7 +175,19 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     # --- 5. dependientes: dos vías excluyentes, se toma la mejor --------
     n_dep = int(p.get("deducciones.dependientes"))
     max_dep = par.exigir("topes.dependientes_72uvt.maximo_dependientes")
-    dep_72 = min(n_dep, max_dep) * par.exigir("topes.dependientes_72uvt.uvt_por_dependiente") * uvt
+    # Las dos vías de dependientes aplican ÚNICAMENTE sobre rentas de
+    # trabajo. El art. 336 num. 3 inciso 2 dice «el TRABAJADOR podrá
+    # deducir», y el Decreto 1625 art. 1.2.1.20.3 es explícito: «aplican
+    # únicamente a los ingresos provenientes de rentas de trabajo».
+    #
+    # `dep_10` ya se calculaba sobre `trabajo`; `dep_72` no dependía de él,
+    # así que un perfil con $300.000.000 de otras rentas no laborales, CERO
+    # honorarios y 4 dependientes recibía $14.342.112 de deducción a la que
+    # no tiene derecho. La asimetría era un descuido, no una decisión.
+    dep_72 = 0.0
+    if trabajo > 0:
+        dep_72 = (min(n_dep, max_dep)
+                  * par.exigir("topes.dependientes_72uvt.uvt_por_dependiente") * uvt)
 
     dep_10 = 0.0
     if n_dep > 0:
@@ -357,9 +369,36 @@ class Palanca:
     tipo: str = PAPEL
     costo: float = 0.0        # plata que hay que desembolsar, si aplica
 
+    # Saldos de partida, para poder medir el ahorro REAL. Ver `ahorro_max`.
+    base_a: float = 0.0
+    base_b: float = 0.0
+    saldo_a: float = 0.0
+    saldo_b: float = 0.0
+
     @property
     def ahorro_max(self) -> float:
-        return max(self.ahorro_a, self.ahorro_b)
+        """Lo que esta palanca ahorra DE VERDAD, desde donde está el usuario.
+
+        Era `max(ahorro_a, ahorro_b)`, y eso sobreestima: el contribuyente no
+        paga el mejor de los dos ahorros, paga el mejor de los dos SALDOS.
+        La cuenta correcta es
+
+            min(saldo_A, saldo_B) − min(saldo_A', saldo_B')
+
+        y la anterior daba de más exactamente `diferencia_entre_rutas` cuando
+        la palanca solo opera en la ruta que pierde. Medido sobre 600
+        perfiles: 1.404 palancas sobreestimadas de ~2.400, y ninguna
+        subestimada.
+
+        No es un error cosmético: esta tabla se titula «cuánto vale cada
+        palanca» y es el número con el que la gente decide si desembolsa. Una
+        fila prometía $94.500.000 cuando el ahorro real eran $80.730.576, y
+        el «PIERDES $170.063.585» de un desembolso eran en realidad
+        $183.833.009. Además la tabla se ORDENA por este valor, así que la
+        palanca que la encabezaba podía valer cero en la ruta que el motor
+        recomienda dos pantallas más arriba.
+        """
+        return min(self.base_a, self.base_b) - min(self.saldo_a, self.saldo_b)
 
     @property
     def neto(self) -> float:
@@ -398,7 +437,8 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         alt = p.copia_con(**cambios)
         pa, pb = _saldo(alt, par, "A"), _saldo(alt, par, "B")
         palancas.append(
-            Palanca(etiqueta, base_a - pa, base_b - pb, solo_ruta, nota, tipo, costo)
+            Palanca(etiqueta, base_a - pa, base_b - pb, solo_ruta, nota, tipo,
+                    costo, base_a=base_a, base_b=base_b, saldo_a=pa, saldo_b=pb)
         )
 
     # --- dependientes ---------------------------------------------------
@@ -413,8 +453,8 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         por_cantidad = {}
         for n in range(actuales + 1, max_dep + 1):
             alt = p.copia_con(deducciones__dependientes=n)
-            por_cantidad[n] = max(base_a - _saldo(alt, par, "A"),
-                                  base_b - _saldo(alt, par, "B"))
+            sa, sb = _saldo(alt, par, "A"), _saldo(alt, par, "B")
+            por_cantidad[n] = min(base_a, base_b) - min(sa, sb)
         mejor_ahorro = max(por_cantidad.values())
         # La cantidad MÍNIMA que alcanza el máximo: perseguir soportes de más
         # no aporta nada y cuesta trámites.
@@ -704,20 +744,65 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
         })
 
     # ¿agente de retención?
+    #
+    # Esto devolvía "NO (perfil de servicios profesionales)" HARDCODEADO, sin
+    # leer un solo campo del perfil, sobre un hecho —la calidad de
+    # comerciante— que el motor nunca vio. Quien vende bienes y supera las
+    # 30.000 UVT leía «NO» y omitía una obligación real.
+    #
+    # Y era incoherente con el estándar que el propio módulo se puso doce
+    # líneas más arriba: OBL-01 se niega expresamente a decir «NO» sin
+    # insumos, con un comentario que explica por qué sería el titular más
+    # peligroso posible. Acá hacía lo contrario.
     ar = par.get("umbrales.agente_retencion_persona_natural", {})
+    tope_ar = ar.get("uvt", 30_000) * uvt
+    comerciante = p.get("contribuyente.es_comerciante", None)
+    supera = max(p.ingresos_brutos, p.patrimonio_bruto) >= tope_ar
+
+    if comerciante is False:
+        estado_ar, sev_ar = "NO — no eres comerciante", "info"
+        detalle_ar = (
+            f"Declaraste que NO ejerces actos de comercio. El art. 368-2 exige "
+            f"las DOS condiciones a la vez, así que no eres agente de retención "
+            f"sin importar el monto. Si empiezas a vender bienes, revísalo."
+        )
+    elif comerciante is None:
+        estado_ar, sev_ar = "NO SE PUEDE AFIRMAR — falta un dato", "media"
+        detalle_ar = (
+            f"El art. 368-2 exige DOS condiciones concurrentes: tener calidad de "
+            f"COMERCIANTE, y superar 30.000 UVT ({_cop(tope_ar)}) de patrimonio o "
+            f"ingresos del año anterior. Lo segundo "
+            f"{'SÍ se cumple' if supera else 'no se cumple'} con lo cargado; lo "
+            f"primero no está en el perfil. Quien presta servicios profesionales "
+            f"no es comerciante en el sentido del art. 20 C.Co.; quien vende "
+            f"bienes o ejerce actos de comercio, sí. Pon "
+            f"`es_comerciante` en [contribuyente] para cerrar este chequeo."
+        )
+    elif supera:
+        estado_ar, sev_ar = "SÍ — revísalo YA con tu contador", "alta"
+        detalle_ar = (
+            f"Eres comerciante y superas las 30.000 UVT ({_cop(tope_ar)}) de "
+            f"patrimonio o ingresos. El art. 368-2 te hace agente de retención: "
+            f"tienes que practicar retención, declararla y consignarla mes a mes. "
+            f"No declararla tiene sanción propia y responsabilidad por el valor "
+            f"dejado de retener (art. 370 ET)."
+        )
+    else:
+        estado_ar, sev_ar = "NO — eres comerciante pero no superas el tope", "info"
+        detalle_ar = (
+            f"Eres comerciante, pero no superas las 30.000 UVT ({_cop(tope_ar)}) "
+            f"de patrimonio ni de ingresos del año anterior. El art. 368-2 exige "
+            f"las dos condiciones. Vigílalo: el umbral se mide sobre el año "
+            f"ANTERIOR, así que un buen año te vuelve agente de retención al "
+            f"siguiente."
+        )
+
     checks.append({
         "id": "OBL-02",
-        "titulo": "¿Era agente de retención en la fuente?",
-        "estado": "NO (perfil de servicios profesionales)",
-        "detalle": (
-            "El art. 368-2 ET exige DOS condiciones concurrentes: tener calidad de "
-            "COMERCIANTE, y superar 30.000 UVT de patrimonio o ingresos del año "
-            "anterior. Quien presta servicios profesionales no es comerciante en el "
-            "sentido del art. 20 C.Co., así que no es agente de retención sin "
-            "importar el monto. Si vendes bienes o ejerces actos de comercio, "
-            "revísalo con tu contador."
-        ),
-        "severidad": "info",
+        "titulo": "¿Eras agente de retención en la fuente?",
+        "estado": estado_ar,
+        "detalle": detalle_ar,
+        "severidad": sev_ar,
         "fuente": ar.get("fuente", "ET art. 368-2"),
     })
 

@@ -1,0 +1,62 @@
+#!/usr/bin/env sh
+#
+# Hook de pre-commit de renta-co.
+#
+# Bloquea el commit si hay datos personales en lo que está a punto de entrar
+# al repositorio. Se instala con `/renta-co:setup --con-hooks`, o a mano:
+#
+#     cp templates/pre-commit .git/hooks/pre-commit
+#     chmod +x .git/hooks/pre-commit
+#     # y edita RENTA_CO abajo si el plugin no está en la ruta por defecto
+#
+# Existía la promesa del hook en tres documentos y no existía el hook: cada
+# agente tenía que inventarse el cuerpo del control de seguridad, y sobre
+# todo cómo resolver la ruta al plugin desde un hook cuyo directorio de
+# trabajo es el repo del usuario. Adivinar eso, precisamente ahí, es lo peor
+# que podía pasar.
+
+set -e
+
+# Dónde está instalado renta-co. Se busca, en orden:
+#   1. la variable de entorno RENTA_CO, si el usuario la exporta;
+#   2. las rutas donde lo dejan los instaladores de plugin;
+#   3. un clon hermano del repo actual.
+#
+# La ruta se resuelve acá y no en el momento de correr porque la ubicación
+# del plugin cambia con cada actualización, y un hook que falla en silencio
+# es peor que no tener hook.
+CANDIDATOS="
+${RENTA_CO:-}
+$HOME/.claude/plugins/renta-co
+$HOME/.codex/plugins/renta-co
+$HOME/.local/share/renta-co
+$(git rev-parse --show-toplevel 2>/dev/null)/../renta-co
+"
+
+RAIZ=""
+for c in $CANDIDATOS; do
+    [ -n "$c" ] || continue
+    if [ -x "$c/bin/renta" ]; then
+        RAIZ=$c
+        break
+    fi
+done
+
+if [ -z "$RAIZ" ]; then
+    echo "✗ pre-commit de renta-co: no encuentro el plugin." >&2
+    echo "  Exporta RENTA_CO con la ruta a renta-co, o edita este hook." >&2
+    echo "  Para commitear igual, a sabiendas: git commit --no-verify" >&2
+    exit 1
+fi
+
+# `--staged` mira los BLOBS del índice, no el disco: es lo que se va a
+# commitear de verdad. Sale distinto de cero si encuentra un dato personal
+# de confianza ALTA, y también si hay un archivo que no pudo leer —un PDF,
+# un XLSX, una foto de la cédula—, porque un hook que no pudo mirar no
+# puede aprobar.
+"$RAIZ/bin/renta" privacidad --staged || {
+    echo "" >&2
+    echo "  Commit detenido por el escáner de privacidad de renta-co." >&2
+    echo "  Si revisaste y estás seguro: git commit --no-verify" >&2
+    exit 1
+}

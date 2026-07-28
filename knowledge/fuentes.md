@@ -61,8 +61,10 @@ Aportes con fuente bienvenidos. Ver `CONTRIBUTING.md`.
 1. **Decreto oficial de plazos** por últimos dos dígitos, por año gravable.
    Es la razón de que `plazos.tabla_cargada = false`: una fecha adivinada
    cuesta una sanción del 5% mensual.
-2. **Doctrina DIAN y jurisprudencia del Consejo de Estado** sobre generación
-   extemporánea del documento soporte físico.
+2. ~~**Doctrina DIAN** sobre generación extemporánea del documento soporte~~
+   **RESUELTO y adverso**: Concepto DIAN 006942 del 5-may-2025 — generarlo
+   fuera de plazo invalida su efecto fiscal. Falta la jurisprudencia del
+   Consejo de Estado, si la hay.
 3. **Cómputo de consignaciones** para el umbral de 3.500 UVT: ¿cuentan los
    traslados entre cuentas propias del mismo titular? La respuesta cambia el
    riesgo de mucha gente.

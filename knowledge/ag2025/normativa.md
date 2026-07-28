@@ -30,7 +30,7 @@ Topes clave del AG 2025 en pesos:
 |---|---|---|
 | Tope conjunto deducciones + rentas exentas (art. 336 num. 3) | 1.340 | $66.730.660 |
 | Renta exenta 25% — tope **anual** | 790 | $39.341.210 |
-| Deducción por dependiente (art. 336 par.) | 72 c/u, máx. 4 | $3.585.528 c/u · $14.342.112 |
+| Deducción por dependiente (art. 336 num. 3 inciso 2) | 72 c/u, máx. 4 | $3.585.528 c/u · $14.342.112 |
 | Deducción 1% compras con factura electrónica | máx. 240 | $11.951.760 |
 | Aportes voluntarios AFP/AFC | máx. 3.800 | $189.236.200 |
 | Intereses de vivienda | máx. 1.200 | $59.758.800 |
@@ -70,11 +70,15 @@ Esta es la decisión que define la declaración de un independiente, y la que m�
 
 **Art. 336 num. 4 ET**, inciso segundo:
 
-> «En estos mismos términos también se podrán restar los costos y los gastos asociados a rentas de trabajo provenientes de honorarios o compensaciones por servicios personales, en desarrollo de una actividad profesional independiente. Los contribuyentes a los que les resulte aplicable el parágrafo 5 del artículo 206 del Estatuto Tributario **deberán optar entre restar los costos y gastos procedentes o la renta exenta** prevista en el numeral 10 del mismo artículo.»
+> «En estos mismos términos también se podrán restar los costos y los gastos asociados a rentas de trabajo **que no provengan de una relación laboral o legal y reglamentaria**, caso en el cual los contribuyentes **deberán optar entre restar los costos y gastos procedentes o la renta exenta** prevista en el numeral 10 del artículo 206 del Estatuto Tributario, conforme con lo dispuesto en el parágrafo 5 del mismo artículo.»
+
+⚠ Ojo con la versión: hasta la **Ley 2277 de 2022 art. 7** este inciso decía «honorarios o compensaciones por servicios personales, en desarrollo de una actividad profesional independiente» — el texto de la **Ley 2010 de 2019 art. 41**, que sigue circulando. El ámbito vigente es más AMPLIO: toda renta de trabajo que no venga de relación laboral. La conclusión (exclusividad) no cambia.
 
 Reglamentado por el **art. 1.2.1.20.5 del Decreto 1625 de 2016**, que recoge la sentencia **C-120 de 2018** de la Corte Constitucional:
 
-> «Los contribuyentes que perciban ingresos considerados como rentas de trabajo provenientes de honorarios o compensaciones de servicios personales, en desarrollo de una actividad profesional independiente, podrán detraer los costos y gastos que tengan relación con la actividad productora de renta… **siempre y cuando no hayan optado por la renta exenta** de que trata el numeral 10 del artículo 206.»
+> «Los contribuyentes que perciban **rentas de trabajo que no provengan de una relación laboral o legal y reglamentaria** podrán detraer los costos y gastos que tengan relación con la actividad productora de renta… **siempre y cuando no hayan optado por la renta exenta** de que trata el numeral 10 del artículo 206.»
+
+⚠ Texto según el **Decreto 2231 de 2023 art. 6**. La redacción anterior, más estrecha, también sigue circulando.
 
 ### La asimetría que decide el caso
 
@@ -137,7 +141,7 @@ Fuentes: [Gerencie — rentas exentas en independientes](https://www.gerencie.co
 
 ## 5. Deducción por dependientes — 72 UVT, **fuera del tope**
 
-**Art. 336 par.**, adicionado por la Ley 2277 de 2022 art. 7:
+**Art. 336 num. 3 inciso 2**, adicionado por la Ley 2277 de 2022 art. 7 (no es un parágrafo — «art. 336 par.» es una cita que no existe y circula mucho):
 
 > «El trabajador podrá deducir, **en adición al límite establecido en el inciso anterior**, setenta y dos (72) UVT por dependiente hasta un máximo de cuatro (4) dependientes.»
 
@@ -287,7 +291,20 @@ Requisitos que no se pueden saltar:
 
 **Art. 288 ET.** Los ingresos en moneda extranjera se reconocen a la **TRM de la fecha de realización de cada pago**. No a un promedio anual, no a la TRM de cierre.
 
-El patrimonio en moneda extranjera a 31 de diciembre se convierte a la TRM de esa fecha (art. 269 ET).
+El patrimonio en moneda extranjera **NO** se convierte a la TRM de cierre. El
+**art. 269 ET**, modificado por la **Ley 1819 de 2016 art. 116**, dice:
+
+> «El valor de los activos en moneda extranjera, se estiman en moneda nacional
+> **al momento de su reconocimiento inicial** a la tasa representativa del
+> mercado, menos los abonos o pagos medidos a la misma tasa representativa del
+> mercado del reconocimiento inicial.»
+
+La regla del último día del año es el texto ORIGINAL del Decreto 624 de 1989,
+derogado en 2016, y sigue circulando en material para contadores. Concuerda
+con el art. 288 inciso 2: las fluctuaciones no realizadas no tienen efecto
+fiscal hasta la enajenación o el abono. Reexpresar a TRM de cierre mueve el
+patrimonio y con él la renta por comparación patrimonial (art. 236) — el
+riesgo R-05. Ver `skills/renta-patrimonio`.
 
 > Usar un promedio anual es un atajo común y caro. En 2025 la TRM osciló entre **$3.706,94 y $4.416,69** — un rango del 19%. Sobre ingresos de tres cifras de millones, la diferencia entre TRM diaria y promedio son millones de base gravable.
 >
@@ -346,7 +363,7 @@ El que guía a todas las skills de este repositorio:
 Bloques donde el conocimiento acá es incompleto y se agradecen aportes con fuente:
 
 1. **Tabla oficial de plazos** AG 2025 por últimos dos dígitos (decreto de plazos).
-2. **Doctrina DIAN y jurisprudencia del Consejo de Estado** sobre generación extemporánea del documento soporte físico. Determina la viabilidad real de la Ruta A para pagos ya hechos.
+2. ~~**Doctrina DIAN** sobre generación extemporánea del documento soporte~~ — **RESUELTO y adverso**: DIAN, Concepto 006942 del 5 de mayo de 2025. El documento soporte se genera el mismo día de la operación, o por operaciones acumuladas con un mismo proveedor dentro de la semana siguiente a la primera; fuera de plazo **invalida su efecto fiscal**. Ver R-03, que subió a severidad ALTA. Falta la jurisprudencia del Consejo de Estado, si la hay.
 3. **Cómputo de consignaciones** para el umbral de 3.500 UVT: ¿cuentan los traslados entre cuentas propias del mismo titular? La respuesta cambia el riesgo de mucha gente.
 4. **Tratamiento de ingresos vía plataformas** (Deel, Upwork, Payoneer): qué reportan a la DIAN, en qué formato, y qué objeciones se han visto en la práctica.
 5. **Cripto**: valoración patrimonial a 31-dic y tratamiento de la ganancia ocasional en enajenaciones.

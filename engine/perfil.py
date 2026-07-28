@@ -20,6 +20,10 @@ ESQUEMA: dict[str, dict] = {
     "contribuyente": {
         "anio_gravable": 2025,
         "residente_fiscal": True,
+        # None a propósito: no hay defecto honesto. Suponer "no comerciante"
+        # es lo que hacía OBL-02 antes, afirmando sobre un hecho que nunca
+        # vio. Sin el dato, el chequeo dice que no puede concluir.
+        "es_comerciante": None,
     },
     "ingresos": {
         "rentas_trabajo_honorarios": 0,

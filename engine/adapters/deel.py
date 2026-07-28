@@ -58,7 +58,9 @@ REGLAS = [
      "traslado"),
     # Los pagos SALIENTES a terceros, antes que los ingresos: "Payment to
     # contractor for milestone 2" trae "milestone", y es dinero que sale.
-    (("payment to", "contractor payment", "pago a", "payout to contractor"), "costo"),
+    (("contractor payment", "payout to contractor", "payment to contractor",
+      "pago a contratista"), "costo_contratista"),
+    (("payment to", "pago a"), "costo"),
     (("invoice", "payment received", "salary", "milestone", "bonus", "payment from",
       "contract payment", "pago recibido"), "ingreso_trabajo"),
     (("platform fee", "service charge", "wise charged", "transfer fee",

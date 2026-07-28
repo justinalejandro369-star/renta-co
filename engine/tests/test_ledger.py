@@ -295,6 +295,22 @@ class TestCaminoNegativoDeLaReclasificacion(unittest.TestCase):
         self.assertTrue(r.ilegibles)
         self.assertTrue(any("no se pudieron leer" in a for a in r.avisos()))
 
+    def test_un_ledger_guardado_desde_excel_en_windows_se_sigue_leyendo(self):
+        """Excel en Windows guarda CSV en cp1252, o con BOM si eliges "CSV
+        UTF-8". Las descripciones colombianas traen tildes, así que el utf-8
+        duro reventaba con UnicodeDecodeError —que el `except OSError` no
+        atrapa— y `importar` moría sin archivo, sin causa y sin remedio, en
+        esa corrida y en TODAS las siguientes."""
+        destino = self._escribir(
+            self._mov(14, 1_500_000, "traslado", desc="RETENCIÓN Y GMF"))
+        crudo = destino.read_text(encoding="utf-8")
+        for etiqueta, datos in (("cp1252", crudo.encode("cp1252")),
+                                ("utf-8 con BOM", crudo.encode("utf-8-sig"))):
+            destino.write_bytes(datos)
+            previas, ilegibles = leer_clasificacion_previa(destino)
+            self.assertEqual(len(previas), 1, f"{etiqueta}: {ilegibles}")
+            self.assertEqual(ilegibles, [], etiqueta)
+
     def test_el_resumen_habla_tambien_cuando_no_se_conservo_nada(self):
         """El caso que importa: cero conservadas tiene que decirse. El
         mensaje viejo vivía dentro de un `if aplicadas`."""

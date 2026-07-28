@@ -16,6 +16,14 @@ anio_gravable = 2025
 # Residente fiscal: más de 183 días en Colombia, continuos o no, en un
 # período de 365 días. Si es false, este motor NO aplica: consulta un contador.
 residente_fiscal = true
+# ¿Ejerces actos de comercio —vender bienes, comprar para revender— en el
+# sentido del art. 20 del Código de Comercio? Prestar servicios
+# profesionales NO es un acto de comercio. Decide el chequeo OBL-02: un
+# comerciante que supere 30.000 UVT de patrimonio o ingresos del año
+# anterior es AGENTE DE RETENCIÓN (art. 368-2) y tiene que retener,
+# declarar y consignar mes a mes. Déjalo comentado si no estás seguro: el
+# motor prefiere decir que no puede concluir a suponer que no.
+# es_comerciante = false
 
 # ── Ingresos ──────────────────────────────────────────────────────────
 [ingresos]

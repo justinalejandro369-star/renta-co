@@ -351,6 +351,33 @@ class TestVeredictosDeObligacion(unittest.TestCase):
 
     # ---- R-02 ---------------------------------------------------------
 
+    def test_obl02_no_concluye_sin_saber_si_eres_comerciante(self):
+        """Devolvía «NO (perfil de servicios profesionales)» HARDCODEADO, sin
+        leer un campo, sobre un hecho que el motor nunca vio. Quien vende
+        bienes y supera 30.000 UVT leía «NO» y omitía una obligación real. Y
+        era incoherente con OBL-01, que se niega a decir «NO» sin insumos."""
+        c = self._check("OBL-02")
+        self.assertIn("NO SE PUEDE AFIRMAR", c["estado"])
+        self.assertEqual(c["severidad"], "media")
+
+    def test_obl02_concluye_cuando_el_perfil_lo_dice(self):
+        no = self._check("OBL-02", contribuyente={"es_comerciante": False})
+        self.assertTrue(no["estado"].startswith("NO"))
+        self.assertEqual(no["severidad"], "info")
+
+    def test_obl02_avisa_al_comerciante_que_supera_el_tope(self):
+        """Las DOS condiciones del art. 368-2 a la vez."""
+        arriba = self._check(
+            "OBL-02", contribuyente={"es_comerciante": True},
+            ingresos={"rentas_trabajo_honorarios": 30_000 * self.uvt})
+        self.assertTrue(arriba["estado"].startswith("SÍ"))
+        self.assertEqual(arriba["severidad"], "alta")
+
+        debajo = self._check(
+            "OBL-02", contribuyente={"es_comerciante": True},
+            ingresos={"rentas_trabajo_honorarios": 1_000_000})
+        self.assertTrue(debajo["estado"].startswith("NO"))
+
     def test_r02_se_emite_solo_si_hay_pagos_sin_pila_verificada(self):
         con = self._check("R-02", costos={"pagos_a_contratistas": 48_000_000})
         self.assertEqual(con["severidad"], "alta")
@@ -505,6 +532,93 @@ class TestParametros(unittest.TestCase):
 # ---------------------------------------------------------------------
 # TRM y ledger: las guardas de la capa de datos
 # ---------------------------------------------------------------------
+
+class TestSensibilidadDiceLaVerdad(unittest.TestCase):
+    """La tabla se titula «cuánto vale cada palanca» y es el número con el
+    que la gente decide si desembolsa. El ahorro reportado era
+    `max(ahorro_a, ahorro_b)`, y el contribuyente no paga el mejor de los dos
+    ahorros: paga el mejor de los dos SALDOS."""
+
+    def setUp(self):
+        from engine.depuracion import comparar
+
+        self.par = P.cargar(2025)
+        self.r = comparar(perfil_con(
+            contribuyente={"anio_gravable": 2025, "residente_fiscal": True},
+            ingresos={"rentas_trabajo_honorarios": 900_000_000},
+            incrngo={"aportes_obligatorios_salud_pension": 18_000_000},
+            deducciones={"dependientes": 2},
+        ), self.par)
+
+    def test_el_ahorro_reportado_es_el_que_de_verdad_se_ahorra(self):
+        """Se recalcula desde cero: aplicar la palanca y volver a liquidar
+        las dos rutas tiene que dar el saldo que la tabla promete."""
+        from engine.depuracion import comparar
+
+        self.assertTrue(self.r["sensibilidad"], "el perfil no produjo palancas")
+        base = min(self.r["rutas"]["A"].saldo, self.r["rutas"]["B"].saldo)
+        for pal in self.r["sensibilidad"]:
+            despues = min(pal.saldo_a, pal.saldo_b)
+            self.assertAlmostEqual(
+                pal.ahorro_max, base - despues, places=0,
+                msg=f"{pal.etiqueta}: promete {pal.ahorro_max} y ahorra {base - despues}",
+            )
+        del comparar
+
+    def test_una_palanca_de_la_ruta_perdedora_no_promete_el_ahorro_de_esa_ruta(self):
+        """El caso que producía la sobreestimación: gana B, y la palanca de
+        costos solo opera en A. Reportaba los $94.500.000 de A cuando el
+        ahorro real es la diferencia contra el saldo de B."""
+        self.assertEqual(self.r["mejor_ruta"], "B",
+                         "este perfil dejó de ejercitar el caso")
+        costos = next(x for x in self.r["sensibilidad"] if "Costos" in x.etiqueta)
+        self.assertGreater(costos.ahorro_a, costos.ahorro_max)
+        self.assertLess(
+            costos.ahorro_max, costos.ahorro_a,
+            "la palanca sigue prometiendo el ahorro de la ruta que pierde")
+
+    def test_ninguna_palanca_promete_mas_de_lo_que_hay_por_ahorrar(self):
+        """Cota dura: nadie puede ahorrar más que el saldo que se debe."""
+        base = min(self.r["rutas"]["A"].saldo, self.r["rutas"]["B"].saldo)
+        for pal in self.r["sensibilidad"]:
+            self.assertLessEqual(round(pal.ahorro_max), round(max(base, 0)) + 1,
+                                 f"{pal.etiqueta} promete más que el saldo entero")
+
+
+class TestDependientesSoloSobreRentasDeTrabajo(unittest.TestCase):
+    """Art. 336 num. 3 inciso 2: «el TRABAJADOR podrá deducir». Y el Decreto
+    1625 art. 1.2.1.20.3: «aplican únicamente a los ingresos provenientes de
+    rentas de trabajo»."""
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+
+    def _renglon(self, perfil, concepto):
+        from engine.depuracion import liquidar
+
+        return next(r.valor for r in liquidar(perfil, self.par, "A").renglones
+                    if concepto in r.concepto)
+
+    def test_sin_honorarios_no_hay_deduccion_de_dependientes(self):
+        p = perfil_con(
+            contribuyente={"anio_gravable": 2025, "residente_fiscal": True},
+            ingresos={"otras_rentas_no_laborales": 300_000_000},
+            deducciones={"dependientes": 4},
+        )
+        self.assertEqual(self._renglon(p, "Dependientes (72 UVT"), 0)
+        self.assertEqual(self._renglon(p, "Dependientes (10%"), 0)
+
+    def test_con_honorarios_si_la_hay(self):
+        """El control: la guarda no puede tragarse el caso normal."""
+        p = perfil_con(
+            contribuyente={"anio_gravable": 2025, "residente_fiscal": True},
+            ingresos={"rentas_trabajo_honorarios": 300_000_000},
+            deducciones={"dependientes": 4},
+        )
+        self.assertGreater(
+            self._renglon(p, "Dependientes (72 UVT")
+            + self._renglon(p, "Dependientes (10%"), 0)
+
 
 class TestCitasNormativas(unittest.TestCase):
     """La cita que ve el contador es la del MOTOR, no la de knowledge/.

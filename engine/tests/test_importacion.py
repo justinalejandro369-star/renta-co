@@ -287,10 +287,10 @@ CASOS_DEEL = [
     ("transfer", "Balance transfer", -400, "traslado"),
     ("transfer", "Move funds to COP balance", -300, "traslado"),
     ("transfer", "Transferencia interna", -250, "traslado"),
-    ("payment", "Payment to contractor Ana", -1000, "costo"),
-    ("payment", "Contractor payment October", -1100, "costo"),
+    ("payment", "Payment to contractor Ana", -1000, "costo_contratista"),
+    ("payment", "Contractor payment October", -1100, "costo_contratista"),
     ("payment", "Pago a proveedor", -700, "costo"),
-    ("payout", "Payout to contractor Luis", -650, "costo"),
+    ("payout", "Payout to contractor Luis", -650, "costo_contratista"),
     ("fee", "Platform fee", -100, "costo"),
     ("fee", "Service charge", -50, "costo"),
     ("fee", "Wise charged a fee", -40, "costo"),
@@ -300,9 +300,9 @@ CASOS_DEEL = [
     # dinero que SALE. Los pagos a terceros son COSTO —que es lo correcto, no
     # solo 'no ingreso'— desde que las reglas de salida van antes que las de
     # ingreso; el retiro es un traslado.
-    ("payment", "Payment to contractor for milestone 2", -1000, "costo"),
+    ("payment", "Payment to contractor for milestone 2", -1000, "costo_contratista"),
     ("payment", "Payment to Juan - salary March", -900, "costo"),
-    ("payment", "Bonus payment to contractor Ana", -600, "costo"),
+    ("payment", "Bonus payment to contractor Ana", -600, "costo_contratista"),
     # Un retiro es un traslado aunque su descripción traiga el número de la
     # factura que lo originó. Antes salía `ingreso_trabajo` —el dinero ya
     # contado como ingreso, contado otra vez— y el arreglo por signo lo
@@ -361,7 +361,8 @@ class TestSignoEnLaClasificacion(unittest.TestCase):
         """`Payout` en Deel es tanto "payout to your bank" (traslado) como
         "payout to contractor" (costo). No puede imponer nada."""
         self.assertEqual(
-            deel._clasificar("Payout", "Payout to contractor Luis", -650), "costo")
+            deel._clasificar("Payout", "Payout to contractor Luis", -650),
+            "costo_contratista")
         self.assertEqual(
             deel._clasificar("Payout", "Milestone 2 payout to your bank", 9800),
             "traslado")

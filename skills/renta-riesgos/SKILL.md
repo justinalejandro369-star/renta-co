@@ -20,7 +20,7 @@ R-01, R-02 y R-09 los emite el motor con los datos del perfil (`bin/renta calcul
 
 El umbral de 3.500 UVT ($174.296.500 en 2025) se mide sobre **consignaciones**, no sobre ingresos propios. Quien recibe plata de clientes y la redistribuye, o mueve dinero entre sus propias cuentas, puede superarlo sin que su ingreso lo haga.
 
-**Consecuencia:** obligación de inscribirse como responsable de IVA, facturar, declarar IVA por período, y sanción por extemporaneidad de **cada** declaración omitida. Puede costar más que el propio impuesto de renta.
+**Consecuencia:** obligación de inscribirse como responsable de IVA, facturar, declarar IVA por período, y sanción por **cada** declaración omitida — la del **art. 643 (no declarar)** si nunca se presentaron, que es más gravosa que la del 641 por extemporaneidad. Puede costar más que el propio impuesto de renta.
 
 **Mitigación:** sumar el total consignado del año con los extractos completos de **todas** las cuentas. Si se supera, evaluar si la actividad califica como exportación de servicios exenta (art. 481 lit. c ET), lo que deja el IVA en 0% aunque obligue a declarar. **Resolverlo antes de presentar renta, no después.**
 
@@ -32,11 +32,13 @@ Art. 108 par. 2 ET: el contratante debe verificar la afiliación y el pago de ap
 **Mitigación:** planilla PILA de cada persona, de los meses trabajados. Si no cotizaron, la Ruta A pierde su fundamento y la Ruta B pasa a ser la correcta — no por conveniencia, sino porque el costo no es deducible.
 
 ### R-03 · Objeción al documento soporte generado extemporáneamente
-**Severidad MEDIA · Solo Ruta A**
+**Severidad ALTA · Solo Ruta A** — subió de MEDIA con el Concepto DIAN 006942 de 2025.
 
-La Resolución DIAN 000167 de 2021 permite generar el documento soporte **en físico** mientras la DIAN no exija la versión electrónica. Eso habilita construir hoy el soporte de pagos ya hechos.
+La Resolución DIAN 000167 de 2021 permite generar el documento soporte **en físico** mientras la DIAN no exija la versión electrónica (par. 3). Sigue vigente: la Res. 000165 de 2023 no la derogó y de hecho remite a ella.
 
-La DIAN puede argumentar que debía existir al momento de la operación. Es discutible: la sustancia está probada con extractos verificables.
+**Pero el art. 2 de esa MISMA resolución fija plazos de generación**, y hay doctrina adversa reciente: la **DIAN, Concepto 006942 del 5 de mayo de 2025**, sostiene que el documento soporte solo puede generarse el mismo día de la operación, o por operaciones acumuladas con un mismo proveedor dentro de la semana siguiente a la primera, y que **generarlo fuera de plazo invalida su efecto fiscal**.
+
+O sea: construir hoy el soporte de pagos de hace meses NO es una posición discutible con la DIAN de un lado y la sustancia del otro. Es una posición que la DIAN ya rechazó por escrito. Se puede sostener —la sustancia está probada con extractos verificables y el concepto no es ley—, pero hay que decirlo así y no como «es discutible».
 
 **Mitigación:** expediente completo — contrato o acuerdo con fechas reales, cuenta de cobro firmada por cada pago, documento soporte con numeración consecutiva, y el extracto de cada transferencia.
 

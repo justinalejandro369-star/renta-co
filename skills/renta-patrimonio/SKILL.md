@@ -28,9 +28,9 @@ A **31 de diciembre del año gravable**, todo, esté donde esté:
 | Cuentas de ahorro y corrientes | Saldo a 31-dic | Certificado de saldo de **cada** banco |
 | Billeteras digitales (Nequi, Daviplata, A la Mano) | Saldo a 31-dic | Certificado o extracto de diciembre |
 | Saldo en plataformas (Deel, Wise, Payoneer, PayPal) | Saldo a 31-dic, **TRM del reconocimiento inicial de cada partida** (art. 269) | Extracto de la plataforma |
-| Cripto | Valor de mercado a 31-dic | Reporte del exchange o del wallet |
-| Acciones, ETFs, brokers | Valor a 31-dic, TRM del reconocimiento inicial | Estado de cuenta anual |
-| Vehículos | Avalúo del Ministerio de Transporte | Tarjeta de propiedad + tabla de avalúo |
+| Cripto | **Costo fiscal** (art. 267), no valor de mercado — DIAN, Concepto 100202208-1621 de 2023 (Unificado de Criptoactivos) | Reporte del exchange o del wallet, y el soporte de lo que pagaste |
+| Acciones, ETFs, brokers | **Costo fiscal** (art. 272: «deben ser declarados por su costo fiscal»), con TRM del reconocimiento inicial. El valor de mercado solo aplica a obligados a sistemas especiales de valoración | Estado de cuenta anual |
+| Vehículos | **Costo fiscal** (art. 267). El avalúo del Ministerio de Transporte es para el impuesto de vehículos y NO se usa en renta | Factura de compra o soporte del costo |
 | Inmuebles | El mayor entre costo fiscal y avalúo catastral | Certificado de tradición, predial |
 | Cuentas por cobrar | Valor nominal | Contrato o soporte |
 | Aportes en sociedades | Costo fiscal | Certificado de la sociedad |

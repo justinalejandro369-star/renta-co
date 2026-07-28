@@ -7,9 +7,16 @@ Invoca la skill `renta-onboarding` y ejecuta su Paso 1 y Paso 2.
 
 Argumentos: $ARGUMENTS
 
-- `--con-hooks` → además instala el hook `pre-commit` que corre
-  `scripts/escanear_privacidad.py --staged` y bloquea el commit si encuentra
-  datos personales.
+- `--con-hooks` → además instala el hook de pre-commit. **Copia
+  `templates/pre-commit`** a `.git/hooks/pre-commit` del repo del usuario y
+  dale permiso de ejecución. No lo escribas a mano: la plantilla resuelve la
+  ruta al plugin, que es la parte que se rompe con cada actualización, y sale
+  distinto de cero también cuando NO PUDO leer un archivo. Si el usuario no
+  tiene repo git, dilo y sáltalo.
+
+  ```bash
+  cp "$RAIZ/templates/pre-commit" .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+  ```
 - `--sin-red` → el motor NO guarda esta preferencia; el flag vive en
   `importar`. Explícale al usuario que tendrá que pasar `--sin-red` cada vez
   que importe, y cómo cargar la serie a mano en

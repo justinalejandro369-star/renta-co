@@ -94,7 +94,12 @@ def luhn(numero: str) -> bool:
 # aparecen en frases como "$3.585.528 por dependiente", que no contienen
 # ningún dato personal. Incluirlas volvía a llenar el reporte de ruido.
 CONTEXTO = re.compile(
-    r"\b(?:c[eé]dula|c\.?c\.?|nit|identificaci[oó]n|documento|doc|pasaporte|"
+    # `c.e.` es cédula de extranjería. `t.i.` (tarjeta de identidad) se probó
+    # y se sacó: "ti" ES una palabra del español, y "lo que terceros
+    # reportaron sobre ti" convertía en identificador cada monto de esa
+    # línea del README. Una abreviatura solo sirve como señal de contexto si
+    # no colisiona con el idioma.
+    r"\b(?:c[eé]dula|c\.?c\.?|c\.?e\.?|nit|identificaci[oó]n|documento|doc|pasaporte|"
     r"cuenta|ahorros|corriente|tarjeta|titular|apellido|"
     # `contraparte`, `beneficiario` y `payee` son los nombres con los que el
     # PROPIO ledger guarda lo que el banco traía en su columna `documento`.
@@ -122,6 +127,21 @@ PATRONES = [
     # copiado de un sistema no. Se busca sin \b para atrapar CC1016086781 y
     # los que van pegados dentro de una URL.
     ("cédula o documento", re.compile(r"(?<!\d)\d{8,11}(?!\d)"), "alta"),
+    # Cédulas de 6–7 dígitos: las antiguas y, sobre todo, las CÉDULAS DE
+    # EXTRANJERÍA, que son de 6 o 7. Un caso de uso entero —el extranjero
+    # residente fiscal en Colombia— quedaba sin cobertura. Van como ambiguas
+    # porque a esa longitud sí chocan con montos: la confianza la decide el
+    # contexto o la columna, igual que "cédula o monto".
+    ("cédula corta o extranjería", re.compile(r"(?<!\d)\d{6,7}(?!\d)"), "ambigua"),
+    # Corridas de 12 o más dígitos: `\d{8,11}` las dejaba pasar enteras. La
+    # skill promete detectar "cuentas bancarias de 9 a 20 dígitos".
+    ("cuenta o identificador largo", re.compile(r"(?<!\d)\d{12,}(?!\d)"), "alta"),
+    # IBAN. El repo trae adaptador de Wise, y Wise entrega IBAN.
+    ("IBAN", re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b"), "alta"),
+    # Fijos colombianos: desde 2022 son 10 dígitos y empiezan por 60X. El
+    # patrón de teléfono solo anclaba en los celulares (3XX).
+    ("teléfono fijo", re.compile(
+        r"(?:\+?57[\s.-]?)?\(?60\d\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"), "alta"),
     ("cuenta bancaria", re.compile(rf"(?<!\d)\d{{2,4}}{SEP}\d{{5,8}}{SEP}\d{{1,4}}(?!\d)"), "alta"),
     ("correo", re.compile(
         r"[\w.%+-]+\s*(?:@|\[at\]|\(at\)|\(arroba\))\s*[\w.-]+\s*"
@@ -142,6 +162,12 @@ RUIDO = re.compile(
     r"\b(?:19|20)\d{2}\b"                        # años
     r"|\b\d{4}-\d{2}-\d{2}\b"                    # fechas ISO
     r"|\bart\.?\s*\d+|\bnum\.?\s*\d+|\bpar\.?\s*\d+"   # referencias normativas
+    # Números de acto administrativo. Van con su palabra delante a
+    # propósito: el radicado de un concepto DIAN —100202208-1621— tiene
+    # exactamente la forma de una cédula, y borrar cualquier corrida de
+    # dígitos "porque parece un radicado" abriría la puerta de par en par.
+    r"|\b(?:concepto|conceptos|resoluci[oó]n|resoluciones|res\.|radicado|circular|"
+    r"sentencia|decreto|ley)\s+(?:unificad[oa]\s+)?(?:DIAN\s+)?[\d.\-]{3,}"
     r"|\bUVT\b",
     re.IGNORECASE,
 )

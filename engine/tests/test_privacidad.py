@@ -307,6 +307,47 @@ class TestUmbralAcumulado(unittest.TestCase):
         self.assertEqual(avisos, [])
 
 
+class TestPatronesQueFaltaban(unittest.TestCase):
+    """Formas de identificador colombiano que el escáner no veía."""
+
+    def test_una_cedula_de_extranjeria_se_detecta(self):
+        """Son de 6 o 7 dígitos, y `\\d{8,11}` las dejaba pasar enteras. Un
+        extranjero residente fiscal en Colombia es un caso de uso completo
+        del producto y no tenía cobertura."""
+        for texto in ("cedula de extranjeria: 791234",
+                      "CE 1234567", "documento 791234"):
+            self.assertTrue(altas(escanear_texto(texto)),
+                            f"{texto!r} no se detectó")
+
+    def test_una_corrida_larga_de_digitos_se_detecta(self):
+        """La skill promete cuentas de 9 a 20 dígitos; `\\d{8,11}` cortaba
+        en 11 y una de 12+ salía intacta."""
+        self.assertIn("cuenta o identificador largo",
+                      tipos(escanear_texto("cuenta 12345678901234")))
+
+    def test_un_iban_se_detecta(self):
+        """El repo trae adaptador de Wise, y Wise entrega IBAN."""
+        self.assertIn("IBAN", tipos(escanear_texto("IBAN ES9121000418450200051332")))
+
+    def test_un_fijo_colombiano_se_detecta(self):
+        """Desde 2022 los fijos son de 10 dígitos y empiezan por 60X. El
+        patrón de teléfono solo anclaba en los celulares (3XX)."""
+        for texto in ("Tel 601 745 8900", "(604) 444 5566", "+57 605 3334455"):
+            self.assertTrue(altas(escanear_texto(texto)), f"{texto!r} no se detectó")
+
+    def test_los_numeros_de_norma_no_son_ruido_nuevo(self):
+        """El radicado de un concepto DIAN tiene forma de cédula. Ampliar los
+        patrones no puede llenar el reporte de citas normativas: un escáner
+        que grita en cada línea deja de leerse."""
+        for texto in ("DIAN, Concepto 100202208-1621 de 2023",
+                      "Resolución DIAN 000238 del 15 de diciembre de 2025",
+                      "la Res. 000165 de 2023 no la derogó",
+                      "Decreto 1625 de 2016 art. 1.6.1.13.2.7",
+                      "El tope conjunto es de 1.340 UVT"):
+            self.assertEqual(altas(escanear_texto(texto)), [],
+                             f"{texto!r} produjo un falso positivo")
+
+
 class TestColumnasConComillas(unittest.TestCase):
     """Una coma dentro de comillas corría todas las columnas de la derecha.
 

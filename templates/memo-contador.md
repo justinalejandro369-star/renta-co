@@ -40,7 +40,7 @@ del Banco de la República. No se usó promedio anual.
 1. **Ruta elegida.** Opté por {{ruta}} conforme al art. 336 num. 4 ET. El
    comparativo completo está en `comparativo.md`. La diferencia frente a la
    otra ruta es de {{$X}}.
-2. **Dependientes.** Tomé {{N}} dependientes por 72 UVT (art. 336 par., Ley
+2. **Dependientes.** Tomé {{N}} dependientes por la vía {{VIA}} (art. 336 num. 3 inciso 2, Ley
    2277 de 2022 art. 7), **fuera del tope del 40%**. Soporte: {{cuál}}.
 3. **Tope conjunto.** Aplicado en {{$X}} — el menor entre el 40% de los
    ingresos netos y 1.340 UVT. Se rechazaron {{$X}} por exceso.
@@ -48,11 +48,16 @@ del Banco de la República. No se usó promedio anual.
 5. **Aportes a seguridad social.** Tratados como INCRNGO, no como deducción,
    para que no consuman el tope del 40%.
 6. **Patrimonio.** {{Completo / faltan los saldos de X, marcados como estimados}}.
-7. **Umbral de consignaciones.** Total consignado en el año: {{$X}} contra el
-   umbral de 3.500 UVT ({{$174.296.500}}). {{Dentro / SUPERADO — ver riesgos}}.
-8. **Retención en la fuente.** No practiqué retención a contratistas. El art.
-   368-2 ET solo obliga a personas naturales **comerciantes** que superen
-   30.000 UVT del año anterior; no cumplo ninguna de las dos condiciones.
+7. **Umbral de consignaciones.** Consignaciones **provenientes de actividades
+   gravadas con IVA** (art. 437 par. 3 num. 6 — NO es el total consignado):
+   {{$X}} contra el umbral de 3.500 UVT ({{$X}}). {{Dentro / SUPERADO — ver
+   riesgos}}. El total bruto que pasó por las cuentas fue {{$X}}, del cual se
+   excluyeron traslados entre cuentas propias y {{lo que aplique}}.
+8. **Retención en la fuente.** {{No practiqué / Practiqué}} retención a
+   contratistas. El art. 368-2 ET obliga a las personas naturales que sean
+   **comerciantes** Y superen 30.000 UVT de patrimonio o ingresos del año
+   anterior — las dos condiciones a la vez. {{Marca cuál de las dos no se
+   cumple, o si se cumplen ambas}}. Ver OBL-02 en la salida del motor.
 
 ---
 
@@ -97,7 +102,7 @@ incluyan por error:
 Todo el cálculo es reproducible:
 
 ```bash
-python3 -m engine.cli calcular --expediente ./expediente
+"$RAIZ/bin/renta" calcular --expediente "$PWD/expediente"
 ```
 
 El motor es Python sin dependencias y la lógica está en

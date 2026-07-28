@@ -37,6 +37,8 @@ y síguela.** Es el punto de entrada y conduce todo el proceso.
 ## Comandos
 
 ```
+# En Codex CLI los mismos comandos se llaman `renta-setup`, `renta-auditar`,
+# `renta-estado` y `renta-privacidad`, sin el prefijo del plugin.
 /renta-co:setup        crea el expediente y arranca
 /renta-co:auditar      corre el cálculo completo
 /renta-co:estado       en qué va y qué sigue

@@ -15,6 +15,9 @@
 [contribuyente]
 anio_gravable = 2025
 residente_fiscal = true
+# Desarrolladora independiente: presta servicios profesionales, que NO son
+# actos de comercio (art. 20 C.Co.). Decide OBL-02.
+es_comerciante = false
 
 # ── Ingresos ──────────────────────────────────────────────────────────
 # En pesos, ya convertidos con TRM diaria por engine/ledger.py.

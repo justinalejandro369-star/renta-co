@@ -39,13 +39,42 @@ causa número uno de que nada funcione.
 Antes de escribir un solo archivo, protege los datos. Escribe o completa `.gitignore` en la raíz del proyecto del usuario:
 
 ```
+# Expediente y sus variantes de nombre
 expediente/
+declaracion/
+mi-renta/
+renta-20*/
+*-expediente/
 perfil.toml
+
+# Soportes. La FOTO DE LA CÉDULA es el documento más común y el más
+# olvidado: además el escáner no puede leer imágenes, así que si no está
+# acá no la protege nadie.
 *.pdf
 *.xlsx
+*.xls
+*.docx
 *.zip
-ledger*.csv
+*.rar
+*.7z
+*.png
+*.jpg
+*.jpeg
+*.heic
+*.eml
+*.msg
+
+# Extractos y salidas del motor. `*.csv` va completo: un
+# `extracto-bancolombia.csv` en la raíz del proyecto no lo cubre
+# `ledger*.csv`.
+*.csv
+*.ofx
+*.qfx
 ```
+
+Esta lista es la que promete `PRIVACY.md`. Si recortas algo, dilo: durante un
+tiempo la lista escrita fue más corta que la anunciada, y `*.csv` —o sea
+cualquier extracto bancario suelto— quedaba fuera.
 
 Después crea:
 
@@ -87,7 +116,30 @@ honorarios sin una sola advertencia.
    - **Salario** → no detrae costos; la opción del art. 336 num. 4 no le aplica.
    - **Arriendos** → son renta de capital, van en su renglón.
 
-   Si aparece alguna de las tres primeras: **dilo de una vez**, explica que el borrador cubrirá solo la parte de honorarios, y que esa porción va al contador señalada explícitamente. No sigas como si nada y lo menciones al final.
+   Si aparece alguna de las tres primeras: **dilo de una vez, LLENA EL CAMPO
+   EN EL PERFIL, y detente ahí.**
+
+   `rentas_pension`, `ganancia_ocasional` y `rentas_laborales_salario` existen
+   en `perfil.toml` justamente para eso. Con el valor puesto, el motor se
+   detiene con el mensaje que explica qué regla propia tiene ese ingreso.
+
+   **Lo que NO se hace: dejar el campo en 0 y seguir «con la parte de
+   honorarios».** Suena razonable y es el peor camino posible: el motor no se
+   entera, imprime una liquidación completa y correcta *para otra persona*, y
+   la palabra «pensión» no aparece por ningún lado. El aviso queda en la
+   prosa de un turno de chat que nadie guarda, y el borrador —que sí se
+   guarda— no lo dice. Es exactamente el único error de esta herramienta que
+   no se ve mirando el resultado.
+
+   **Y no lo metas en otro renglón.** Poner la pensión en
+   `otras_rentas_no_laborales` o en `rentas_capital` esquiva la guarda por
+   completo y liquida como ordinaria una renta exenta: un pensionado se
+   sobrepaga millones. Si el ingreso no cabe en un renglón de la cédula
+   general, no cabe en este motor.
+
+   Lo que sí puedes hacer después de detenerte: preparar el expediente y el
+   memo con la parte de honorarios claramente rotulada como PARCIAL, para que
+   el contador arme el resto. Pero el número global no sale de acá.
 
 **No preguntes nada más todavía.** La entrevista larga viene después de leer los documentos, y así te ahorras la mitad de las preguntas.
 
