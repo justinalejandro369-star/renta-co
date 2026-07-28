@@ -50,26 +50,34 @@ jobs:
       - name: Sin datos personales en los commits del PR
         if: github.event_name == 'pull_request'
         run: |
-          set -e
+          set -u
           BASE="origin/${{ github.base_ref }}"
-          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}"
+          git fetch --no-tags origin "${{ github.base_ref }}"
           # Las líneas AGREGADAS por el PR, sin el prefijo '+' del diff.
+          # `grep` devuelve 1 cuando no encuentra nada, que acá es el caso
+          # bueno: por eso no se usa `set -e` ni `pipefail` en este bloque.
           git log -p "$BASE..HEAD" -- . \
-            | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//' > /tmp/pr-agregado.txt
+            | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//' \
+            > /tmp/pr-agregado.txt || true
           echo "Líneas agregadas por el PR: $(wc -l < /tmp/pr-agregado.txt)"
           python3 scripts/escanear_privacidad.py /tmp/pr-agregado.txt
 
       - name: El archivo de exclusiones no puede vaciar el escaneo
         run: |
-          set -euo pipefail
+          set -u
           # Cuántos archivos ve el escáner con y sin exclusiones. Si las
           # exclusiones se comen buena parte del árbol, dejaron de ser una
           # lista de excepciones. El escáner ya lo rechaza por efecto; esto
           # verifica que el rechazo sigue vivo.
+          #
+          # OJO: el modo estricto sale con código 1 A PROPÓSITO —incluye los
+          # archivos de test, que contienen cédulas de prueba—. Con `set -e`
+          # o `pipefail` este paso moría en silencio y no verificaba nada,
+          # que es justo el defecto que vino a corregir.
           CON=$(python3 scripts/escanear_privacidad.py . 2>&1 \
-                | grep -oE 'en [0-9]+ archivo' | grep -oE '[0-9]+' | head -1)
+                | grep -oE 'en [0-9]+ archivo' | grep -oE '[0-9]+' | head -1 || true)
           SIN=$(python3 scripts/escanear_privacidad.py --estricto . 2>&1 \
-                | grep -oE 'en [0-9]+ archivo' | grep -oE '[0-9]+' | head -1)
+                | grep -oE 'en [0-9]+ archivo' | grep -oE '[0-9]+' | head -1 || true)
           echo "archivos escaneados: $CON (normal) / $SIN (estricto)"
           if [ -z "$CON" ] || [ -z "$SIN" ]; then
             echo "✗ No se pudo leer el conteo de archivos escaneados." >&2
