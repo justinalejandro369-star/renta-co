@@ -57,10 +57,12 @@ def construir_perfil(persona: dict) -> PF.Perfil:
     for clave, valor in persona["datos"].items():
         seccion, campo = clave.split(".", 1)
         datos.setdefault(seccion, {})[campo] = valor
-    if persona.get("patrimonio"):
+    if persona.get("patrimonio") or persona.get("pasivos"):
         datos["patrimonio"] = {
-            "activos": [{"nombre": n, "valor": v} for n, v in persona["patrimonio"]],
-            "pasivos": [],
+            "activos": [{"nombre": n, "valor": v}
+                        for n, v in persona.get("patrimonio", [])],
+            "pasivos": [{"nombre": n, "valor": v}
+                        for n, v in persona.get("pasivos", [])],
         }
     completos, supuestos = PF._completar(datos)
     return PF.Perfil(completos, None, supuestos)
@@ -159,8 +161,17 @@ def invariantes(par) -> list[str]:
         if marginal != esperada:
             fallos.append(f"{pid}: tarifa marginal {marginal} != {esperada}")
 
-        if round(r["patrimonio_liquido"]) != round(r["patrimonio_bruto"] - r["pasivos"]):
-            fallos.append(f"{pid}: patrimonio líquido no cuadra con bruto − pasivos")
+        # Contra el PERFIL, no contra el mismo diccionario que produjo la
+        # cifra: comparar comparar()["liquido"] con comparar()["bruto"] menos
+        # comparar()["pasivos"] es una tautología que no puede fallar.
+        activos = sum(a["valor"] for a in p.datos["patrimonio"]["activos"])
+        pasivos = sum(x["valor"] for x in p.datos["patrimonio"]["pasivos"])
+        if round(r["patrimonio_bruto"]) != round(activos):
+            fallos.append(f"{pid}: patrimonio bruto {r['patrimonio_bruto']} != {activos}")
+        if round(r["pasivos"]) != round(pasivos):
+            fallos.append(f"{pid}: pasivos {r['pasivos']} != {pasivos}")
+        if round(r["patrimonio_liquido"]) != round(activos - pasivos):
+            fallos.append(f"{pid}: patrimonio líquido no cuadra con el perfil")
 
         # Los renglones son lo que se copia al formulario: si cambian de
         # etiqueta o de orden, el comparativo deja de ser legible aunque los

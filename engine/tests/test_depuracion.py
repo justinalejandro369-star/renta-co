@@ -802,14 +802,38 @@ class TestClasificacionYSalidas(unittest.TestCase):
         self.assertEqual(peligrosas, [], "una descripción quedó como fórmula")
         self.assertTrue(any(r["descripcion"] == "pago normal" for r in filas))
 
-    def test_costos_suman_salidas_no_el_neto(self):
-        """abs() sobre el total hacía que un reembolso clasificado como costo
-        restara del gasto deducible."""
+    def test_los_reembolsos_netean_y_se_avisan(self):
+        """Un reembolso dentro de los costos tiene que restar del gasto
+        deducible: lo devuelto no se gastó.
+
+        Este test fijó dos veces el comportamiento equivocado. Primero con
+        abs() sobre el total, donde el signo del resultado dependía de cuál
+        partida pesara más. Después sumando solo las salidas, que ignora el
+        reembolso en silencio y sobrestima el costo — o sea subestima el
+        impuesto, que es el lado caro.
+
+        Lo correcto es netear Y decirlo, porque la cifra que sale ya no es la
+        suma de los comprobantes y el contador va a preguntar.
+        """
         ledger = self._ledger([
             self._mov("pago a contratista", -5_000_000, "costo"),
             self._mov("reembolso del contratista", 1_000_000, "costo"),
         ])
-        self.assertEqual(ledger.a_perfil()["costos"]["otros"], 5_000_000)
+        self.assertEqual(ledger.a_perfil()["costos"]["otros"], 4_000_000)
+        self.assertTrue(any("POSITIVO" in a for a in ledger.validar()),
+                        "netear sin avisar deja al usuario sin explicación")
+
+    def test_retencion_reversada_resta_del_anticipo(self):
+        """Mismo arreglo que en costos, que no se había aplicado acá: con
+        abs() por movimiento, una retención devuelta AUMENTABA el anticipo
+        que se descuenta del impuesto."""
+        ledger = self._ledger([
+            self._mov("retención en la fuente", -1_000_000, "retencion"),
+            self._mov("reintegro de retención", 500_000, "retencion"),
+        ])
+        self.assertEqual(
+            ledger.a_perfil()["anticipos"]["retenciones_practicadas"], 500_000
+        )
 
     def test_extracto_en_latin1_conserva_las_tildes(self):
         """Con errors='replace' se perdían las tildes y con ellas las

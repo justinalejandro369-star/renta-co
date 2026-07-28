@@ -39,15 +39,20 @@ COLUMNAS_FORMA = [
 ]
 
 # Palabras del campo tipo/descripción → categoría tributaria
+# Gana la PRIMERA que coincide, así que el orden es la regla. Los ingresos
+# van primero: "Invoice #002, platform fee deducted" trae la palabra "fee",
+# y clasificarlo como costo borra el ingreso del ledger Y lo suma como gasto
+# deducible — doble error, los dos a favor del contribuyente.
 REGLAS = [
+    (("invoice", "payment received", "salary", "milestone", "bonus", "payment from",
+      "contract payment", "pago recibido"), "ingreso_trabajo"),
     (("withdraw", "retiro", "payout to bank", "bank transfer out", "transfer to bank"),
      "traslado"),
     (("internal transfer", "balance transfer", "move funds", "transferencia interna"),
      "traslado"),
-    (("fee", "comision", "comisión", "service charge", "platform fee"), "costo"),
     (("payment to", "contractor payment", "pago a", "payout to contractor"), "costo"),
-    (("invoice", "payment received", "salary", "milestone", "bonus", "payment from",
-      "contract payment", "pago recibido"), "ingreso_trabajo"),
+    (("platform fee", "service charge", "wise charged", "transfer fee",
+      "comision", "comisión"), "costo"),
 ]
 
 

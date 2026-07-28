@@ -211,6 +211,18 @@ def _validar_tarifa(par: Parametros, archivo: Path) -> None:
             f"la del año padre en vez de completarla."
         )
     tarifas = [r.get("tarifa", 0) for r in rangos]
+    for r in rangos:
+        t = r.get("tarifa", 0)
+        if not 0 <= t <= 1:
+            raise ParametrosNoEncontrados(
+                f"{archivo}: tarifa {t} fuera de rango. Se escribe como "
+                f"fracción: 0.39 para el 39%, no 39."
+            )
+        if r.get("adicional_uvt", 0) < 0:
+            raise ParametrosNoEncontrados(
+                f"{archivo}: adicional_uvt negativo en el rango que empieza "
+                f"en {r.get('desde_uvt')} UVT."
+            )
     if tarifas != sorted(tarifas):
         raise ParametrosNoEncontrados(
             f"{archivo}: las tarifas marginales deben ir de menor a mayor."

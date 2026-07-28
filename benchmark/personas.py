@@ -173,6 +173,8 @@ PERSONAS: list[dict] = [
             "ingresos.rentas_capital": 2_000_000,
         },
         "patrimonio": [("Ahorros", 300_000_000)],
+        "pasivos": [("Crédito de vehículo", 48_000_000),
+                    ("Tarjeta de crédito a 31-dic", 6_500_000)],
     },
 
     {

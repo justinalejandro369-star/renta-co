@@ -35,7 +35,10 @@ def detecta(cabeceras: list[str], nombre: str = "") -> bool:
     texto = " ".join(c.lower() for c in cabeceras)
     import re as _re
 
-    if _re.search(r"\bwise\b", nombre.lower()):
+    # (?<![a-z]) en vez de \b: el guion bajo es carácter de palabra, así que
+    # \bwise\b no reconoce "wise_statement.csv". Lo que hay que excluir es
+    # "otherwise", o sea una letra pegada por delante.
+    if _re.search(r"(?<![a-z])wise(?![a-z])", nombre.lower()):
         return True
     tiene_wise = any(s in texto for s in SENALES)
     tiene_forma = "amount" in texto and ("description" in texto or "reference" in texto)

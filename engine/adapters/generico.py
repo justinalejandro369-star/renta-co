@@ -174,7 +174,10 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
     # arriba por estructura y no llegan acá.
     if not decimales and len(seps) == 1:
         entero = grupos[0]
-        if len(entero) > 3 or entero.startswith("0"):
+        # `entero == "0"` y no `startswith("0")`: "054.937" es un monto con
+        # cero de relleno —los extractos los traen— y leerlo como decimal lo
+        # dividía por mil. Solo el cero solo delata un decimal.
+        if len(entero) > 3 or entero == "0":
             decimales = [0]
         elif sep_decimal == seps[0]:
             decimales = [0]

@@ -165,7 +165,7 @@ class Ledger:
         }
 
     def validar(self, trm=None) -> list[str]:
-        avisos = list(self.avisos)
+        avisos = list(self.avisos) + self.avisos_de_signo()
         if trm is not None:
             huecos = trm.huecos_grandes()
             if huecos:
@@ -205,6 +205,29 @@ class Ledger:
         return Ledger(
             [m for m in self.movimientos if m.fecha.year == anio], list(self.avisos)
         )
+
+    def avisos_de_signo(self) -> list[str]:
+        """Categorías donde entradas y salidas se mezclan.
+
+        Un reembolso dentro de los costos, o una retención reversada, netean
+        con el resto. Es lo correcto, pero hay que decirlo: la cifra que sale
+        no es la suma de los comprobantes, y el contador va a preguntar.
+        """
+        avisos = []
+        for categoria, etiqueta in (("costo", "costos"),
+                                    ("retencion", "retenciones")):
+            entradas = [m for m in self.movimientos
+                        if m.categoria == categoria and m.monto_cop > 0]
+            if entradas:
+                total = sum(m.monto_cop for m in entradas)
+                avisos.append(
+                    f"{len(entradas)} movimiento(s) de {etiqueta} vienen en "
+                    f"POSITIVO por {total:,.0f} COP: se tratan como devoluciones "
+                    f"y netean contra el total. Si en realidad están mal "
+                    f"clasificados, corrígelos antes de calcular."
+                    .replace(",", ".")
+                )
+        return avisos
 
     @staticmethod
     def _neutralizar(valor: str) -> str:
@@ -248,21 +271,71 @@ class Ledger:
                 # el total, un reembolso clasificado como costo restaba del
                 # gasto deducible en vez de reducirlo explícitamente, y el
                 # signo del resultado dependía de cuál pesara más.
-                "otros": round(sum(
-                    -m.monto_cop for m in self.movimientos
-                    if m.categoria == "costo" and m.monto_cop < 0
-                )),
+                "otros": round(
+                    -sum(m.monto_cop for m in self.movimientos
+                         if m.categoria == "costo")
+                ),
             },
             "anticipos": {
-                "retenciones_practicadas": round(sum(
-                    abs(m.monto_cop) for m in self.movimientos
-                    if m.categoria == "retencion"
-                )),
+                # Salidas menos devoluciones, igual que en costos. Con
+                # abs() por movimiento, una retención reversada sumaba en vez
+                # de restar, y esta cifra se descuenta del impuesto.
+                "retenciones_practicadas": round(
+                    -sum(m.monto_cop for m in self.movimientos
+                         if m.categoria == "retencion")
+                ),
             },
             # consignaciones_totales_anio NO se llena desde el ledger: exige
             # separar por origen gravado con IVA y descartar duplicados entre
             # fuentes. Lo pone el usuario con su contador. Ver consignaciones().
         }
+
+
+def leer_clasificacion_previa(ruta: Path) -> dict[tuple, str]:
+    """Categorías que el usuario ya corrigió a mano en un ledger anterior.
+
+    La herramienta le dice «arréglala ahí y vuelve a correr», y hasta ahora
+    `importar` sobreescribía el archivo y tiraba esa corrección a la basura
+    sin avisar. Era el único remedio que ofrecía para una clasificación
+    equivocada, y no funcionaba.
+
+    La llave es lo que identifica el movimiento con independencia de cómo se
+    haya clasificado: fecha, monto de origen, moneda y archivo de origen.
+    """
+    if not ruta.exists():
+        return {}
+    previas: dict[tuple, str] = {}
+    try:
+        with open(ruta, newline="", encoding="utf-8") as f:
+            for fila in csv.DictReader(f):
+                try:
+                    clave = (
+                        fila["fecha"],
+                        f'{float(fila["monto_origen"]):.2f}',
+                        fila["moneda"],
+                        fila["fuente"],
+                    )
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if fila.get("categoria"):
+                    previas[clave] = fila["categoria"]
+    except OSError:
+        return {}
+    return previas
+
+
+def aplicar_clasificacion_previa(ledger: Ledger, previas: dict[tuple, str]) -> int:
+    """Reaplica las categorías corregidas a mano. Devuelve cuántas."""
+    if not previas:
+        return 0
+    aplicadas = 0
+    for m in ledger.movimientos:
+        clave = (m.fecha.isoformat(), f"{m.monto_origen:.2f}", m.moneda, m.fuente)
+        anterior = previas.get(clave)
+        if anterior and anterior in CATEGORIAS and anterior != m.categoria:
+            m.categoria = anterior
+            aplicadas += 1
+    return aplicadas
 
 
 def escribir_sugerencia_perfil(ledger: Ledger, destino: Path) -> Path:
@@ -324,8 +397,6 @@ def comparar_trm_diaria_vs_promedio(ledger: Ledger, trm: TRM) -> dict:
     El promedio se calcula sobre las fechas DEL LEDGER, no sobre el caché
     entero: el caché puede abarcar varios años y compararlo contra los
     ingresos de uno solo daba una diferencia inventada.
-    """
-    """Cuánta base gravable mueve usar promedio en vez de TRM diaria.
 
     Sirve para reconciliar cuando el contador usó promedio.
     """

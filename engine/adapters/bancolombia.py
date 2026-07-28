@@ -29,8 +29,13 @@ REGLAS = [
     (("gmf", "4x1000", "4 x 1000", "gravamen movimiento"), "gasto_personal"),
     (("retencion", "retención", "rte fte", "retefuente"), "retencion"),
     (("rendimiento", "intereses ganados", "abono intereses"), "ingreso_capital"),
-    (("traslado entre cuentas propias", "transferencia a cuenta propia",
-      "traslado a ahorro a la mano", "traslado cuenta propia"), "traslado"),
+    # Frases, no subcadenas sueltas: "NEQUI" a secas convertía en traslado
+    # cualquier pago a un tercero. Pero tampoco tan literales que dejen de
+    # ver los traslados reales — ninguna de estas menciona Nequi.
+    (("traslado entre cuentas", "traslado a cuenta", "traslado de cuenta",
+      "traslado a ahorro", "traslado de ahorro", "traslado cuenta propia",
+      "transferencia a cuenta propia", "transferencia cta propia",
+      "transferencia entre cuentas"), "traslado"),
 ]
 
 

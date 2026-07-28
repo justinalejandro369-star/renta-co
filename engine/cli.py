@@ -227,7 +227,8 @@ def _envolver(texto: str, ancho: int) -> list[str]:
 
 def cmd_importar(args) -> int:
     from . import adapters
-    from .ledger import Ledger, escribir_sugerencia_perfil
+    from .ledger import (Ledger, aplicar_clasificacion_previa,
+                         escribir_sugerencia_perfil, leer_clasificacion_previa)
     from .trm import TRM, SinTRM
 
     exp = Path(args.expediente)
@@ -292,7 +293,17 @@ def cmd_importar(args) -> int:
 
     ledger.convertir(trm)
     destino = exp / "02-datos" / "ledger.csv"
+
+    # Antes de sobreescribir, se recuperan las clasificaciones que el usuario
+    # corrigió a mano en la corrida anterior. Sin esto, el consejo de
+    # "arréglala en el ledger y vuelve a correr" era una pérdida de tiempo.
+    reaplicadas = aplicar_clasificacion_previa(
+        ledger, leer_clasificacion_previa(destino)
+    )
     ledger.escribir_csv(destino)
+    if reaplicadas:
+        print(f"\n↻ Se conservaron {reaplicadas} clasificación(es) que habías "
+              f"corregido a mano en el ledger anterior.")
 
     print(f"\nLedger → {destino}\n")
     print("Resumen por categoría:")
