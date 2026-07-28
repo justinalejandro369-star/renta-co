@@ -231,6 +231,56 @@ class TestRepositorio(unittest.TestCase):
     def test_modo_estricto_ignora_el_archivo_de_exclusiones(self):
         self.assertEqual(esc.globs_ignorados(RAIZ, estricto=True), [])
 
+    def test_ninguna_ruta_de_esta_maquina_quedo_en_el_repo(self):
+        """La ruta HOME de quien escribe no puede terminar publicada.
+
+        Este test existe porque pasó, en la sesión que escribió el test de
+        `enmascarar`: se documentó el comportamiento con un ejemplo real
+        —`/Users/<usuario>`— en el docstring de la función y en el test. Los
+        dos archivos están en `.privacidadignore`, así que el escaneo por
+        defecto no los mira, y CI no corre `--estricto` porque el modo
+        estricto sale 1 a propósito (los tests traen cédulas de prueba).
+
+        O sea: el punto ciego exacto que la verificación adversarial había
+        reportado, ocupado en menos de una hora por quien lo estaba
+        arreglando. La guarda tiene que ser específica y correr SIEMPRE, no
+        depender de que alguien se acuerde de pasar una bandera.
+
+        Se compara contra el HOME de la máquina actual, que es lo único que
+        distingue "ejemplo ficticio" de "mi computador".
+        """
+        import os
+
+        usuario = Path.home().name
+        if not usuario or len(usuario) < 3:
+            self.skipTest("no hay un nombre de usuario contra el cual comparar")
+
+        # Los ejemplos ficticios del repo son intencionales y se listan acá
+        # para que un usuario que de verdad se llame así no rompa el build.
+        FICTICIOS = {"fulanito", "usuario", "user", "runner", "home", "root"}
+        if usuario.lower() in FICTICIOS:
+            self.skipTest(f"el usuario de esta máquina ({usuario}) es un ficticio")
+
+        sucios = []
+        for archivo in RAIZ.rglob("*"):
+            if not archivo.is_file() or archivo.suffix.lower() in esc.BINARIAS:
+                continue
+            if esc.IGNORAR_DIRS & set(archivo.parts):
+                continue
+            try:
+                texto = archivo.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for n, linea in enumerate(texto.splitlines(), start=1):
+                if usuario in linea:
+                    sucios.append(f"{archivo.relative_to(RAIZ)}:{n}")
+        self.assertEqual(
+            sucios, [],
+            f"el usuario de esta máquina aparece en el repo (usa un nombre "
+            f"ficticio como 'fulanito'): {sucios[:5]}",
+        )
+        del os
+
 
 class TestUmbralAcumulado(unittest.TestCase):
     """Medir cada glob contra el total dejaba pasar varios globs pequeños

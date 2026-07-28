@@ -180,7 +180,7 @@ def enmascarar(texto: str) -> str:
     Tapaba solo los dígitos, así que lo alfabético salía intacto y los dos
     hallazgos cuyo valor ES alfabético salían enteros:
 
-        "/Users/fulanito"          → "/Users/fulanito"
+        "/Users/fulanito"            → "/Users/fulanito"
         "Calle 100 #45-20 Apto 301 Barrio Chico"
                                      → "Calle 1XX #XX-XX Apto 301 Barrio Chico"
 
