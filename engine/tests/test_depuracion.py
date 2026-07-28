@@ -349,3 +349,51 @@ class TestAdaptadores(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAdaptadorNoSecuestraArchivos(unittest.TestCase):
+    """Un CSV colombiano no puede ser leído como si fuera de Deel.
+
+    El export de un gateway local trae "Payment ID" y montos en pesos con
+    punto de miles. Si el adaptador de Deel se lo quedaba, lo parseaba con
+    separador decimal anglosajón y le asignaba USD: el ingreso declarado
+    quedaba multiplicado por ~4, en silencio.
+    """
+
+    CSV_COLOMBIANO = (
+        "Fecha,Payment ID,Descripcion,Monto\n"
+        "15/03/2025,MP-88231,Pago recibido cliente,500.000\n"
+        "20/03/2025,MP-88410,Pago recibido cliente,250.000\n"
+    )
+
+    def _escribir(self, contenido, nombre):
+        import tempfile
+
+        d = Path(tempfile.mkdtemp())
+        ruta = d / nombre
+        ruta.write_text(contenido, encoding="utf-8")
+        return ruta
+
+    def test_no_lo_reclama_deel(self):
+        from engine.adapters import deel
+
+        cabeceras = ["Fecha", "Payment ID", "Descripcion", "Monto"]
+        self.assertFalse(deel.detecta(cabeceras, "movimientos.csv"))
+
+    def test_lo_toma_el_generico_y_los_montos_quedan_bien(self):
+        from engine import adapters
+
+        ruta = self._escribir(self.CSV_COLOMBIANO, "movimientos.csv")
+        movs, nombre = adapters.importar(ruta)
+        self.assertEqual(nombre, "Genérico (CSV)")
+        self.assertEqual([m.monto_origen for m in movs], [500_000.0, 250_000.0])
+        self.assertTrue(all(m.moneda == "COP" for m in movs))
+
+    def test_deel_sin_columna_de_moneda_falla_en_vez_de_suponer_usd(self):
+        from engine.adapters import deel
+
+        ruta = self._escribir(self.CSV_COLOMBIANO, "deel-export.csv")
+        self.assertTrue(deel.detecta(["Fecha", "Payment ID", "Monto"], ruta.name))
+        with self.assertRaises(ValueError) as ctx:
+            deel.importar(ruta)
+        self.assertIn("moneda", str(ctx.exception))

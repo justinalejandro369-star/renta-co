@@ -186,7 +186,7 @@ def cmd_importar(args) -> int:
     exp = Path(args.expediente)
     crudo = exp / "00-crudo"
     if not crudo.exists():
-        print(f"No existe {crudo}. Corre /renta:setup primero.")
+        print(f"No existe {crudo}. Corre /renta-co:setup primero.")
         return 1
 
     ledger = Ledger()

@@ -19,7 +19,7 @@ Reglamentado por el art. 1.2.1.20.5 del Decreto 1625 de 2016, que recoge la sent
 
 | | **Ruta A** — costos y gastos | **Ruta B** — renta exenta 25% |
 |---|---|---|
-| Tope | **Ninguno** | 25%, tope 240 UVT/mes, **y además** dentro del tope conjunto 40% / 1.340 UVT |
+| Tope | Sin tope que recorte la deducción, pero superar el **60% de los ingresos brutos** activa el art. 336-1: casilla informativa obligatoria y soporte **electrónico** | 25%, tope **790 UVT anuales**, **y además** dentro del tope conjunto 40% / 1.340 UVT |
 | Soporte | Factura o documento soporte por cada peso | Ninguno |
 | Aportes del contratista | Hay que verificarlos (art. 108 par. 2) | No aplica |
 | Riesgo de fiscalización | Alto si el soporte es débil | Bajo |
@@ -30,7 +30,7 @@ Reglamentado por el art. 1.2.1.20.5 del Decreto 1625 de 2016, que recoge la sent
 **No por opinión. Se corre el motor.**
 
 ```bash
-python -m engine.cli calcular --expediente ./expediente
+python3 -m engine.cli calcular --expediente ./expediente
 ```
 
 Sale el comparativo renglón por renglón y la diferencia en pesos.
@@ -45,13 +45,28 @@ Entonces la comparación real no es «mis gastos» contra «el 25%». Es:
 
 Mucha gente asume que gana la Ruta A «porque tengo muchos gastos», y al filtrar por soporte real la mitad desaparece.
 
-## El mito del "2+ trabajadores por 90 días"
+## Cómo se calcula el 25% — dos errores caros
 
-Existe una regla que excluye del beneficio del 25% a quien vincula dos o más trabajadores, **pero está en el art. 383 ET y opera únicamente para la retención en la fuente mensual**, no para la depuración anual.
+**1. El tope es de 790 UVT ANUALES**, no de 240 UVT mensuales. La Ley 2277 de 2022 art. 2 lo cambió; el texto viejo es de la Ley 1607 de 2012 y sigue circulando. La diferencia es de 3,6 veces.
 
-En la declaración manda el art. 336 num. 4: **la opción es libre**. Tener contratistas no te saca de la Ruta B; solo te da costos que hacen la Ruta A potencialmente mejor.
+**2. La base no es el ingreso bruto.** El inciso 2 del num. 10 exige detraer primero los INCRNGO, las deducciones y las otras rentas exentas:
 
-Si el contador dice lo contrario, esta es la cita.
+```
+base = rentas de trabajo − INCRNGO − deducciones − otras rentas exentas
+exención = min(base × 25%, 790 UVT)
+```
+
+Si alguien te muestra un cálculo del 25% sobre el bruto y topado en 2.880 UVT, está usando la norma derogada.
+
+## La regla de los "2+ trabajadores por 90 días" — derogada
+
+Circula mal explicada en las dos direcciones, así que conviene responderla con precisión.
+
+La regla **existió** y sí condicionaba la declaración anual: estaba en el **art. 206 par. 5** (redacción de la Ley 2010 de 2019), no en el art. 383.
+
+**La Ley 2277 de 2022 art. 2 reescribió ese parágrafo y la eliminó.** Hoy la exención procede «en relación con las rentas de trabajo que no provengan de una relación laboral o legal y reglamentaria», sin condición de equipo.
+
+Conclusión práctica: **tener contratistas no te saca de la Ruta B.** Pero si vas a citarlo frente a un contador, cita la Ley 2277 de 2022 art. 2, no el art. 383 — ese artículo no dice nada de trabajadores ni de 90 días, y quedarías mal.
 
 ## Cómo presentar la decisión
 

@@ -287,7 +287,7 @@ def cargar(ruta: Path | str) -> Perfil:
         ruta = ruta / "perfil.toml"
     if not ruta.exists():
         raise FileNotFoundError(
-            f"No existe {ruta}. Corre /renta:setup, o copia "
+            f"No existe {ruta}. Corre /renta-co:setup, o copia "
             f"templates/perfil.ejemplo.toml y llénalo."
         )
     try:

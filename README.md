@@ -49,7 +49,7 @@ Requiere Python 3.11 o superior. **Cero dependencias externas.**
 ## Uso
 
 ```
-/renta:setup
+/renta-co:setup
 ```
 
 Crea `./expediente/` en tu máquina —ya ignorado por git— y te hace cuatro preguntas.
@@ -76,7 +76,7 @@ expediente/
 Antes de compartir cualquier cosa con quien sea:
 
 ```
-/renta:privacidad
+/renta-co:privacidad
 ```
 
 Escanea las salidas y te dice archivo y línea donde quedó una cédula, un número de cuenta o un nombre. Enmascarado.
@@ -94,7 +94,7 @@ Diez skills que saben **qué preguntar, en qué orden y por qué**. No un formul
 </td><td width="50%" valign="top">
 
 ### El motor calcula
-Python determinista con 37 tests. **El modelo de lenguaje nunca hace la aritmética del impuesto.** Puedes leer `engine/depuracion.py` y recalcularlo a mano.
+Python determinista con 64 tests y un benchmark de 14 personas verificado en tres capas. **El modelo de lenguaje nunca hace la aritmética del impuesto.** Puedes leer `engine/depuracion.py` y recalcularlo a mano.
 
 </td></tr>
 <tr><td valign="top">
@@ -125,7 +125,7 @@ Este proyecto ataca el caso más difícil y peor atendido: **el freelance con in
 | Tienes que elegir entre costos y el 25% exento | Calcula **las dos rutas** y te dice la diferencia en pesos. Son excluyentes (art. 336 num. 4 ET) |
 | Nadie te retuvo nada | Te lo dice antes de que sea sorpresa, y confirma que **no eras agente de retención** (art. 368-2 ET exige ser comerciante *y* superar 30.000 UVT) |
 | Le pagas a un equipo | Levanta el requisito que tumba más deducciones: verificar los aportes del contratista (art. 108 par. 2 ET) |
-| Por tu cuenta pasa plata de clientes | Cuantifica el umbral de **consignaciones** de 3.500 UVT. Se mide sobre lo que entró, no sobre lo tuyo |
+| Por tu cuenta pasa plata de clientes | Trabaja el umbral de **consignaciones** de 3.500 UVT, con su calificador: solo cuenta lo proveniente de actividades gravadas con IVA |
 
 ---
 
@@ -148,9 +148,9 @@ Acreditar 4 dependiente(s) — hoy tienes 0   $4.015.791    $4.015.791
 
 ### Encuentra lo que nadie mira
 
-El umbral de **consignaciones** de 3.500 UVT se mide sobre todo lo que entró a tus cuentas, no sobre tu ingreso propio. Quien recibe plata de clientes y la redistribuye puede pasarse sin que su ingreso se acerque. Si te pasas, pierdes la calidad de no responsable de IVA y aparecen obligación de facturar, declaraciones de IVA y sanción por cada una omitida — puede costar más que el propio impuesto de renta.
+El umbral de **consignaciones** de 3.500 UVT se mide sobre lo que entró a tus cuentas, no sobre tu ingreso propio: quien recibe plata de clientes y la redistribuye puede pasarse sin que su ingreso se acerque. Si te pasas, pierdes la calidad de no responsable de IVA y aparecen obligación de facturar, declaraciones de IVA y sanción por cada una omitida.
 
-`renta-co` lo cuantifica **antes** de que presentes.
+Y trae el calificador que casi nadie cita: el art. 437 par. 3 num. 6 habla de consignaciones **provenientes de actividades gravadas con IVA**. Los traslados entre cuentas propias no cuentan, y si tu actividad es exportación de servicios la cifra relevante puede ser cero. `renta-co` te ayuda a separarlo **antes** de que presentes, en vez de darte una alarma falsa.
 
 ### Registra los riesgos en vez de esconderlos
 
@@ -179,7 +179,7 @@ Si le pides lo contrario, no lo hace.
 | `renta-planeacion` | El año en curso, que es donde todavía se puede cambiar algo |
 | `renta-privacidad` | Escaneo de datos personales antes de compartir o commitear |
 
-**Comandos:** `/renta:setup` · `/renta:auditar` · `/renta:estado` · `/renta:privacidad`
+**Comandos:** `/renta-co:setup` · `/renta-co:auditar` · `/renta-co:estado` · `/renta-co:privacidad`
 
 ---
 
@@ -188,7 +188,7 @@ Si le pides lo contrario, no lo hace.
 ```bash
 git clone https://github.com/justinalejandro369-star/renta-co
 cd renta-co
-python -m engine.cli calcular --expediente expediente.ejemplo
+python3 -m engine.cli calcular --expediente expediente.ejemplo
 ```
 
 Contribuyente ficticio, flujo completo, cifras redondas. Fíjate en tres cosas: la Ruta A gana pero **la elección de ruta no es lo importante**, el riesgo R-01 sale en rojo, y el motor escoge entre las dos vías de dependientes calculando ambas.

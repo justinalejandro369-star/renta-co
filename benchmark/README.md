@@ -1,7 +1,7 @@
 # Benchmark
 
 ```bash
-python -m benchmark.correr
+python3 -m benchmark.correr
 ```
 
 Catorce contribuyentes ficticios, tres capas de verificación. Corre en CI en

@@ -6,7 +6,7 @@ Revisa el estado del expediente y di, en menos de quince líneas, dónde va y
 qué sigue.
 
 ```bash
-python -m engine.cli verificar --expediente ./expediente
+python3 -m engine.cli verificar --expediente ./expediente
 ```
 
 Revisa también:

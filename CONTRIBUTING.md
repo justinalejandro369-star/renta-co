@@ -86,7 +86,7 @@ limpio. Python 3.11+ por `tomllib`.
 **Nada de datos personales, nunca.** Corre esto antes de cada commit:
 
 ```bash
-python scripts/escanear_privacidad.py
+python3 scripts/escanear_privacidad.py
 ```
 
 Si aportas una muestra, revísala dos veces. Un archivo con la cédula de
@@ -103,9 +103,9 @@ en la documentación.
 ## Antes de mandar el PR
 
 ```bash
-python -m unittest discover -s engine/tests -t .
-python -m engine.cli calcular --expediente expediente.ejemplo
-python scripts/escanear_privacidad.py
+python3 -m unittest discover -s engine/tests -t .
+python3 -m engine.cli calcular --expediente expediente.ejemplo
+python3 scripts/escanear_privacidad.py
 ```
 
 Los tres tienen que pasar limpios.

@@ -1,6 +1,6 @@
 ---
 name: renta-onboarding
-description: Punto de entrada de renta-co. Úsala cuando alguien quiera empezar su declaración de renta en Colombia, diga "declaración de renta", "renta 2025", "DIAN", "formulario 210", "me toca declarar", "cuánto me toca pagar de renta", o corra /renta:setup. Crea el expediente, protege los datos con .gitignore, y conduce todo el proceso de principio a fin.
+description: Punto de entrada de renta-co. Úsala cuando alguien quiera empezar su declaración de renta en Colombia, diga "declaración de renta", "renta 2025", "DIAN", "formulario 210", "me toca declarar", "cuánto me toca pagar de renta", o corra /renta-co:setup. Crea el expediente, protege los datos con .gitignore, y conduce todo el proceso de principio a fin.
 ---
 
 # renta-co · Onboarding
@@ -72,7 +72,7 @@ Cuando diga que ya cargó: invoca **`renta-clasificar`**.
 ## Paso 4 — Construir el ledger
 
 ```bash
-python -m engine.cli importar --expediente ./expediente
+python3 -m engine.cli importar --expediente ./expediente
 ```
 
 Si quedan movimientos sin clasificar, resuélvelos **uno por uno** con el usuario antes de seguir. Un ingreso mal clasificado cambia el impuesto; un traslado contado como ingreso duplica la base.
@@ -86,8 +86,8 @@ De todo el proceso, **la pregunta de dependientes es la que más plata mueve**. 
 ## Paso 6 — Calcular
 
 ```bash
-python -m engine.cli verificar --expediente ./expediente   # qué falta
-python -m engine.cli calcular  --expediente ./expediente --csv
+python3 -m engine.cli verificar --expediente ./expediente   # qué falta
+python3 -m engine.cli calcular  --expediente ./expediente --csv
 ```
 
 Presenta el resultado en este orden, que es el orden en que importa:
@@ -104,7 +104,7 @@ Invoca **`renta-entregables`** y luego **`renta-riesgos`**.
 
 Termina siempre con:
 
-> Antes de mandarle esto a tu contador o a quien sea, corre `/renta:privacidad`.
+> Antes de mandarle esto a tu contador o a quien sea, corre `/renta-co:privacidad`.
 
 ## Paso 8 — El año que viene
 

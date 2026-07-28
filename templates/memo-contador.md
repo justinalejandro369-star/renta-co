@@ -97,7 +97,7 @@ incluyan por error:
 Todo el cálculo es reproducible:
 
 ```bash
-python -m engine.cli calcular --expediente ./expediente
+python3 -m engine.cli calcular --expediente ./expediente
 ```
 
 El motor es Python sin dependencias y la lógica está en

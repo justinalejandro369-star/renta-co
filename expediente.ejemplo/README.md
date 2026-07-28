@@ -9,7 +9,7 @@ USD por plataforma, subcontrata a dos personas, mantiene a su madre.
 ## Correrlo
 
 ```bash
-python -m engine.cli calcular --expediente expediente.ejemplo
+python3 -m engine.cli calcular --expediente expediente.ejemplo
 ```
 
 ## Qué mirar
@@ -43,7 +43,7 @@ en curso.
 ## El ledger
 
 ```bash
-python -m engine.cli importar --expediente expediente.ejemplo
+python3 -m engine.cli importar --expediente expediente.ejemplo
 ```
 
 Importa `00-crudo/movimientos-plataforma.csv` con el adaptador de Deel y

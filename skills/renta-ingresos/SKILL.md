@@ -35,7 +35,7 @@ Sumar todo lo positivo triplica el ingreso. Es el error más común al importar 
 Cada operación en moneda extranjera se convierte a la TRM **de su fecha de realización**. No promedio anual, no TRM de cierre.
 
 ```bash
-python -m engine.cli importar --expediente ./expediente
+python3 -m engine.cli importar --expediente ./expediente
 ```
 
 Descarga la serie de `datos.gov.co` (solo se envía un rango de fechas), la cachea, y convierte movimiento por movimiento.

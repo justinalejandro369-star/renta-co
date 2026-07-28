@@ -7,7 +7,7 @@ Este proyecto toca cédula, extractos bancarios, patrimonio y datos de familia. 
 **El código y los datos viven separados, físicamente.**
 
 - `renta-co` es lo que instalas. Es público, no contiene datos y no los recibe.
-- `./expediente/` es tuyo. Vive en tu proyecto, en tu máquina, y está ignorado por git desde que `/renta:setup` lo crea.
+- `./expediente/` es tuyo. Vive en tu proyecto, en tu máquina, y está ignorado por git desde que `/renta-co:setup` lo crea.
 
 Ningún archivo del expediente entra al árbol del plugin. Ningún dato tuyo llega al repositorio de nadie.
 
@@ -20,7 +20,7 @@ Exactamente dos cosas, y ninguna lleva datos tuyos:
 | Serie TRM diaria | `datos.gov.co` (Banco de la República, dato público) | Un rango de fechas. Nada más |
 | Consulta de normativa | El buscador o sitio que use tu agente, solo cuando se lo pides | El término de búsqueda |
 
-La TRM se cachea en `expediente/02-datos/trm-cache.csv` después de la primera descarga. Si prefieres cero red, descarga la serie una vez y ponla ahí a mano: `/renta:setup --sin-red` te explica cómo.
+La TRM se cachea en `expediente/02-datos/trm-cache.csv` después de la primera descarga. Si prefieres cero red, descarga la serie una vez y ponla ahí a mano: `/renta-co:setup --sin-red` te explica cómo.
 
 ## Qué NO hay
 
@@ -45,7 +45,7 @@ Qué puedes hacer al respecto:
 
 ## Protecciones incluidas
 
-**`.gitignore` generado en el setup.** `/renta:setup` escribe estas reglas en tu proyecto antes de crear un solo archivo:
+**`.gitignore` generado en el setup.** `/renta-co:setup` escribe estas reglas en tu proyecto antes de crear un solo archivo:
 
 ```
 expediente/
@@ -58,13 +58,13 @@ ledger*.csv
 
 **Skill `renta-privacidad`.** Escanea cualquier salida antes de que la compartas y detecta cédulas, NIT, números de cuenta, nombres tomados de tu `perfil.toml`, direcciones y correos. Reporta archivo y línea. Úsala antes de mandarle algo a tu contador por correo, o antes de pegar un fragmento en un issue.
 
-**Hook pre-commit opcional.** `/renta:setup --con-hooks` instala un hook que bloquea el commit si detecta esos patrones. Es opcional porque un hook que la gente no entiende termina desactivado.
+**Hook pre-commit opcional.** `/renta-co:setup --con-hooks` instala un hook que bloquea el commit si detecta esos patrones. Es opcional porque un hook que la gente no entiende termina desactivado.
 
 **`expediente.ejemplo/`.** Un contribuyente ficticio completo. Prueba el flujo entero, reporta bugs y comparte pantallazos sin exponer nada tuyo.
 
 ## Si vas a reportar un bug
 
-No pegues tu expediente. Reproduce el problema contra `expediente.ejemplo/` o corre `/renta:privacidad` sobre lo que vas a pegar. Un issue con la cédula de alguien queda indexado por Google para siempre.
+No pegues tu expediente. Reproduce el problema contra `expediente.ejemplo/` o corre `/renta-co:privacidad` sobre lo que vas a pegar. Un issue con la cédula de alguien queda indexado por Google para siempre.
 
 ## Borrar todo
 

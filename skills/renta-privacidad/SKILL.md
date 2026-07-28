@@ -18,8 +18,8 @@ Un expediente tributario es de lo más sensible que hay: cédula, patrimonio, mo
 ## Cómo
 
 ```bash
-python scripts/escanear_privacidad.py expediente/04-entregables/
-python scripts/escanear_privacidad.py --perfil expediente/perfil.toml archivo.md
+python3 scripts/escanear_privacidad.py expediente/04-entregables/
+python3 scripts/escanear_privacidad.py --perfil expediente/perfil.toml archivo.md
 ```
 
 Con `--perfil` también busca los nombres propios que aparezcan en el perfil, que es lo que un patrón genérico nunca va a atrapar.
@@ -89,7 +89,7 @@ No corras reescrituras de historial por tu cuenta. Explica la situación y deja 
 
 ## Hook opcional
 
-`/renta:setup --con-hooks` instala un `pre-commit` que corre este escaneo y bloquea el commit si encuentra algo. Es opcional a propósito: un hook que la gente no entiende termina desactivado con `--no-verify`, y eso es peor que no tenerlo.
+`/renta-co:setup --con-hooks` instala un `pre-commit` que corre este escaneo y bloquea el commit si encuentra algo. Es opcional a propósito: un hook que la gente no entiende termina desactivado con `--no-verify`, y eso es peor que no tenerlo.
 
 ## Lo que hay que decirle al usuario
 

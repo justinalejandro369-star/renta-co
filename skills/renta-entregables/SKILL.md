@@ -34,7 +34,7 @@ Poner el valor en pesos al lado de cada papel es lo que hace que la gente efecti
 
 ## 2. `comparativo.md`
 
-La salida de `python -m engine.cli calcular --csv`, en prosa:
+La salida de `python3 -m engine.cli calcular --csv`, en prosa:
 
 - Tabla renglón por renglón, ambas rutas.
 - Cuál gana y por cuánto.
@@ -102,4 +102,4 @@ Invoca `renta-planeacion` para `planeacion-<año siguiente>.md`.
 
 ## Antes de entregar
 
-Corre `/renta:privacidad` sobre `04-entregables/`. Estos archivos son los que la persona va a mandar por correo o por WhatsApp, y son los que más fácil terminan donde no deben.
+Corre `/renta-co:privacidad` sobre `04-entregables/`. Estos archivos son los que la persona va a mandar por correo o por WhatsApp, y son los que más fácil terminan donde no deben.

@@ -52,11 +52,28 @@ REGLAS = [
 
 
 def detecta(cabeceras: list[str], nombre: str = "") -> bool:
+    """Reconoce un export de Deel.
+
+    Regla de seguridad: **nunca reclamar un archivo sin columna de moneda**,
+    salvo que el nombre del archivo diga Deel.
+
+    Un CSV colombiano de Mercado Pago o PayU trae "Payment ID" y montos en
+    pesos con punto de miles ("500.000"). Si este adaptador se lo quedaba, lo
+    parseaba con separador decimal anglosajón (500.000 → 500,00) y le asignaba
+    USD por defecto: dos errores compuestos y silenciosos que multiplicaban el
+    ingreso declarado por ~4. Exigir la columna de moneda cierra las dos
+    puertas a la vez, porque sin ella no hay nada que convertir.
+    """
     normalizadas = {c.strip().lower() for c in cabeceras}
     texto = " ".join(normalizadas)
 
     if "deel" in nombre.lower():
         return True
+
+    tiene_moneda = bool(normalizadas & {"currency", "moneda", "ccy"})
+    if not tiene_moneda:
+        return False
+
     if any(s in texto for s in SENALES_FUERTES):
         return True
     return all(normalizadas & alias for alias in COLUMNAS_FORMA)
@@ -95,6 +112,15 @@ def importar(ruta: Path) -> list[Movimiento]:
                 f"El archivo de Deel {ruta.name} no tiene columnas de fecha y monto "
                 f"reconocibles. Columnas: {lector.fieldnames}"
             )
+        if not c_moneda:
+            # Solo puede pasar si el archivo se llama "deel-algo.csv" y no trae
+            # columna de moneda. Suponer USD acá cambiaría el ingreso por un
+            # factor de ~4.000: mejor fallar y preguntar.
+            raise ValueError(
+                f"{ruta.name} se identificó como export de Deel pero no trae "
+                f"columna de moneda. No se supone USD: agrégala al CSV, o "
+                f"renombra el archivo para que lo tome el adaptador genérico."
+            )
 
         for i, fila in enumerate(lector, start=2):
             crudo = (fila.get(c_fecha) or "").strip()
@@ -113,7 +139,7 @@ def importar(ruta: Path) -> list[Movimiento]:
                 fecha=fecha,
                 descripcion=(desc or tipo or "movimiento Deel"),
                 monto_origen=monto,
-                moneda=((fila.get(c_moneda) or "USD").strip().upper() if c_moneda else "USD"),
+                moneda=(fila.get(c_moneda) or "USD").strip().upper(),
                 categoria=_clasificar(tipo, desc, monto),
                 contraparte=((fila.get(c_parte) or "").strip() if c_parte else ""),
                 fuente=ruta.name,

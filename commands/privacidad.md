@@ -12,7 +12,7 @@ raíz del proyecto excluyendo `expediente/`.
 Ejecuta:
 
 ```bash
-python scripts/escanear_privacidad.py --perfil expediente/perfil.toml <objetivo>
+python3 scripts/escanear_privacidad.py --perfil expediente/perfil.toml <objetivo>
 ```
 
 Después del escaneo:

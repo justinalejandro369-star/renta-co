@@ -1,6 +1,6 @@
 # Comparativo de rutas — AG {{año}}
 
-Generado con `python -m engine.cli calcular --csv`. UVT {{año}} = {{$X}}.
+Generado con `python3 -m engine.cli calcular --csv`. UVT {{año}} = {{$X}}.
 
 ---
 
@@ -66,7 +66,7 @@ Todo lo que no salió de un documento:
 ## Reproducir
 
 ```bash
-python -m engine.cli calcular --expediente ./expediente
+python3 -m engine.cli calcular --expediente ./expediente
 ```
 
 Lógica en `engine/depuracion.py`. Parámetros y fuentes en

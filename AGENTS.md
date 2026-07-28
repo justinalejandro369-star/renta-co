@@ -37,20 +37,20 @@ y síguela.** Es el punto de entrada y conduce todo el proceso.
 ## Comandos
 
 ```
-/renta:setup        crea el expediente y arranca
-/renta:auditar      corre el cálculo completo
-/renta:estado       en qué va y qué sigue
-/renta:privacidad   escanea datos personales antes de compartir
+/renta-co:setup        crea el expediente y arranca
+/renta-co:auditar      corre el cálculo completo
+/renta-co:estado       en qué va y qué sigue
+/renta-co:privacidad   escanea datos personales antes de compartir
 ```
 
 ## Motor
 
 ```bash
-python -m engine.cli verificar  --expediente ./expediente   # qué falta
-python -m engine.cli importar   --expediente ./expediente   # ledger con TRM diaria
-python -m engine.cli calcular   --expediente ./expediente   # dos rutas + sensibilidad
-python -m engine.cli parametros --anio 2025                 # UVT, topes, tarifa
-python -m unittest discover -s engine/tests -t .            # tests
+python3 -m engine.cli verificar  --expediente ./expediente   # qué falta
+python3 -m engine.cli importar   --expediente ./expediente   # ledger con TRM diaria
+python3 -m engine.cli calcular   --expediente ./expediente   # dos rutas + sensibilidad
+python3 -m engine.cli parametros --anio 2025                 # UVT, topes, tarifa
+python3 -m unittest discover -s engine/tests -t .            # tests
 ```
 
 ## Reglas que no se rompen
@@ -121,4 +121,4 @@ expediente.ejemplo/  caso ficticio completo, para probar sin exponer nada
 - Los tests van con valores calculados a mano contra la norma, no copiados de
   la salida del programa.
 - Cualquier muestra de datos en tests o docs va anonimizada. Corre
-  `python scripts/escanear_privacidad.py` antes de hacer commit.
+  `python3 scripts/escanear_privacidad.py` antes de hacer commit.
