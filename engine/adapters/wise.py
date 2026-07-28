@@ -66,6 +66,16 @@ def importar(ruta: Path) -> list[Movimiento]:
                 f"El extracto de Wise {ruta.name} no tiene columnas reconocibles. "
                 f"Columnas: {lector.fieldnames}"
             )
+        if not c_moneda:
+            # Mismo guardia que en deel.py, que acá faltaba: suponer USD sobre
+            # un archivo en pesos multiplica el ingreso declarado por ~4.000.
+            from . import ErrorSinRespaldo
+
+            raise ErrorSinRespaldo(
+                f"{ruta.name} se identificó como extracto de Wise pero no trae "
+                f"columna de moneda. No se supone USD: agrégala al CSV, o "
+                f"renombra el archivo para que lo tome el adaptador genérico."
+            )
 
         for i, fila in enumerate(lector, start=2):
             crudo = (fila.get(c_fecha) or "").strip()
@@ -83,7 +93,7 @@ def importar(ruta: Path) -> list[Movimiento]:
                 fecha=fecha,
                 descripcion=desc or "movimiento Wise",
                 monto_origen=monto,
-                moneda=((fila.get(c_moneda) or "USD").strip().upper() if c_moneda else "USD"),
+                moneda=(fila.get(c_moneda) or "USD").strip().upper(),
                 categoria=_clasificar(desc),
                 contraparte=((fila.get(c_parte) or "").strip() if c_parte else ""),
                 fuente=ruta.name,

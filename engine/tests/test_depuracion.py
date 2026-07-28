@@ -643,3 +643,103 @@ class TestRegresionesRonda2(unittest.TestCase):
             self.assertIn("10%", fila.nota)
         else:
             self.assertIn("tarifa 0%", fila.nota)
+
+
+class TestRegresionesRonda3(unittest.TestCase):
+    """La tercera ronda de verificación. Los dos primeros son la misma clase
+    de bug —una moneda leída con el factor equivocado— por dos caminos."""
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+
+    def test_montos_con_tres_decimales(self):
+        """La regla 'tres dígitos detrás del separador = miles' no tenía
+        excepción, así que rompía TODO monto de tres decimales: 0.500 salía
+        500,0 y 12500.750 daba error. Las comisiones de Wise y las monedas
+        de tres decimales (KWD, BHD, OMR) caen justo ahí."""
+        self.assertEqual(parse_monto("0.500", "."), 0.5)
+        self.assertEqual(parse_monto("0.001", "."), 0.001)
+        self.assertEqual(parse_monto("12500.750", "."), 12500.75)
+        self.assertEqual(parse_monto("1000.000", "."), 1000.0)
+        self.assertEqual(parse_monto("897.681", "."), 897.681)
+
+    def test_el_caso_ambiguo_sigue_resolviendose_a_favor_de_pesos(self):
+        """'1.234' sin pista, o con pista de coma decimal, son mil
+        doscientos treinta y cuatro pesos."""
+        self.assertEqual(parse_monto("1.234"), 1234)
+        self.assertEqual(parse_monto("1.234", ","), 1234)
+        self.assertEqual(parse_monto("1.234", "."), 1.234)
+
+    def test_grupos_de_miles_siguen_siendo_grupos_de_miles(self):
+        """El arreglo no puede reabrir la regresión de la ronda anterior."""
+        for pista in (None, ".", ","):
+            self.assertEqual(parse_monto("1.234.567", pista), 1_234_567)
+            self.assertEqual(parse_monto("1.000.000", pista), 1_000_000)
+
+    def test_wise_sin_moneda_no_supone_dolares(self):
+        """Deel tenía el guardia y Wise no: un archivo en pesos leído como
+        dólares multiplica el ingreso declarado por ~4.000."""
+        import tempfile
+
+        from engine import adapters
+
+        d = Path(tempfile.mkdtemp())
+        ruta = d / "wise-statement.csv"
+        ruta.write_text("Date,Amount,Description\n"
+                        "2025-03-14,4500000,Received money from Cliente\n",
+                        encoding="utf-8")
+        try:
+            movs, nombre = adapters.importar(ruta)
+        except ValueError as e:
+            self.assertIn("moneda", str(e))
+            return
+        # Si lo toma el genérico, tiene que ser COP, no USD.
+        self.assertTrue(all(m.moneda == "COP" for m in movs),
+                        f"{nombre} asumió una moneda extranjera")
+
+    def test_fecha_con_zona_horaria_no_cambia_de_anio(self):
+        """Deel y Wise emiten marcas ISO con zona. Cortarlas a 19 caracteres
+        dejaba la fecha en UTC y movía un pago del 31 de diciembre al año
+        siguiente, donde filtrar_anio lo botaba del ledger."""
+        self.assertEqual(parse_fecha("2026-01-01T02:30:00Z").isoformat(),
+                         "2025-12-31")
+        self.assertEqual(parse_fecha("2025-06-15T12:00:00-05:00").isoformat(),
+                         "2025-06-15")
+        self.assertEqual(parse_fecha("2025-06-15").isoformat(), "2025-06-15")
+
+    def test_tarifa_incompleta_no_se_carga(self):
+        """_fusionar reemplaza las listas enteras: un año hijo con un solo
+        rango borraba los otros seis y el motor liquidaba impuesto cero para
+        cualquier base, sin aparecer como heredado."""
+        import tempfile
+
+        d = Path(tempfile.mkdtemp())
+        (d / "ag2025").mkdir()
+        (d / "ag2025" / "parametros.toml").write_text(
+            (RAIZ / "knowledge" / "ag2025" / "parametros.toml").read_text(),
+            encoding="utf-8")
+        (d / "ag2099").mkdir()
+        (d / "ag2099" / "parametros.toml").write_text(
+            '[meta]\nanio_gravable = 2099\nhereda_de = "ag2025"\n'
+            '[uvt]\nvalor = 60000\nfuente = "inventada"\n'
+            '[[tarifa.rangos]]\ndesde_uvt = 0\nhasta_uvt = 0\n'
+            'tarifa = 0.0\nadicional_uvt = 0\n',
+            encoding="utf-8")
+        with self.assertRaises(P.ParametrosNoEncontrados):
+            P.cargar(2099, d)
+
+    def test_traslados_que_se_cancelan_siguen_avisando(self):
+        """Importar la plataforma y el banco deja el total de traslados en
+        cero, y el aviso más importante del módulo no se emitía justo en el
+        caso que describe."""
+        from engine.ledger import Ledger, Movimiento
+        from datetime import date as _date
+
+        ledger = Ledger([
+            Movimiento(_date(2025, 3, 10), "retiro", -1000, "COP", "traslado"),
+            Movimiento(_date(2025, 3, 11), "abono", 1000, "COP", "traslado"),
+        ])
+        ledger.convertir(None)
+        self.assertEqual(ledger.total("traslado"), 0)
+        self.assertIn("traslado", ledger.resumen())
+        self.assertTrue(any("traslados" in a.lower() for a in ledger.validar()))

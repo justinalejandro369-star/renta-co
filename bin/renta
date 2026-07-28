@@ -17,7 +17,18 @@
 
 set -e
 
-RAIZ=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+# Se resuelven los symlinks a mano: `dirname "$0"` sobre un enlace apunta al
+# directorio del enlace, no al del repo, y el lanzador terminaba en
+# ModuleNotFoundError. `readlink -f` no existe en macOS.
+OBJETIVO=$0
+while [ -L "$OBJETIVO" ]; do
+    DESTINO=$(readlink "$OBJETIVO")
+    case "$DESTINO" in
+        /*) OBJETIVO=$DESTINO ;;
+        *)  OBJETIVO=$(dirname -- "$OBJETIVO")/$DESTINO ;;
+    esac
+done
+RAIZ=$(CDPATH= cd -- "$(dirname -- "$OBJETIVO")/.." && pwd)
 
 PY=${RENTA_CO_PYTHON:-python3}
 
@@ -49,10 +60,12 @@ fi
 # lanzador, ANTES del cd.
 ORIGEN=$(pwd)
 
+# La sustitución de comandos recorta los saltos de línea finales, así que
+# no se usa: se compone con expansión de parámetros, que los preserva.
 absolutizar() {
     case "$1" in
-        /*) printf '%s' "$1" ;;
-        *)  printf '%s/%s' "$ORIGEN" "$1" ;;
+        /*) RUTA_ABS=$1 ;;
+        *)  RUTA_ABS=$ORIGEN/$1 ;;
     esac
 }
 
@@ -74,7 +87,8 @@ while [ "$I" -lt "$N" ]; do
     arg=$1
     shift
     if [ "$ESPERA_RUTA" = "1" ]; then
-        arg=$(absolutizar "$arg")
+        absolutizar "$arg"
+        arg=$RUTA_ABS
         ESPERA_RUTA=0
     else
         case "$arg" in
@@ -88,13 +102,17 @@ while [ "$I" -lt "$N" ]; do
                 # para evitar.
                 clave=${arg%%=*}
                 valor=${arg#*=}
-                arg="$clave=$(absolutizar "$valor")"
+                absolutizar "$valor"
+                arg=$clave=$RUTA_ABS
                 [ "$clave" = "--expediente" ] && TIENE_EXPEDIENTE=1
                 ;;
             -*)
                 : ;;
             *)
-                [ "$SUBCOMANDO" = "privacidad" ] && arg=$(absolutizar "$arg")
+                if [ "$SUBCOMANDO" = "privacidad" ]; then
+                    absolutizar "$arg"
+                    arg=$RUTA_ABS
+                fi
                 ;;
         esac
     fi
@@ -107,7 +125,12 @@ done
 # "./expediente" y se resolvería después del cd, apuntando al del repo.
 case "$SUBCOMANDO" in
     calcular|importar|verificar)
-        [ "$TIENE_EXPEDIENTE" = "0" ] && set -- "$@" --expediente "$ORIGEN/expediente"
+        # `ESPERA_RUTA = 1` significa que el último argumento fue --expediente
+        # o --perfil sin valor: agregar el default ahí produciría
+        # "--perfil --expediente <ruta>". Se deja que argparse dé su error.
+        if [ "$TIENE_EXPEDIENTE" = "0" ] && [ "$ESPERA_RUTA" = "0" ]; then
+            set -- "$@" --expediente "$ORIGEN/expediente"
+        fi
         ;;
 esac
 set +f

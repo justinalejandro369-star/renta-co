@@ -24,10 +24,12 @@ class ParametrosNoEncontrados(Exception):
 class Parametros:
     """Parámetros de un año gravable, con trazabilidad de herencia."""
 
-    def __init__(self, datos: dict, heredados: set[str], anio: int):
+    def __init__(self, datos: dict, heredados: set[str], anio: int,
+                 padre_incompleto: bool = False):
         self._d = datos
         self.heredados = heredados
         self.anio_gravable = anio
+        self.padre_incompleto = padre_incompleto
 
     # ---- acceso ------------------------------------------------------
 
@@ -66,7 +68,10 @@ class Parametros:
 
     @property
     def completo(self) -> bool:
-        return bool(self.get("meta.completo", True))
+        """Un año heredado no puede ser más completo que su padre."""
+        if not bool(self.get("meta.completo", True)):
+            return False
+        return not self.padre_incompleto
 
     def advertencias(self) -> list[str]:
         avisos = []
@@ -126,7 +131,8 @@ def _fusionar(base: dict, encima: dict, raiz: bool = True) -> tuple[dict, set[st
     return resultado, heredados
 
 
-def cargar(anio_gravable: int, knowledge: Path | None = None) -> Parametros:
+def cargar(anio_gravable: int, knowledge: Path | None = None,
+           visitados: set[int] | None = None) -> Parametros:
     """Carga los parámetros de un año gravable, resolviendo la herencia."""
     base_dir = knowledge or KNOWLEDGE
     carpeta = base_dir / f"ag{anio_gravable}"
@@ -145,15 +151,79 @@ def cargar(anio_gravable: int, knowledge: Path | None = None) -> Parametros:
     datos = _leer_toml(archivo)
     heredados: set[str] = set()
 
+    padre_incompleto = False
     padre = datos.get("meta", {}).get("hereda_de")
     if padre:
-        anio_padre = int(str(padre).replace("ag", ""))
-        p = cargar(anio_padre, base_dir)
+        try:
+            anio_padre = int(str(padre).lower().replace("ag", ""))
+        except ValueError:
+            raise ParametrosNoEncontrados(
+                f"meta.hereda_de = {padre!r} en {archivo} no es un año gravable. "
+                f"Se escribe como 'ag2025'."
+            ) from None
+        if anio_padre == anio_gravable or anio_padre in (visitados or set()):
+            raise ParametrosNoEncontrados(
+                f"Ciclo de herencia en knowledge/: ag{anio_gravable} vuelve a "
+                f"ag{anio_padre}. Revisa meta.hereda_de."
+            )
+        p = cargar(anio_padre, base_dir, (visitados or set()) | {anio_gravable})
+        padre_incompleto = not p.completo
         datos, heredados = _fusionar(p._d, datos)
         # el meta del hijo siempre manda
         datos["meta"] = _leer_toml(archivo)["meta"]
 
-    return Parametros(datos, heredados, anio_gravable)
+    par = Parametros(datos, heredados, anio_gravable, padre_incompleto)
+    _validar_tarifa(par, archivo)
+    return par
+
+
+def _validar_tarifa(par: Parametros, archivo: Path) -> None:
+    """La tabla del art. 241 tiene que estar completa y ser contigua.
+
+    `_fusionar` reemplaza las listas enteras, así que un hijo que declare un
+    solo `[[tarifa.rangos]]` borra los otros seis en silencio y el motor
+    liquida impuesto cero para cualquier base. Un año gravable sin tarifa
+    válida no debe cargarse.
+    """
+    rangos = par.get("tarifa.rangos")
+    if not rangos:
+        raise ParametrosNoEncontrados(f"{archivo} no define tarifa.rangos.")
+    if len(rangos) < 2:
+        # Una tabla de un solo rango es lo que queda cuando un hijo declara
+        # un `[[tarifa.rangos]]` y la fusión reemplaza la lista del padre.
+        # Con tarifa 0 en ese rango único, el motor liquida cero para
+        # cualquier base — en silencio, y sin aparecer como heredado.
+        raise ParametrosNoEncontrados(
+            f"{archivo}: la tarifa tiene {len(rangos)} rango(s). El art. 241 "
+            f"tiene siete; una tabla así suele ser una lista que reemplazó a "
+            f"la del año padre en vez de completarla."
+        )
+    tarifas = [r.get("tarifa", 0) for r in rangos]
+    if tarifas != sorted(tarifas):
+        raise ParametrosNoEncontrados(
+            f"{archivo}: las tarifas marginales deben ir de menor a mayor."
+        )
+    if tarifas[-1] <= 0:
+        raise ParametrosNoEncontrados(
+            f"{archivo}: la tarifa del último rango es {tarifas[-1]}. Con eso "
+            f"el impuesto sería cero para cualquier base."
+        )
+    if rangos[0].get("desde_uvt") != 0:
+        raise ParametrosNoEncontrados(
+            f"{archivo}: la tarifa debe empezar en 0 UVT, empieza en "
+            f"{rangos[0].get('desde_uvt')}."
+        )
+    if rangos[-1].get("hasta_uvt") not in (0, None):
+        raise ParametrosNoEncontrados(
+            f"{archivo}: el último rango de la tarifa debe ser abierto "
+            f"(hasta_uvt = 0)."
+        )
+    for anterior, siguiente in zip(rangos, rangos[1:]):
+        if anterior.get("hasta_uvt") != siguiente.get("desde_uvt"):
+            raise ParametrosNoEncontrados(
+                f"{archivo}: hueco en la tarifa entre {anterior.get('hasta_uvt')} "
+                f"y {siguiente.get('desde_uvt')} UVT."
+            )
 
 
 def anios_disponibles(knowledge: Path | None = None) -> list[int]:

@@ -365,7 +365,8 @@ def globs_ignorados(raiz: Path, estricto: bool) -> list[str]:
 LIMITE_OMISION = 0.40
 
 
-def aplicar_ignorados(archivos: list[Path], globs: list[str]) -> tuple[list[Path], list[str]]:
+def aplicar_ignorados(archivos: list[Path], globs: list[str],
+                      raiz: Path | None = None) -> tuple[list[Path], list[str]]:
     """Filtra por los globs y rechaza los que apaguen el escáner.
 
     Una lista literal de globs prohibidos (`*`, `**`, …) no protege nada:
@@ -379,37 +380,61 @@ def aplicar_ignorados(archivos: list[Path], globs: list[str]) -> tuple[list[Path
     avisos = []
     aceptados: list[str] = []
     total = len(archivos)
-    limite = total * LIMITE_OMISION
+    # El límite se mide contra el árbol COMPLETO cuando se sabe cuál es.
+    # Midiéndolo solo contra el objetivo del escaneo, revisar un directorio
+    # que está legítimamente ignorado rechazaba su propio glob por "100% del
+    # árbol". Y midiéndolo siempre contra el directorio actual, una lista de
+    # archivos que no viene del repo se compara contra un universo ajeno.
+    universo = total
+    if raiz is not None:
+        universo = max(len(archivos_de([str(raiz)])), total)
+    limite = universo * LIMITE_OMISION
 
     # El límite es ACUMULADO, no por glob. Medir cada uno contra el total
     # dejaba pasar cuatro globs del 25% que juntos apagaban el escáner
     # entero: cada uno quedaba por debajo del umbral y ninguno se rechazaba.
     for g in globs:
         candidatos = aceptados + [g]
-        omitidos = sum(1 for a in archivos if esta_ignorado(a, candidatos))
+        omitidos = sum(1 for a in archivos if esta_ignorado(a, candidatos, raiz))
         if omitidos > limite:
-            solo_este = sum(1 for a in archivos if esta_ignorado(a, [g]))
+            solo_este = sum(1 for a in archivos if esta_ignorado(a, [g], raiz))
             avisos.append(
                 f"{ARCHIVO_IGNORADOS}: se RECHAZA el glob '{g}'. Por sí solo deja "
                 f"fuera {solo_este} de {total} archivos, y sumado a los anteriores "
-                f"llegaría a {omitidos} ({omitidos / total:.0%} del árbol). El "
+                f"llegaría a {omitidos} ({omitidos / universo:.0%} del árbol). El "
                 f"límite acumulado es {LIMITE_OMISION:.0%}: este archivo es para "
                 f"excepciones puntuales, no para apagar el escáner."
             )
             continue
         aceptados.append(g)
 
-    restantes = [a for a in archivos if not esta_ignorado(a, aceptados)]
+    restantes = [a for a in archivos if not esta_ignorado(a, aceptados, raiz)]
     return restantes, avisos
 
 
-def esta_ignorado(ruta: Path, globs: list[str]) -> bool:
+def esta_ignorado(ruta: Path, globs: list[str], raiz: Path | None = None) -> bool:
+    """¿La ruta cae en alguno de los globs?
+
+    Los globs de .privacidadignore son relativos a la raíz del repositorio.
+    La ruta puede llegar relativa, con './' o absoluta —el lanzador
+    absolutiza los objetivos—, y compararla tal cual hacía que el mismo
+    archivo se ignorara o no según cómo se hubiera invocado el escáner.
+    """
     from fnmatch import fnmatch
 
+    candidatos = set()
     texto = str(ruta)
     if texto.startswith("./"):
         texto = texto[2:]
-    return any(fnmatch(texto, g) for g in globs)
+    candidatos.add(texto)
+
+    base = raiz or Path.cwd()
+    try:
+        candidatos.add(str(Path(texto).resolve().relative_to(base.resolve())))
+    except (ValueError, OSError):
+        pass
+
+    return any(fnmatch(c, g) for c in candidatos for g in globs)
 
 
 def archivos_de(objetivos: list[str]) -> list[Path]:
@@ -487,13 +512,26 @@ def main(argv=None) -> int:
     if args.perfil and not nombres:
         print("⚠ El perfil no aportó nombres. La detección de nombres queda apagada.")
 
+    raiz_repo = Path.cwd()
     if args.staged:
         resultados, revisados = escanear_indice(nombres)
+        globs = globs_ignorados(raiz_repo, args.estricto)
+        if globs:
+            antes = len(resultados)
+            rutas = [Path(r) for r, _ in resultados]
+            conservadas, avisos_globs = aplicar_ignorados(rutas, globs, raiz_repo)
+            conservadas = {str(x) for x in conservadas}
+            resultados = [(r, h) for r, h in resultados if r in conservadas]
+            for aviso in avisos_globs:
+                print(f"⚠ {aviso}")
+            if antes - len(resultados):
+                print(f"({antes - len(resultados)} archivo(s) del índice omitidos "
+                      f"por {ARCHIVO_IGNORADOS})")
     else:
         archivos = archivos_de(args.objetivos or ["."])
-        globs = globs_ignorados(Path("."), args.estricto)
+        globs = globs_ignorados(raiz_repo, args.estricto)
         antes = len(archivos)
-        archivos, avisos_globs = aplicar_ignorados(archivos, globs)
+        archivos, avisos_globs = aplicar_ignorados(archivos, globs, raiz_repo)
         for aviso in avisos_globs:
             print(f"⚠ {aviso}")
         if antes - len(archivos):

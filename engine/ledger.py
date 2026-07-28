@@ -85,7 +85,16 @@ class Ledger:
         return sum(m.monto_cop for m in self.movimientos if m.categoria == categoria)
 
     def resumen(self) -> dict[str, float]:
-        return {c: self.total(c) for c in CATEGORIAS if self.total(c)}
+        """Total por categoría, incluyendo las que suman cero pero existen.
+
+        Una categoría cuyos movimientos se cancelan entre sí desaparecía del
+        resumen, que es exactamente lo que pasa con los traslados cuando se
+        importan la plataforma y el banco.
+        """
+        return {
+            c: self.total(c) for c in CATEGORIAS
+            if any(m.categoria == c for m in self.movimientos)
+        }
 
     def sin_clasificar(self) -> list[Movimiento]:
         return [m for m in self.movimientos if m.categoria == "desconocido"]
@@ -134,7 +143,7 @@ class Ledger:
                 "giro, el dinero está contado dos veces. Revisa el desglose por "
                 "fuente antes de comparar contra el umbral."
             )
-        if self.total("traslado"):
+        if any(m.categoria == "traslado" for m in self.movimientos):
             avisos.append(
                 "Hay traslados entre cuentas propias. Consignan, pero NO "
                 "provienen de una actividad gravada con IVA, así que no cuentan "
@@ -176,7 +185,11 @@ class Ledger:
                 f"Clasifícalos antes de calcular: un ingreso mal clasificado "
                 f"cambia el impuesto."
             )
-        if self.total("traslado"):
+        # Se cuentan los MOVIMIENTOS, no el total: un retiro y su abono se
+        # cancelan y dejaban el total en cero, así que el aviso más
+        # importante del módulo no se emitía justo en el caso que describe
+        # —importar la plataforma y el banco a la vez—.
+        if any(m.categoria == "traslado" for m in self.movimientos):
             avisos.append(ADVERTENCIA_TRASLADO)
         fechas = [m.fecha for m in self.movimientos]
         if fechas:

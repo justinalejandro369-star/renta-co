@@ -12,7 +12,7 @@ from __future__ import annotations
 import csv
 import math
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ..ledger import Movimiento
@@ -36,6 +36,9 @@ ALIAS = {
 # guiones bajos, separadores repetidos y dígitos no ASCII.
 _TOKEN = re.compile(r"[0-9]+(?:[.,][0-9]+)*")
 
+# Colombia no tiene horario de verano: UTC-5 todo el año.
+HORA_COLOMBIA = timezone(timedelta(hours=-5))
+
 FORMATOS_FECHA = [
     "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d",
     "%d/%m/%y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S",
@@ -58,10 +61,31 @@ def _mapear(cabeceras: list[str]) -> dict[str, str]:
 
 
 def parse_fecha(texto: str):
+    """Fecha de un movimiento, en hora de Colombia.
+
+    Los exports de Deel y Wise traen marcas ISO con zona ("2026-01-01T02:30:00Z").
+    Cortar la cadena a 19 caracteres descartaba el offset y dejaba la fecha en
+    UTC: en la frontera del año gravable eso mueve un movimiento de diciembre
+    a enero, y `filtrar_anio` lo bota del ledger.
+    """
     texto = texto.strip()
+    if not texto:
+        raise ValueError("fecha vacía")
+
+    iso = texto.replace("Z", "+00:00")
+    try:
+        momento = datetime.fromisoformat(iso)
+    except ValueError:
+        momento = None
+    if momento is not None:
+        if momento.tzinfo is not None:
+            momento = momento.astimezone(HORA_COLOMBIA)
+        return momento.date()
+
     for fmt in FORMATOS_FECHA:
         try:
-            return datetime.strptime(texto[:19] if " " in texto or "T" in texto else texto, fmt).date()
+            recorte = texto[:19] if (" " in texto or "T" in texto) else texto
+            return datetime.strptime(recorte, fmt).date()
         except ValueError:
             continue
     raise ValueError(f"Fecha no reconocida: {texto!r}")
@@ -131,6 +155,30 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
 
     # Clasificar cada separador por el tamaño del grupo que le sigue.
     decimales = [i for i, g in enumerate(grupos[1:]) if len(g) != 3]
+
+    # Caso ambiguo: UN separador seguido de exactamente tres dígitos.
+    # "1.234" vale mil doscientos treinta y cuatro en Colombia y uno coma
+    # doscientos treinta y cuatro en inglés, y la forma no lo dice.
+    #
+    # Pero hay dos señales que sí resuelven, y que la versión anterior
+    # ignoraba — por eso rompía TODO monto de tres decimales:
+    #
+    #   "12500.750" → la parte entera tiene cinco dígitos, así que leerla
+    #                 como grupo de miles es imposible: es decimal.
+    #   "0.500"     → un grupo de miles no empieza en cero. Nadie escribe
+    #                 quinientos como "0.500": es decimal.
+    #
+    # Y solo si ninguna de las dos aplica se consulta `sep_decimal`, que es
+    # su único trabajo legítimo. Ojo: esto NO reabre el bug de la ronda
+    # anterior, porque los casos de varios separadores ya se resolvieron
+    # arriba por estructura y no llegan acá.
+    if not decimales and len(seps) == 1:
+        entero = grupos[0]
+        if len(entero) > 3 or entero.startswith("0"):
+            decimales = [0]
+        elif sep_decimal == seps[0]:
+            decimales = [0]
+
     if len(decimales) > 1:
         raise malo("hay más de un separador decimal")
     if decimales and decimales[0] != len(seps) - 1:

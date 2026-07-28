@@ -77,17 +77,74 @@ def descargar(desde: date, hasta: date, timeout: int = 30) -> dict[date, float]:
     return serie
 
 
-def leer_cache(ruta: Path) -> dict[date, float]:
+# La TRM del peso ha estado siempre en el rango de los miles. Un valor fuera
+# de esta banda es un error de lectura, no un dato: se descarta y se avisa,
+# en vez de convertirse en una base gravable absurda.
+TRM_MINIMA = 500.0
+TRM_MAXIMA = 50_000.0
+
+
+def leer_cache(ruta: Path) -> tuple[dict[date, float], list[str]]:
+    """Lee el caché local. Devuelve la serie y los problemas encontrados.
+
+    Antes devolvía solo la serie y se tragaba los errores con un `continue`.
+    Eso convertía un caché mal formado en uno silenciosamente vacío o, peor,
+    en uno con valores equivocados: una TRM escrita como "4,010.50" hacía que
+    csv.DictReader mandara el resto a la restkey y quedaba TRM = 4, que
+    después multiplica los ingresos en dólares por cuatro.
+    """
     if not ruta.exists():
-        return {}
-    serie = {}
-    with open(ruta, newline="", encoding="utf-8") as f:
-        for fila in csv.DictReader(f):
+        return {}, []
+
+    serie: dict[date, float] = {}
+    avisos: list[str] = []
+    # utf-8-sig: un caché guardado desde Excel trae BOM y la cabecera dejaba
+    # de reconocerse, con lo que el archivo entero se leía como vacío.
+    with open(ruta, newline="", encoding="utf-8-sig", errors="replace") as f:
+        lector = csv.DictReader(f)
+        campos = {c.lower().strip(): c for c in (lector.fieldnames or [])}
+        c_fecha = campos.get("fecha") or campos.get("date")
+        c_trm = campos.get("trm") or campos.get("valor") or campos.get("value")
+        if not c_fecha or not c_trm:
+            return {}, [
+                f"{ruta.name} no tiene cabecera 'fecha,trm' reconocible "
+                f"(encontrado: {lector.fieldnames}). Se ignora el caché."
+            ]
+
+        for n, fila in enumerate(lector, start=2):
             try:
-                serie[_parse_fecha(fila["fecha"])] = float(fila["trm"])
-            except (KeyError, ValueError):
+                fecha = _parse_fecha(fila[c_fecha])
+                # Acepta 4.010,50 y 4,010.50: un caché editado a mano o
+                # exportado desde una hoja de cálculo trae separadores.
+                valor = _parse_valor(fila[c_trm])
+            except (KeyError, TypeError, ValueError) as e:
+                avisos.append(f"{ruta.name} línea {n}: {e}")
                 continue
-    return serie
+            if not (TRM_MINIMA <= valor <= TRM_MAXIMA):
+                avisos.append(
+                    f"{ruta.name} línea {n}: TRM {valor} fuera del rango "
+                    f"plausible ({TRM_MINIMA:.0f}–{TRM_MAXIMA:.0f}). Se descarta."
+                )
+                continue
+            serie[fecha] = valor
+    return serie, avisos
+
+
+def _parse_valor(texto) -> float:
+    """Convierte el valor de TRM tolerando separadores de miles."""
+    t = str(texto).strip().replace(" ", "").replace("$", "")
+    if not t:
+        raise ValueError("valor de TRM vacío")
+    if "," in t and "." in t:
+        t = (t.replace(".", "").replace(",", ".") if t.rfind(",") > t.rfind(".")
+             else t.replace(",", ""))
+    elif "," in t:
+        entero, _, dec = t.rpartition(",")
+        t = f"{entero}.{dec}" if len(dec) <= 2 else t.replace(",", "")
+    valor = float(t)
+    if valor != valor or valor in (float("inf"), float("-inf")):
+        raise ValueError(f"valor de TRM no finito: {texto!r}")
+    return valor
 
 
 def escribir_cache(ruta: Path, serie: dict[date, float]) -> None:
@@ -118,16 +175,20 @@ class TRM:
     @classmethod
     def para(cls, desde: date, hasta: date, cache: Path | None = None,
              permitir_red: bool = True) -> "TRM":
-        serie = leer_cache(cache) if cache else {}
+        serie, avisos_cache = leer_cache(cache) if cache else ({}, [])
+        for aviso in avisos_cache:
+            print(f"⚠ caché de TRM — {aviso}")
         faltan = [
             desde + timedelta(days=i)
             for i in range((hasta - desde).days + 1)
             if desde + timedelta(days=i) not in serie
         ]
         if faltan and permitir_red:
-            serie.update(descargar(min(faltan), max(faltan)))
-            if cache:
-                escribir_cache(cache, serie)
+            # Se pide desde unos días antes: la TRM del viernes es la que rige
+            # el sábado, y filtrar por `vigenciadesde >= desde` la dejaba
+            # fuera cuando el primer movimiento caía en fin de semana o
+            # después de un puente.
+            serie.update(descargar(min(faltan) - timedelta(days=7), max(faltan)))
             # Verificar que la descarga cerró los huecos. La fuente puede
             # devolver un rango parcial, y sin este chequeo el objeto se
             # construía igual y `de()` rellenaba hacia atrás sin avisar.
@@ -138,11 +199,15 @@ class TRM:
                     if any((d - timedelta(days=i)) in serie for i in range(1, 5))
                 )
                 if cubiertos < len(quedan):
+                    # El caché NO se escribe: guardar una serie con huecos los
+                    # deja pegados también para las corridas con --sin-red.
                     raise SinTRM(
                         f"La descarga dejó {len(quedan) - cubiertos} día(s) sin "
                         f"TRM ni un día hábil cercano. Primero: {min(quedan)}. "
                         f"Reintenta, o carga la serie a mano en el caché."
                     )
+            if cache:
+                escribir_cache(cache, serie)
             return cls(serie)
         if faltan:
             raise SinTRM(

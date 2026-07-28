@@ -380,7 +380,12 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         # es peor que no decir ninguno: de esa explicación el usuario deduce
         # qué esperar el año siguiente.
         alt = p.copia_con(deducciones__dependientes=suficientes)
-        via = liquidar(alt, par, "A").dependientes_via
+        # La vía se consulta en la ruta que da el ahorro que se está
+        # reportando. Mirar siempre la A daba una razón que contradecía la
+        # cifra cuando ganaba la B.
+        ahorro_a = base_a - _saldo(alt, par, "A")
+        ruta_del_ahorro = "A" if ahorro_a >= base_b - _saldo(alt, par, "B") else "B"
+        via = liquidar(alt, par, ruta_del_ahorro).dependientes_via
         if suficientes < max_dep:
             motivo = ("la vía que gana en tu caso es la del 10% de la renta de "
                       "trabajo (art. 387), que no depende de cuántos sean"
