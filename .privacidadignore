@@ -1,0 +1,21 @@
+# Archivos que el escáner de privacidad omite.
+# Globs, uno por línea. Se comparan contra la ruta y contra el nombre.
+#
+# Solo va acá lo que contiene cadenas con FORMA de dato personal pero que
+# demostrablemente no lo son: casos de prueba y ejemplos de documentación.
+# Nunca agregues acá un archivo con datos reales — el punto del escáner es
+# encontrarlos.
+
+# Tests: contienen montos de prueba con formato de miles, que tienen la
+# misma forma que una cédula.
+engine/tests/*.py
+
+# Docstring del parser de montos: documenta cada formato con un ejemplo.
+engine/adapters/generico.py
+
+# Documentación del propio escáner: muestra ejemplos de lo que detecta.
+skills/renta-privacidad/SKILL.md
+scripts/escanear_privacidad.py
+
+# Este mismo archivo.
+.privacidadignore
