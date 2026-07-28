@@ -21,6 +21,20 @@ from . import bancolombia, deel, generico, wise
 REGISTRO = [deel, wise, bancolombia, generico]   # generico siempre de último
 
 
+class ErrorSinRespaldo(ValueError):
+    """Fallo que NO se debe reintentar con el adaptador genérico.
+
+    El genérico asigna COP por defecto cuando no hay columna de moneda. Para
+    un archivo que otro adaptador reconoció como export en dólares, ese
+    respaldo silencioso convierte 3.800 USD en 3.800 COP: un error de ~4.000×
+    presentado como una importación exitosa. Cuando el adaptador específico
+    falla precisamente por no poder determinar la moneda, hay que parar y
+    preguntar.
+    """
+
+    sin_respaldo = True
+
+
 def leer_cabeceras(ruta: Path) -> list[str]:
     with open(ruta, newline="", encoding="utf-8-sig", errors="replace") as f:
         for fila in csv.reader(f):
@@ -63,7 +77,7 @@ def importar(ruta: Path):
     try:
         return adaptador.importar(ruta), adaptador.NOMBRE
     except ValueError as e:
-        if adaptador is generico:
+        if adaptador is generico or getattr(e, "sin_respaldo", False):
             raise
         try:
             movs = generico.importar(ruta)

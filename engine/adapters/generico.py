@@ -30,10 +30,10 @@ ALIAS = {
                     "tercero", "nombre"],
 }
 
-# Lo único que se acepta después de normalizar: dígitos con a lo sumo un
-# punto decimal. Sin notación científica, sin nan/inf, sin separadores
-# sobrantes.
-_NUMERO_LIMPIO = re.compile(r"\d+(?:\.\d+)?")
+# Forma válida de un monto ANTES de normalizar: dígitos ASCII separados por
+# un solo punto o una sola coma. Excluye notación científica, nan/inf,
+# guiones bajos, separadores repetidos y dígitos no ASCII.
+_TOKEN = re.compile(r"[0-9]+(?:[.,][0-9]+)*")
 
 FORMATOS_FECHA = [
     "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d",
@@ -73,8 +73,7 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
     conocen su fuente deberían pasarlo siempre. Bancolombia escribe
     "1.234.567,89"; Deel y Wise escriben "1234567.89".
 
-    Sin pista, se aplica esta heurística — documentada porque tiene un caso
-    ambiguo real:
+    Sin pista, se aplica esta heurística, que tiene un caso ambiguo real:
 
       "1.234,56"  → ambos separadores: decimal es el último       → 1234.56
       "1,234.56"  → ambos separadores: decimal es el último       → 1234.56
@@ -83,52 +82,80 @@ def parse_monto(texto: str, sep_decimal: str | None = None) -> float:
       "1.234"     → un punto, 3 dígitos detrás: se asume MILES    → 1234
       "1,50"      → una coma, 2 dígitos detrás: decimal           → 1.5
 
-    El caso ambiguo es "1.234": vale 1.234 en USD y 1234 en COP. Se resuelve
-    a favor de COP porque es lo que domina en extractos colombianos. Pasa
+    El ambiguo es "1.234": vale 1.234 en USD y 1234 en COP. Se resuelve a
+    favor de COP porque es lo que domina en extractos colombianos. Pasa
     `sep_decimal` si tu fuente hace lo contrario.
+
+    VALIDACIÓN — por qué se hace ANTES de tocar los separadores
+    ───────────────────────────────────────────────────────────
+    Un intento anterior validaba con una expresión regular al final, sobre
+    el texto ya normalizado. No servía de nada: la normalización es
+    justamente la que fabrica el número creíble. "1.2.3" llegaba al regex
+    convertido en "123" y pasaba como ciento veintitrés.
+
+    Acá se valida la ESTRUCTURA del token original: dígitos ASCII separados
+    por un solo punto o una sola coma, y los grupos de miles de exactamente
+    tres dígitos. Así "1.2.3", "1..2" y "12,34,567" fallan por lo que son —
+    montos malformados— y no se convierten en una cifra que después nadie
+    puede rastrear en la base gravable.
     """
-    t = str(texto).strip().replace("$", "").replace(" ", "").replace("\xa0", "")
+    original = str(texto)
+    t = original.strip().replace("$", "").replace(" ", "").replace("\xa0", "")
     if not t or t in {"-", "—", "N/A", "n/a"}:
         return 0.0
 
-    negativo = t.startswith("(") and t.endswith(")")
-    t = t.strip("()")
-    if t.startswith("-"):
-        negativo, t = True, t[1:]
-    t = t.replace("+", "")
+    def malo(motivo):
+        return ValueError(f"{original!r} no es un monto reconocible: {motivo}.")
 
-    if sep_decimal == ",":
-        t = t.replace(".", "").replace(",", ".")
-    elif sep_decimal == ".":
-        t = t.replace(",", "")
-    elif "," in t and "." in t:
-        t = (t.replace(".", "").replace(",", ".") if t.rfind(",") > t.rfind(".")
-             else t.replace(",", ""))
-    elif "," in t:
-        entero, _, dec = t.rpartition(",")
-        t = f"{entero.replace('.', '')}.{dec}" if len(dec) <= 2 else t.replace(",", "")
-    elif "." in t:
-        if t.count(".") > 1 or len(t.rpartition(".")[2]) == 3:
-            t = t.replace(".", "")
+    entre_parentesis = t.startswith("(") and t.endswith(")")
+    if entre_parentesis:
+        t = t[1:-1]
 
-    if not t or t == ".":
-        return 0.0
+    negativo = entre_parentesis
+    if t.startswith(("-", "+")):
+        if entre_parentesis:
+            raise malo("tiene paréntesis Y signo, y no se sabe cuál manda")
+        negativo = t[0] == "-"
+        t = t[1:]
 
-    # float() acepta cosas que en un extracto bancario no son un monto y que,
-    # si pasan, contaminan la base gravable sin dejar rastro:
-    #   "1.2.3"  → 123.0     (los puntos se borran y queda un número creíble)
-    #   "1e5"    → 100000.0
-    #   "nan"    → nan       y revienta más tarde, en Movimiento.convertir(),
-    #                        fuera del try/except, con un traceback sin nombre
-    #                        de archivo ni de línea
-    # Mejor fallar acá, donde se sabe qué archivo y qué fila.
-    if not _NUMERO_LIMPIO.fullmatch(t):
-        raise ValueError(
-            f"{texto!r} no es un monto reconocible. Después de normalizar quedó "
-            f"{t!r}, que no es un número decimal simple."
-        )
+    # [0-9] es ASCII a propósito: float() acepta dígitos árabes y de ancho
+    # completo, y "١٢٣" no es un monto que deba entrar callado a un ledger.
+    if not _TOKEN.fullmatch(t):
+        raise malo("solo se aceptan dígitos separados por un punto o una coma")
 
-    valor = float(t)
+    grupos = re.split(r"[.,]", t)
+    separadores = [c for c in t if c in ".,"]
+
+    if sep_decimal in (".", ","):
+        decimal = sep_decimal in separadores
+    elif "," in separadores and "." in separadores:
+        decimal = True                       # el último separador es el decimal
+    elif len(separadores) == 1:
+        # Un solo separador: es decimal salvo que deje exactamente tres
+        # dígitos detrás, que es la forma de un grupo de miles.
+        decimal = len(grupos[-1]) != 3
+    else:
+        decimal = False                      # varios separadores iguales: miles
+
+    if sep_decimal in (".", ",") and decimal:
+        # Con pista explícita, el decimal es el ÚLTIMO separador de ese tipo.
+        corte = t.rfind(sep_decimal)
+        entero, fraccion = t[:corte], t[corte + 1:]
+    elif decimal:
+        corte = max(t.rfind("."), t.rfind(","))
+        entero, fraccion = t[:corte], t[corte + 1:]
+    else:
+        entero, fraccion = t, ""
+
+    partes = [p for p in re.split(r"[.,]", entero) if p != ""] or ["0"]
+    if len(partes) > 1:
+        if len(partes[0]) > 3:
+            raise malo(f"el primer grupo de miles tiene {len(partes[0])} dígitos")
+        for p in partes[1:]:
+            if len(p) != 3:
+                raise malo(f"el grupo de miles {p!r} no tiene tres dígitos")
+
+    valor = float("".join(partes) + ("." + fraccion if fraccion else ""))
     return -valor if negativo else valor
 
 

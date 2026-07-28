@@ -356,13 +356,41 @@ def globs_ignorados(raiz: Path, estricto: bool) -> list[str]:
         g = linea.strip()
         if not g or g.startswith("#"):
             continue
-        # Un glob que ignora todo convertiría el escáner en un adorno.
-        if g in {"*", "**", "*.*", "**/*", ".", "./", "/"}:
-            print(f"⚠ {ARCHIVO_IGNORADOS}: se rechaza el glob '{g}'. "
-                  f"No se puede desactivar el escáner desde este archivo.")
-            continue
         globs.append(g)
     return globs
+
+
+# Si las exclusiones se comen más que esto del árbol, el archivo dejó de ser
+# una lista de excepciones y pasó a ser un interruptor de apagado.
+LIMITE_OMISION = 0.40
+
+
+def aplicar_ignorados(archivos: list[Path], globs: list[str]) -> tuple[list[Path], list[str]]:
+    """Filtra por los globs y rechaza los que apaguen el escáner.
+
+    Una lista literal de globs prohibidos (`*`, `**`, …) no protege nada:
+    `?*` o `[a-z]*` hacen exactamente lo mismo y no están en ninguna lista.
+    Se mide el EFECTO — cuántos archivos deja fuera cada glob — que es lo que
+    de verdad importa y no se puede rodear cambiando la sintaxis.
+    """
+    if not archivos or not globs:
+        return archivos, []
+
+    avisos = []
+    aceptados = []
+    for g in globs:
+        omitidos = sum(1 for a in archivos if esta_ignorado(a, [g]))
+        if omitidos > len(archivos) * LIMITE_OMISION:
+            avisos.append(
+                f"{ARCHIVO_IGNORADOS}: se RECHAZA el glob '{g}' — dejaría fuera "
+                f"{omitidos} de {len(archivos)} archivos ({omitidos / len(archivos):.0%}). "
+                f"Este archivo es para excepciones puntuales, no para apagar el escáner."
+            )
+            continue
+        aceptados.append(g)
+
+    restantes = [a for a in archivos if not esta_ignorado(a, aceptados)]
+    return restantes, avisos
 
 
 def esta_ignorado(ruta: Path, globs: list[str]) -> bool:
@@ -454,12 +482,13 @@ def main(argv=None) -> int:
     else:
         archivos = archivos_de(args.objetivos or ["."])
         globs = globs_ignorados(Path("."), args.estricto)
-        if globs:
-            antes = len(archivos)
-            archivos = [a for a in archivos if not esta_ignorado(a, globs)]
-            if antes - len(archivos):
-                print(f"({antes - len(archivos)} archivo(s) omitidos por "
-                      f"{ARCHIVO_IGNORADOS}; usa --estricto para incluirlos)")
+        antes = len(archivos)
+        archivos, avisos_globs = aplicar_ignorados(archivos, globs)
+        for aviso in avisos_globs:
+            print(f"⚠ {aviso}")
+        if antes - len(archivos):
+            print(f"({antes - len(archivos)} archivo(s) omitidos por "
+                  f"{ARCHIVO_IGNORADOS}; usa --estricto para incluirlos)")
         resultados = [(str(a), escanear(a, nombres)) for a in sorted(archivos)]
         resultados = [(r, h) for r, h in resultados if h]
         revisados = len(archivos)
@@ -505,7 +534,7 @@ def main(argv=None) -> int:
         return 1
 
     print(f"✓ Sin datos personales de confianza alta en {revisados} archivo(s).")
-    return 0 if not opacas else 0
+    return 0
 
 
 if __name__ == "__main__":

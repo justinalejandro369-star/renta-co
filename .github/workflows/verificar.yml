@@ -61,6 +61,23 @@ jobs:
 
       - name: El archivo de exclusiones no puede vaciar el escaneo
         run: |
-          set -e
-          ANTES=$(python3 scripts/escanear_privacidad.py --estricto . | tail -1)
-          echo "modo estricto: $ANTES"
+          set -euo pipefail
+          # Cuántos archivos ve el escáner con y sin exclusiones. Si las
+          # exclusiones se comen buena parte del árbol, dejaron de ser una
+          # lista de excepciones. El escáner ya lo rechaza por efecto; esto
+          # verifica que el rechazo sigue vivo.
+          CON=$(python3 scripts/escanear_privacidad.py . 2>&1 \
+                | grep -oE 'en [0-9]+ archivo' | grep -oE '[0-9]+' | head -1)
+          SIN=$(python3 scripts/escanear_privacidad.py --estricto . 2>&1 \
+                | grep -oE 'en [0-9]+ archivo' | grep -oE '[0-9]+' | head -1)
+          echo "archivos escaneados: $CON (normal) / $SIN (estricto)"
+          if [ -z "$CON" ] || [ -z "$SIN" ]; then
+            echo "✗ No se pudo leer el conteo de archivos escaneados." >&2
+            exit 1
+          fi
+          # Al menos el 80% de lo que ve el modo estricto.
+          MINIMO=$(( SIN * 8 / 10 ))
+          if [ "$CON" -lt "$MINIMO" ]; then
+            echo "✗ .privacidadignore está ocultando demasiado: $CON de $SIN." >&2
+            exit 1
+          fi

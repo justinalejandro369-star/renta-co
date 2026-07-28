@@ -71,7 +71,7 @@ def cmd_calcular(args) -> int:
     # pantalla, justo en el caso más frecuente —retenciones altas—.
     for i, ren in enumerate(a.renglones):
         rb = b.renglones[i]
-        if ren.concepto != rb.concepto:
+        if i == len(a.renglones) - 1:
             etiqueta = "= SALDO  (+ a pagar · − a favor)"
             va, vb = round(a.saldo), round(b.saldo)
         else:
@@ -84,8 +84,15 @@ def cmd_calcular(args) -> int:
     print(f"  Ruta más favorable      : RUTA {mejor} — {RUTAS[mejor]}")
     print(f"  Diferencia entre rutas  : {cop(r['diferencia_entre_rutas'])}")
     print(f"  Tarifa marginal         : {r['tarifa_marginal']:.0%}")
-    if a.dependientes_via != "sin dependientes":
-        print(f"  Vía de dependientes     : {a.dependientes_via}")
+    # La vía de dependientes puede diferir entre rutas. Reportar siempre la
+    # de A contradecía la tabla de arriba cuando ganaba B, y es la línea que
+    # alguien copia al formulario.
+    ganadora = r["rutas"][mejor]
+    if ganadora.dependientes_via != "sin dependientes":
+        print(f"  Vía de dependientes     : {ganadora.dependientes_via}")
+        otra = r["rutas"]["B" if mejor == "A" else "A"]
+        if otra.dependientes_via != ganadora.dependientes_via:
+            print(f"    (la otra ruta usaría: {otra.dependientes_via})")
 
     print()
     print(f"  Patrimonio bruto        : {cop(r['patrimonio_bruto'])}")
@@ -141,6 +148,20 @@ def cmd_calcular(args) -> int:
             print(f"   Fuente: {v['fuente']}")
         print()
 
+    # --- supuestos que deciden si este motor aplica --------------------
+    # Un perfil sin bloque [contribuyente] producía una liquidación completa
+    # de residente fiscal sin una sola advertencia: el supuesto se registraba
+    # y solo lo imprimía `verificar`, que casi nadie corre.
+    criticos = [x for x in r["supuestos"] if "DECIDE SI ESTE MOTOR APLICA" in x]
+    if criticos:
+        titulo("⚠ SUPUESTOS QUE DECIDEN SI ESTE CÁLCULO APLICA")
+        for x in criticos:
+            print(f"  · {x}")
+        print()
+        print("  No venían en el perfil y se asumieron. Si alguno está mal, el")
+        print("  resultado completo lo está: confírmalos antes de seguir.")
+        print()
+
     # --- lo que falta -------------------------------------------------
     if r["faltantes"]:
         titulo("LO QUE FALTA — ordenado por impacto potencial")
@@ -172,9 +193,13 @@ def _escribir_csv(destino: Path, a, b) -> None:
         w.writerow(["concepto", "ruta_A_costos", "ruta_B_exenta_25", "fuente"])
         for i, ren in enumerate(a.renglones):
             rb = b.renglones[i]
-            if ren.concepto != rb.concepto:
-                # Signo explícito: el CSV lo lee un contador, y "SALDO A
-                # PAGAR 6.704.873" cuando son a favor es un error caro.
+            if i == len(a.renglones) - 1:
+                # El último renglón es SIEMPRE el saldo, con signo explícito
+                # y la misma etiqueta pase lo que pase. Una versión anterior
+                # solo usaba el signo cuando las dos rutas divergían, así que
+                # la misma columna significaba una cosa u otra según el
+                # perfil: quien lo leyera con un script sumaba un saldo a
+                # favor como si fuera a pagar.
                 w.writerow(["= SALDO (positivo a pagar, negativo a favor)",
                             round(a.saldo), round(b.saldo), ren.fuente])
             else:
@@ -232,7 +257,17 @@ def cmd_importar(args) -> int:
         print("\nNo se importó ningún movimiento.")
         return 1
 
-    anio = args.anio or PF.cargar(exp).anio_gravable if (exp / "perfil.toml").exists() else args.anio
+    # El propósito de `importar` es CONSTRUIR los datos que llenan el perfil,
+    # así que no puede exigir que el perfil ya exista ni que parsee. Si está
+    # y sirve, se usa su año; si no, se sigue sin filtrar y se avisa.
+    anio = args.anio
+    if anio is None and (exp / "perfil.toml").exists():
+        try:
+            anio = PF.cargar(exp).anio_gravable
+        except (ValueError, OSError) as e:
+            print(f"\n⚠ No se pudo leer perfil.toml para saber el año gravable "
+                  f"({e.__class__.__name__}). Se importa todo sin filtrar; pasa "
+                  f"--anio si quieres acotarlo.")
     if anio:
         antes = len(ledger.movimientos)
         ledger = ledger.filtrar_anio(anio)

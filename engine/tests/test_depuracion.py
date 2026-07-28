@@ -488,3 +488,89 @@ class TestEtiquetaDelSaldo(unittest.TestCase):
             L = liquidar(p, self.par, ruta)
             self.assertLess(L.saldo, 0)
             self.assertGreater(L.renglones[-1].valor, 0)
+
+
+class TestRegresionesDeLaAuditoria(unittest.TestCase):
+    """Casos que una auditoría adversarial encontró rotos. Fijados acá para
+    que no vuelvan en silencio."""
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+
+    def _perfil(self, **secciones):
+        base = {"contribuyente": {"anio_gravable": 2025, "residente_fiscal": True}}
+        for k, v in secciones.items():
+            base.setdefault(k, {}).update(v)
+        d, sup = PF._completar(base)
+        return PF.Perfil(d, None, sup)
+
+    def test_parse_monto_rechaza_montos_malformados(self):
+        """El regex validaba DESPUÉS de borrar los separadores, así que
+        '1.2.3' llegaba convertido en '123' y pasaba como ciento veintitrés."""
+        for basura in ("1.2.3", "1..2", "1.2.3.4", "12,34,567", "1e5",
+                       "nan", "inf", "1_000", "(-1.234)", "١٢٣", "１２３"):
+            with self.assertRaises(ValueError, msg=f"{basura!r} debería fallar"):
+                parse_monto(basura)
+
+    def test_parse_monto_sigue_aceptando_lo_valido(self):
+        self.assertEqual(parse_monto("1.234.567"), 1_234_567)
+        self.assertEqual(parse_monto("3800.00"), 3800.0)
+        self.assertEqual(parse_monto("1.234"), 1234)
+        self.assertEqual(parse_monto("1.234,56"), 1234.56)
+        self.assertEqual(parse_monto("1,234.56"), 1234.56)
+        self.assertEqual(parse_monto("(2.000,00)"), -2000.0)
+        self.assertEqual(parse_monto("1.234.567,89", sep_decimal=","), 1_234_567.89)
+
+    def test_deel_sin_moneda_no_cae_al_generico(self):
+        """El respaldo genérico anulaba la guarda de moneda: un export de
+        Deel sin columna de moneda se leía como COP, o sea 3.800 USD como
+        3.800 pesos."""
+        import tempfile
+
+        from engine import adapters
+
+        d = Path(tempfile.mkdtemp())
+        ruta = d / "deel-payments.csv"
+        ruta.write_text("Date,Type,Amount\n2025-03-14,invoice,3800.00\n",
+                        encoding="utf-8")
+        with self.assertRaises(ValueError) as ctx:
+            adapters.importar(ruta)
+        self.assertIn("moneda", str(ctx.exception))
+
+    def test_una_sola_palanca_de_dependientes(self):
+        """Cuatro filas con la misma cifra invitaban a sumarlas, y el valor
+        marginal del 2º al 4º dependiente es cero cuando gana la vía del
+        10%, que no depende de cuántos sean."""
+        r = comparar(self._perfil(
+            ingresos={"rentas_trabajo_honorarios": 200_000_000}), self.par)
+        filas = [p for p in r["sensibilidad"] if "dependiente" in p.etiqueta]
+        self.assertEqual(len(filas), 1, f"debería haber una sola fila: {filas}")
+
+    def test_via_de_dependientes_reportada_es_la_de_la_ruta_ganadora(self):
+        """El resumen tomaba siempre la de la Ruta A y contradecía su propia
+        tabla cuando ganaba la B."""
+        p = self._perfil(
+            ingresos={"rentas_trabajo_honorarios": 100_000_000},
+            costos={"otros": 5_000_000},
+            deducciones={"aportes_voluntarios": 25_000_000, "dependientes": 1},
+        )
+        r = comparar(p, self.par)
+        ganadora = r["rutas"][r["mejor_ruta"]]
+        self.assertIn(ganadora.dependientes_via,
+                      ("72 UVT por dependiente (fuera del tope)",
+                       "10% de la renta de trabajo (dentro del tope)"))
+        # El objeto de la ruta ganadora es la fuente de verdad; el CLI lo lee
+        # de ahí y no de la Ruta A.
+        self.assertIs(ganadora, r["rutas"][r["mejor_ruta"]])
+
+    def test_el_saldo_es_siempre_el_ultimo_renglon(self):
+        """El CLI y el CSV identifican la fila del saldo por posición."""
+        for ret in (0, 8_322_360, 900_000_000):
+            p = self._perfil(
+                ingresos={"rentas_trabajo_honorarios": 130_000_000},
+                costos={"otros": 40_000_000},
+                anticipos={"retenciones_practicadas": ret},
+            )
+            for ruta in ("A", "B"):
+                L = liquidar(p, self.par, ruta)
+                self.assertIn("SALDO", L.renglones[-1].concepto)

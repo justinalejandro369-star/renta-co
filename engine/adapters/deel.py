@@ -115,8 +115,11 @@ def importar(ruta: Path) -> list[Movimiento]:
         if not c_moneda:
             # Solo puede pasar si el archivo se llama "deel-algo.csv" y no trae
             # columna de moneda. Suponer USD acá cambiaría el ingreso por un
-            # factor de ~4.000: mejor fallar y preguntar.
-            raise ValueError(
+            # factor de ~4.000, y dejar que el genérico lo tome como COP hace
+            # lo mismo al revés. Se corta el respaldo: hay que preguntar.
+            from . import ErrorSinRespaldo
+
+            raise ErrorSinRespaldo(
                 f"{ruta.name} se identificó como export de Deel pero no trae "
                 f"columna de moneda. No se supone USD: agrégala al CSV, o "
                 f"renombra el archivo para que lo tome el adaptador genérico."

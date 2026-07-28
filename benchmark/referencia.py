@@ -1,19 +1,34 @@
 """Implementación de REFERENCIA de la depuración — independiente del motor.
 
 Escrita directamente desde el Estatuto Tributario, sin importar nada de
-`engine/`, con estilo deliberadamente literal y sin optimizaciones. Su único
-propósito es servir de segunda opinión: si `engine/depuracion.py` y este
-archivo producen números distintos para el mismo caso, uno de los dos está
-mal y hay que averiguar cuál.
+`engine/`. Su único propósito es ser una segunda opinión: si esto y
+`engine/depuracion.py` producen números distintos para el mismo caso, uno de
+los dos está mal y hay que averiguar cuál.
 
-Esto es *differential testing*. Vale más que un test que compara la salida
-del motor contra una constante que salió del propio motor: para que un error
-pase desapercibido tendría que aparecer idéntico en dos implementaciones
-escritas por separado.
+POR QUÉ ESTÁ ESCRITA COMO ESTÁ
+──────────────────────────────
+Este archivo ya falló una vez, y de la forma en que fallan las segundas
+opiniones: se escribió reproduciendo la misma estructura y el mismo
+malentendido que el motor, así que la capa diferencial encontró dos
+implementaciones de acuerdo — y equivocadas — sobre el tope de la renta
+exenta. El error solo lo atrapó un ancla calculada a mano.
 
-Las constantes están escritas a mano acá A PROPÓSITO. No se leen de
-knowledge/parametros.toml: si ese archivo tuviera una cifra equivocada, leerla
-desde ambos lados haría que el error se cancelara y el test pasara.
+Para que sea de verdad una segunda opinión y no una transcripción, acá:
+
+1. **Las constantes están escritas a mano**, no leídas de
+   `knowledge/parametros.toml`. Leerlas de ahí haría que una cifra
+   equivocada en ese archivo se cancelara entre ambas implementaciones.
+
+2. **La estructura de control es distinta.** El motor evalúa dos
+   combinaciones de dependientes con una función interna que recibe los dos
+   montos. Acá se ENUMERAN escenarios completos como diccionarios y se
+   liquida cada uno de principio a fin con la misma rutina lineal. Es más
+   lento y más verboso a propósito: un error de estructura en un lado no
+   tiene cómo aparecer igual en el otro.
+
+3. **La depuración es secuencial y literal**, en el orden en que la lee el
+   art. 336: ingresos, INCRNGO, costos o exención, deducciones, tope, y
+   deducciones fuera del tope.
 
 Fuente de cada constante: Estatuto Tributario, año gravable 2025.
 """
@@ -41,19 +56,19 @@ EXENTA_PCT = 0.25                 # art. 206 num. 10
 # 240 UVT (Ley 1607 de 2012) por este. El texto viejo sigue circulando en
 # blogs de contadores y sobreestima la exención en 3,6 veces.
 EXENTA_TOPE_UVT = 790
-DEP_UVT = 72                      # art. 336 par. (Ley 2277/2022 art. 7)
+DEP_UVT = 72                      # art. 336 num. 3 inciso 2 (Ley 2277/2022 art. 7)
 DEP_MAX = 4
 DEP_10_PCT = 0.10                 # art. 387
 DEP_10_TOPE_UVT = 32 * 12
 VIVIENDA_TOPE_UVT = 1_200         # art. 119
-PREPAGADA_TOPE_UVT = 16 * 12      # art. 387 num. 1
+PREPAGADA_TOPE_UVT = 16 * 12      # art. 387 inciso 2 lit. a) y b)
 VOLUNTARIOS_PCT = 0.30            # arts. 126-1 y 126-4
 VOLUNTARIOS_TOPE_UVT = 3_800
 GMF_PCT = 0.50                    # art. 115
-FE_PCT = 0.01                     # art. 336 par. 4
+FE_PCT = 0.01                     # art. 336 num. 5
 FE_TOPE_UVT = 240
 DONACION_PCT = 0.25               # art. 257
-DONACION_TOPE_IMPUESTO_PCT = 0.25
+DONACION_TOPE_IMPUESTO_PCT = 0.25 # art. 258
 
 
 def impuesto(base_pesos: float) -> int:
@@ -70,25 +85,32 @@ def impuesto(base_pesos: float) -> int:
     return 0
 
 
-def liquidar(caso: dict, ruta: str) -> dict:
-    """Depuración de la cédula general. `caso` usa las mismas llaves que el
-    perfil.toml del motor, aplanadas con punto."""
+def _topar(valor: float, tope: float) -> float:
+    return valor if valor < tope else tope
 
-    def v(clave, defecto=0):
-        return caso.get(clave, defecto)
 
+def _liquidar_escenario(c: dict, ruta: str, escenario: dict) -> dict:
+    """Depuración completa, de arriba abajo, para UN escenario ya fijado.
+
+    `escenario` dice cuánto de dependientes va dentro del tope conjunto y
+    cuánto queda fuera. Acá no se decide nada: se liquida lo que llega.
+    """
+    def v(clave):
+        return c.get(clave, 0)
+
+    # 1. Ingresos de la cédula general.
     trabajo = v("ingresos.rentas_trabajo_honorarios")
-    capital = v("ingresos.rentas_capital")
-    otras = v("ingresos.otras_rentas_no_laborales")
-    brutos = trabajo + capital + otras
+    ingresos = (trabajo
+                + v("ingresos.rentas_capital")
+                + v("ingresos.otras_rentas_no_laborales"))
 
+    # 2. Ingresos no constitutivos de renta.
     incrngo = (v("incrngo.aportes_obligatorios_salud_pension")
                + v("incrngo.componente_inflacionario")
                + v("incrngo.otros"))
+    netos = ingresos - incrngo
 
-    netos = brutos - incrngo
-
-    costos = 0
+    # 3. Costos y gastos — solo en la ruta que los eligió.
     if ruta == "A":
         costos = (v("costos.pagos_a_contratistas")
                   + v("costos.comisiones_plataforma")
@@ -96,81 +118,107 @@ def liquidar(caso: dict, ruta: str) -> dict:
                   + v("costos.internet_software")
                   + v("costos.arriendo_oficina")
                   + v("costos.otros"))
-
-    gmf = v("deducciones.gmf_pagado") * GMF_PCT
-    vivienda = min(v("deducciones.intereses_vivienda"), VIVIENDA_TOPE_UVT * UVT)
-    prepagada = min(v("deducciones.medicina_prepagada"), PREPAGADA_TOPE_UVT * UVT)
-    voluntarios = min(v("deducciones.aportes_voluntarios"),
-                      brutos * VOLUNTARIOS_PCT,
-                      VOLUNTARIOS_TOPE_UVT * UVT)
-    dentro_fijo = gmf + vivienda + prepagada + voluntarios
-
-    fe = min(v("deducciones.compras_con_factura_electronica") * FE_PCT,
-             FE_TOPE_UVT * UVT)
-
-    n_dep = int(v("deducciones.dependientes"))
-    dep_72 = min(n_dep, DEP_MAX) * DEP_UVT * UVT
-    dep_10 = 0.0
-    if n_dep > 0:
-        dep_10 = min(trabajo * DEP_10_PCT, DEP_10_TOPE_UVT * UVT)
-
-    tope = max(min(netos * TOPE_CONJUNTO_PCT, TOPE_CONJUNTO_UVT * UVT), 0)
-
-    def evaluar(extra_dentro: float, extra_fuera: float):
-        deducciones = dentro_fijo + extra_dentro
-
-        # Art. 206 num. 10 inciso 2: la base de la exención se obtiene «una
-        # vez se detraiga del valor total de los pagos laborales los ingresos
-        # no constitutivos de renta, las deducciones y las rentas exentas
-        # diferentes a la establecida en el presente numeral».
-        exenta = 0.0
-        if ruta == "B":
-            base = trabajo - incrngo - deducciones - extra_fuera - fe
-            if base < 0:
-                base = 0
-            exenta = min(base * EXENTA_PCT, EXENTA_TOPE_UVT * UVT)
-
-        solicitado = deducciones + exenta
-        aplicado = min(solicitado, tope)
-        rl = netos - costos - aplicado - extra_fuera - fe
-        if rl < 0:
-            rl = 0
-        return rl, impuesto(rl), solicitado - aplicado, aplicado, exenta
-
-    if n_dep > 0:
-        via_72 = evaluar(0.0, dep_72)
-        via_10 = evaluar(dep_10, 0.0)
-        elegida, via = (via_72, "72") if via_72[1] <= via_10[1] else (via_10, "10")
     else:
-        elegida, via = evaluar(0.0, 0.0), "sin"
+        costos = 0
 
-    renta_liquida, imp, rechazado, aplicado, exenta = elegida
+    # 4. Deducciones con tope individual.
+    deducciones = 0.0
+    deducciones += v("deducciones.gmf_pagado") * GMF_PCT
+    deducciones += _topar(v("deducciones.intereses_vivienda"), VIVIENDA_TOPE_UVT * UVT)
+    deducciones += _topar(v("deducciones.medicina_prepagada"), PREPAGADA_TOPE_UVT * UVT)
+    voluntarios = v("deducciones.aportes_voluntarios")
+    voluntarios = _topar(voluntarios, ingresos * VOLUNTARIOS_PCT)
+    voluntarios = _topar(voluntarios, VOLUNTARIOS_TOPE_UVT * UVT)
+    deducciones += voluntarios
+    deducciones += escenario["dependientes_dentro"]
 
-    donado = v("descuentos.donaciones_certificadas_rte")
-    descuento = min(donado * DONACION_PCT, imp * DONACION_TOPE_IMPUESTO_PCT)
+    # 5. Deducciones que quedan FUERA del tope conjunto.
+    fuera = escenario["dependientes_fuera"]
+    fuera += _topar(v("deducciones.compras_con_factura_electronica") * FE_PCT,
+                    FE_TOPE_UVT * UVT)
+
+    # 6. Renta exenta del 25%, solo en la ruta B.
+    #    Art. 206 num. 10 inciso 2: se calcula «una vez se detraiga del valor
+    #    total de los pagos laborales los ingresos no constitutivos de renta,
+    #    las deducciones y las rentas exentas diferentes a la establecida en
+    #    el presente numeral».
+    if ruta == "B":
+        base_exenta = trabajo - incrngo - deducciones - fuera
+        if base_exenta < 0:
+            base_exenta = 0
+        exenta = _topar(base_exenta * EXENTA_PCT, EXENTA_TOPE_UVT * UVT)
+    else:
+        exenta = 0.0
+
+    # 7. Tope conjunto del art. 336 num. 3.
+    tope = _topar(netos * TOPE_CONJUNTO_PCT, TOPE_CONJUNTO_UVT * UVT)
+    if tope < 0:
+        tope = 0.0
+    solicitado = deducciones + exenta
+    aplicado = _topar(solicitado, tope)
+
+    # 8. Renta líquida gravable.
+    renta_liquida = netos - costos - aplicado - fuera
+    if renta_liquida < 0:
+        renta_liquida = 0.0
+
+    # 9. Impuesto y descuentos.
+    imp = impuesto(renta_liquida)
+    descuento = _topar(
+        v("descuentos.donaciones_certificadas_rte") * DONACION_PCT,
+        imp * DONACION_TOPE_IMPUESTO_PCT,
+    )
     neto = imp - descuento
     if neto < 0:
-        neto = 0
+        neto = 0.0
 
     saldo = (neto
              - v("anticipos.retenciones_practicadas")
              - v("anticipos.saldo_a_favor_anio_anterior"))
 
     return {
-        "ingresos_brutos": brutos,
+        "ingresos_brutos": ingresos,
         "ingresos_netos": netos,
         "costos": costos,
+        "renta_exenta_aplicada": exenta,
         "tope_conjunto": tope,
         "aplicado": aplicado,
-        "rechazado": rechazado,
-        "renta_exenta_aplicada": exenta,
+        "rechazado": solicitado - aplicado,
         "renta_liquida": round(renta_liquida),
         "impuesto": imp,
         "descuento_donaciones": round(descuento),
         "impuesto_neto": round(neto),
         "saldo": round(saldo),
-        "via_dependientes": via,
+        "via_dependientes": escenario["via"],
     }
+
+
+def _escenarios(c: dict) -> list[dict]:
+    """Las combinaciones de dependientes que la norma permite.
+
+    Son excluyentes: o se toman las 72 UVT por dependiente (art. 336 num. 3
+    inciso 2, fuera del tope conjunto) o el 10% de la renta de trabajo
+    (art. 387, dentro del tope). Se enumeran las dos como escenarios
+    completos y después se elige; el motor lo resuelve con otra estructura.
+    """
+    n = int(c.get("deducciones.dependientes", 0))
+    if n <= 0:
+        return [{"via": "sin", "dependientes_dentro": 0.0, "dependientes_fuera": 0.0}]
+
+    trabajo = c.get("ingresos.rentas_trabajo_honorarios", 0)
+    por_72 = min(n, DEP_MAX) * DEP_UVT * UVT
+    por_10 = _topar(trabajo * DEP_10_PCT, DEP_10_TOPE_UVT * UVT)
+
+    return [
+        {"via": "72", "dependientes_dentro": 0.0, "dependientes_fuera": por_72},
+        {"via": "10", "dependientes_dentro": por_10, "dependientes_fuera": 0.0},
+    ]
+
+
+def liquidar(caso: dict, ruta: str) -> dict:
+    """Liquida todos los escenarios y devuelve el de menor impuesto."""
+    resultados = [_liquidar_escenario(caso, ruta, e) for e in _escenarios(caso)]
+    return min(resultados, key=lambda r: r["impuesto"])
 
 
 def comparar(caso: dict) -> dict:

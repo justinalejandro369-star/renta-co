@@ -27,25 +27,83 @@ if ! command -v "$PY" >/dev/null 2>&1; then
     exit 1
 fi
 
-VERSION_OK=$("$PY" -c 'import sys; print(sys.version_info >= (3, 11) and ".".join(map(str, sys.version_info[:3])) or "")' 2>/dev/null) || VERSION_OK=""
-if [ -z "$VERSION_OK" ]; then
+# Se compara contra un token propio: verificar solo que el comando "produjo
+# salida" dejaba pasar cosas como /bin/echo, que imprime sus argumentos y
+# hacía que el lanzador terminara en 0 sin ejecutar nada.
+VERSION_OK=$("$PY" -c 'import sys; print("RENTA_CO_OK" if sys.version_info >= (3, 11) else "")' 2>/dev/null) || VERSION_OK=""
+if [ "$VERSION_OK" != "RENTA_CO_OK" ]; then
     echo "✗ '$PY' no es un Python 3.11 o superior utilizable." >&2
     echo "  El motor usa tomllib, que es stdlib desde 3.11." >&2
     echo "  Exporta RENTA_CO_PYTHON con la ruta a un intérprete válido." >&2
     exit 1
 fi
 
-# El escáner de privacidad es un script suelto; el resto va por el CLI.
-if [ "$1" = "privacidad" ]; then
-    shift
-    exec "$PY" "$RAIZ/scripts/escanear_privacidad.py" "$@"
-fi
+# El lanzador hace `cd` a la raíz del repo para poder importar el paquete
+# `engine`. Eso cambia el significado de cualquier ruta relativa que venga
+# del usuario — incluido el `--expediente ./expediente` por defecto, que
+# apuntaría al expediente DEL REPO en vez de al del usuario. Como
+# `expediente/` está en .gitignore, ese es un sitio plausible para datos
+# reales: se podría liquidar el expediente equivocado en silencio.
+#
+# Por eso las rutas se resuelven contra el directorio donde se invocó el
+# lanzador, ANTES del cd.
+ORIGEN=$(pwd)
 
-if [ "$1" = "benchmark" ]; then
-    shift
-    cd "$RAIZ"
-    exec "$PY" -m benchmark.correr "$@"
-fi
+absolutizar() {
+    case "$1" in
+        /*) printf '%s' "$1" ;;
+        *)  printf '%s/%s' "$ORIGEN" "$1" ;;
+    esac
+}
+
+SUBCOMANDO=$1
+[ $# -gt 0 ] && shift
+
+ARGS=""
+ESPERA_RUTA=0
+for arg in "$@"; do
+    if [ "$ESPERA_RUTA" = "1" ]; then
+        arg=$(absolutizar "$arg")
+        ESPERA_RUTA=0
+    elif [ "$arg" = "--expediente" ] || [ "$arg" = "--perfil" ]; then
+        ESPERA_RUTA=1
+    elif [ "$SUBCOMANDO" = "privacidad" ]; then
+        case "$arg" in
+            -*) : ;;
+            *) arg=$(absolutizar "$arg") ;;
+        esac
+    fi
+    ARGS="$ARGS
+$arg"
+done
+
+# Si el subcomando trabaja sobre un expediente y el usuario no pasó
+# --expediente, se inyecta el del directorio DESDE DONDE INVOCÓ, no el del
+# repo. El default de argparse es "./expediente" y se resolvería después del
+# cd, apuntando al expediente del propio repositorio.
+case "$SUBCOMANDO" in
+    calcular|importar|verificar)
+        if [ "$ESPERA_RUTA" = "0" ] && ! printf '%s' "$ARGS" | grep -q -- '--expediente'; then
+            ARGS="$ARGS
+--expediente
+$ORIGEN/expediente"
+        fi
+        ;;
+esac
+
+# Reconstruir los argumentos preservando espacios en las rutas.
+OLDIFS=$IFS
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $ARGS
+IFS=$OLDIFS
 
 cd "$RAIZ"
-exec "$PY" -m engine.cli "$@"
+
+case "$SUBCOMANDO" in
+    privacidad) exec "$PY" "$RAIZ/scripts/escanear_privacidad.py" "$@" ;;
+    benchmark)  exec "$PY" -m benchmark.correr "$@" ;;
+    "")         exec "$PY" -m engine.cli ;;
+    *)          exec "$PY" -m engine.cli "$SUBCOMANDO" "$@" ;;
+esac

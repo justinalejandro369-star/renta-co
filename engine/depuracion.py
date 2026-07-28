@@ -358,15 +358,32 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         )
 
     # --- dependientes ---------------------------------------------------
+    # Una sola fila, no una por cada cantidad. Como el motor elige entre la
+    # vía de 72 UVT y la del 10% —y la del 10% no depende del número—, con
+    # frecuencia el 2º, 3º y 4º dependiente valen exactamente lo mismo que el
+    # primero. Cuatro filas con la misma cifra en una tabla titulada "cuánto
+    # vale cada palanca" invitan a sumarlas, y el valor marginal es cero.
     actuales = int(p.get("deducciones.dependientes"))
     max_dep = par.exigir("topes.dependientes_72uvt.maximo_dependientes")
-    for n in range(actuales + 1, max_dep + 1):
+    if actuales < max_dep:
+        por_cantidad = {}
+        for n in range(actuales + 1, max_dep + 1):
+            alt = p.copia_con(deducciones__dependientes=n)
+            por_cantidad[n] = max(base_a - _saldo(alt, par, "A"),
+                                  base_b - _saldo(alt, par, "B"))
+        mejor_ahorro = max(por_cantidad.values())
+        # La cantidad MÍNIMA que alcanza el máximo: perseguir soportes de más
+        # no aporta nada y cuesta trámites.
+        suficientes = min(n for n, v in por_cantidad.items() if v == mejor_ahorro)
+        extra = (f" Acreditar más de {suficientes} no agrega nada: la vía que "
+                 f"gana en tu caso no depende de cuántos sean."
+                 if suficientes < max_dep else "")
         probar(
-            f"Acreditar {n} dependiente(s) — hoy tienes {actuales}",
-            {"deducciones__dependientes": n},
+            f"Acreditar {suficientes} dependiente(s) — hoy tienes {actuales}",
+            {"deducciones__dependientes": suficientes},
             "FUERA del tope del 40%. No exige factura ni desembolso: se acredita "
             "la condición. Padres y hermanos con ingresos anuales < 260 UVT "
-            "cuentan; hijos estudiando, hasta los 25 (Ley 2411 de 2024).",
+            "cuentan; hijos estudiando, hasta los 25 (Ley 2411 de 2024)." + extra,
             tipo=CONDICION,
         )
 
@@ -492,7 +509,9 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
 
     # Con el perfil a medias, "NO obligado" es el titular más peligroso que
     # puede dar esta herramienta: alguien lo lee, no declara, y la sanción por
-    # extemporaneidad corre. Solo se afirma si están los cuatro insumos.
+    # extemporaneidad corre. Solo se afirma si están los tres insumos que el
+    # perfil sí modela; los otros dos umbrales (consumos con tarjeta y compras
+    # totales) no están en el perfil y por eso el mensaje los nombra aparte.
     faltan_insumos = [
         etiqueta for valor, etiqueta in (
             (p.ingresos_brutos, "ingresos"),

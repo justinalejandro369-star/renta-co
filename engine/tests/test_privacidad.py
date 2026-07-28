@@ -170,13 +170,29 @@ class TestRepositorio(unittest.TestCase):
         self.assertEqual(sucios, [], f"PII en el repositorio: {sucios}")
 
     def test_privacidadignore_no_puede_desactivar_el_escaner(self):
-        """Un PR con una línea '*' no puede poner CI en verde."""
-        import tempfile as _tf
-        with _tf.TemporaryDirectory() as d:
-            raiz = Path(d)
-            (raiz / esc.ARCHIVO_IGNORADOS).write_text("*\n**\nfoo.md\n")
-            globs = esc.globs_ignorados(raiz, estricto=False)
-            self.assertEqual(globs, ["foo.md"])
+        """Un PR no puede poner CI en verde vaciando el escaneo.
+
+        La primera versión rechazaba una lista literal de globs ('*', '**',
+        …). No protegía nada: '?*' y '[a-z]*' hacen exactamente lo mismo y no
+        estaban en ninguna lista. Ahora se rechaza por EFECTO —cuántos
+        archivos deja fuera cada glob— que es lo que importa y no se puede
+        rodear cambiando la sintaxis.
+        """
+        archivos = [Path(f"dir/archivo{i}.md") for i in range(10)]
+
+        for glob in ("*", "**", "?*", "[a-zA-Z0-9._-]*", "*[!x]*", "*.md"):
+            quedan, avisos = esc.aplicar_ignorados(archivos, [glob])
+            self.assertEqual(len(quedan), len(archivos),
+                             f"el glob {glob!r} vació el escaneo")
+            self.assertTrue(avisos, f"el glob {glob!r} no produjo aviso")
+            self.assertIn("RECHAZA", avisos[0])
+
+    def test_privacidadignore_si_permite_excepciones_puntuales(self):
+        """Lo que sí es su propósito: dejar fuera unos pocos archivos."""
+        archivos = [Path(f"dir/archivo{i}.md") for i in range(10)]
+        quedan, avisos = esc.aplicar_ignorados(archivos, ["dir/archivo3.md"])
+        self.assertEqual(len(quedan), 9)
+        self.assertEqual(avisos, [])
 
     def test_modo_estricto_ignora_el_archivo_de_exclusiones(self):
         self.assertEqual(esc.globs_ignorados(RAIZ, estricto=True), [])
