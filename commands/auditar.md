@@ -5,9 +5,11 @@ argument-hint: "[--anio 2025]"
 
 Corre el motor y presenta el resultado. Argumentos: $ARGUMENTS
 
+Si el usuario pasó `--anio N`, agrégalo a AMBOS comandos como `--anio N`. Si no, no pases nada y el motor toma el año del perfil.
+
 ```bash
 "$RAIZ/bin/renta" verificar --expediente "$PWD/expediente"
-"$RAIZ/bin/renta" calcular  --expediente "$PWD/expediente" --csv
+"$RAIZ/bin/renta" calcular  --expediente "$PWD/expediente" --csv $ANIO
 ```
 
 Presenta la salida en este orden, que es el orden en que le importa a la

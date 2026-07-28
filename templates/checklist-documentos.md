@@ -27,10 +27,15 @@ consignaciones de 3.500 UVT.
 
 ## 🟠 Alto impacto — dinero directo
 
-### 5. {{Soporte de dependientes}} — vale **{{$X}}**
+### 5. {{Soporte de dependientes}} — ahorra **{{$X}} de impuesto**
 {{Certificado de estudio / registro civil / declaración de dependencia}}.
 72 UVT por dependiente, **fuera del tope del 40%**, sin factura ni desembolso.
 Se resuelve con {{una llamada / un trámite de X minutos}}.
+
+> Cuidado al citar cifras: 72 UVT = $3.585.528 es **base deducida**, no
+> impuesto ahorrado. A una tarifa marginal del 19–28% eso son $680.000 a
+> $1.000.000 de impuesto. El número que va en esta lista es el de la tabla de
+> sensibilidad, que ya es impuesto.
 
 ### 6. {{Planillas PILA del año}} — vale **{{$X}}**
 Son INCRNGO: restan antes del tope del 40% y no lo consumen.

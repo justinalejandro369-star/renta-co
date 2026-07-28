@@ -14,9 +14,11 @@ python3 -m engine.cli calcular --expediente expediente.ejemplo
 
 ## Qué mirar
 
-**1. La Ruta A gana, pero la elección de ruta no es lo importante.**
-Mira la tabla de sensibilidad: hay palancas que valen más que la diferencia
-entre rutas, y ninguna exige elegir nada — solo conseguir un papel.
+**1. La Ruta A gana, y acá sí por un margen que importa.**
+La diferencia entre rutas supera a cualquier palanca individual — no siempre
+es así, y por eso el motor las calcula todas en vez de asumir. Fíjate en que
+la tabla separa lo que solo exige un papel de lo que exige desembolsar: las
+dos palancas más grandes de este caso cuestan más de lo que ahorran.
 
 **2. La vía de dependientes que escoge el motor.**
 Con un dependiente y el tope del 40% sin saturar, gana la deducción del 10%

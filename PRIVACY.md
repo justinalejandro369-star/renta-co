@@ -17,10 +17,16 @@ Exactamente dos cosas, y ninguna lleva datos tuyos:
 
 | Qué | A dónde | Qué se envía |
 |---|---|---|
-| Serie TRM diaria | `datos.gov.co` (Banco de la República, dato público) | Un rango de fechas. Nada más |
+| Serie TRM diaria | `datos.gov.co` (Banco de la República, dato público) | Un rango de fechas — y hay que decir cuál: son **las fechas del primer y del último movimiento en moneda extranjera de tu ledger**. En corridas incrementales, los días nuevos. Como toda petición HTTP, también llega tu IP |
 | Consulta de normativa | El buscador o sitio que use tu agente, solo cuando se lo pides | El término de búsqueda |
 
 La TRM se cachea en `expediente/02-datos/trm-cache.csv` después de la primera descarga. Si prefieres cero red, descarga la serie una vez y ponla ahí a mano: `/renta-co:setup --sin-red` te explica cómo.
+
+## Qué garantiza el CI
+
+El repositorio corre un escaneo en cada push y en cada PR: sobre el árbol de trabajo y sobre las líneas que el PR agrega a la historia, porque agregar un dato en un commit y borrarlo en el siguiente dejaba el árbol limpio y el dato vivo para siempre.
+
+Lo que eso **no** garantiza: que el escáner detecte todo (ver sus límites arriba), ni nada sobre archivos en formatos que no sabe abrir. Es una red mecánica que evita el descuido más común, no una prueba de ausencia.
 
 ## Qué NO hay
 
@@ -45,22 +51,23 @@ Qué puedes hacer al respecto:
 
 ## Protecciones incluidas
 
-**`.gitignore` generado en el setup.** `/renta-co:setup` escribe estas reglas en tu proyecto antes de crear un solo archivo:
+**`.gitignore` generado en el setup.** `/renta-co:setup` escribe las reglas en tu proyecto antes de crear un solo archivo. Cubren `expediente/` y sus variantes de nombre, `perfil.toml`, los formatos de soporte y los CSV.
 
-```
-expediente/
-perfil.toml
-*.pdf
-*.xlsx
-*.zip
-ledger*.csv
-```
+Lo que **no** cubre, y conviene saberlo: si guardas tu expediente en una carpeta con un nombre que no se parezca a ninguno de los patrones, no queda protegido. Corre `/renta-co:privacidad` antes de commitear y no dependas solo del `.gitignore`.
 
-**Skill `renta-privacidad`.** Escanea cualquier salida antes de que la compartas y detecta cédulas, NIT, números de cuenta, nombres tomados de tu `perfil.toml`, direcciones y correos. Reporta archivo y línea. Úsala antes de mandarle algo a tu contador por correo, o antes de pegar un fragmento en un issue.
+**Skill `renta-privacidad`.** Escanea texto y detecta cédulas, NIT, cuentas, tarjetas, correos, teléfonos, direcciones, rutas de usuario y los nombres propios de tu `perfil.toml`. Reporta archivo y línea, siempre enmascarado.
 
-**Hook pre-commit opcional.** `/renta-co:setup --con-hooks` instala un hook que bloquea el commit si detecta esos patrones. Es opcional porque un hook que la gente no entiende termina desactivado.
+Sus límites, dichos de frente:
+
+- **Es una heurística, no una garantía.** Un identificador escrito de una forma que no previmos puede pasar. Clasifica en confianza alta y baja para no ahogarte en falsos positivos, y solo la alta bloquea un commit.
+- **No lee PDF, XLSX ni DOCX.** Los reporta como *no escaneados* en vez de omitirlos en silencio, pero revisarlos es tuyo — y son justo los formatos que el onboarding te pide soltar.
+- Úsalo como red de seguridad, no como permiso para dejar de mirar.
+
+**Hook pre-commit opcional.** `/renta-co:setup --con-hooks` instala un hook que lee los **blobs del índice** —no el archivo en disco— y bloquea el commit si encuentra algo de confianza alta. Es opcional porque un hook que la gente no entiende termina desactivado con `--no-verify`, y eso es peor que no tenerlo.
 
 **`expediente.ejemplo/`.** Un contribuyente ficticio completo. Prueba el flujo entero, reporta bugs y comparte pantallazos sin exponer nada tuyo.
+
+Si lo usas de plantilla para tus datos, **cópialo a `expediente/` primero**. Los archivos que el motor genera dentro de `expediente.ejemplo/` están ignorados, pero trabajar con datos reales dentro del árbol del repositorio es pedir un accidente.
 
 ## Si vas a reportar un bug
 
@@ -68,4 +75,10 @@ No pegues tu expediente. Reproduce el problema contra `expediente.ejemplo/` o co
 
 ## Borrar todo
 
-Tus datos están en un solo directorio. `rm -rf expediente/` y no queda nada. El plugin no guarda estado en ningún otro lado — ni en `~/.claude`, ni en un caché global, ni en variables de entorno.
+El plugin no guarda estado en ningún lado propio: ni en `~/.claude`, ni en un caché global, ni en variables de entorno. Todo lo tuyo vive donde apunte `--expediente`.
+
+Con el flujo normal eso es un solo directorio y `rm -rf expediente/` no deja nada. Pero `--expediente` acepta cualquier ruta: si lo corriste apuntando a otro sitio, ahí quedaron el `ledger.csv`, el caché de TRM y los escenarios. Búscalos antes de dar por hecho que borraste todo:
+
+```bash
+find . -name 'ledger*.csv' -o -name 'trm-cache.csv' -o -name 'perfil.toml'
+```

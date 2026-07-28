@@ -1,6 +1,6 @@
 ---
 name: renta-onboarding
-description: Punto de entrada de renta-co. Úsala cuando alguien quiera empezar su declaración de renta en Colombia, diga "declaración de renta", "renta 2025", "DIAN", "formulario 210", "me toca declarar", "cuánto me toca pagar de renta", o corra /renta-co:setup. Crea el expediente, protege los datos con .gitignore, y conduce todo el proceso de principio a fin.
+description: Punto de entrada de renta-co. Úsala cuando alguien quiera empezar su declaración de renta en Colombia, diga "declaración de renta", "renta 2025", "DIAN", "formulario 210", "me toca declarar", "cuánto me toca pagar de renta", o corra /renta-co:setup. Crea el expediente, protege los datos con .gitignore y conduce el proceso. También cuando el caso sea de asalariado, pensionado, arriendos, ganancia ocasional o no residente fiscal: el motor está hecho para independientes con honorarios, y esta skill detecta esos casos al principio y lo dice, en vez de producir un número equivocado.
 ---
 
 # renta-co · Onboarding
@@ -22,6 +22,17 @@ Todo eso es normal. **Tu trabajo es que no tenga que organizar nada ni entender 
 4. **Nada de datos personales fuera de `./expediente/`.** Ni en resúmenes que escribas en otro lado, ni en el repo.
 5. **El resultado siempre se llama BORRADOR** y siempre se acompaña del memo para el contador.
 6. **No antedatar, no inventar gastos, no ocultar ingresos.** Si te lo piden, dilo claro y ofrece la alternativa legal.
+
+## Paso 0 — Resolver dónde está el motor
+
+Antes de correr nada, resuelve **una vez** la raíz de renta-co y guárdala en
+`$RAIZ` para toda la sesión. Es el directorio que contiene `AGENTS.md` y
+`bin/renta`. Instalado como plugin en Claude Code es `$CLAUDE_PLUGIN_ROOT`;
+clonado, es la raíz del repo.
+
+El expediente del usuario vive en **otro** directorio: su proyecto. Pasa
+siempre `--expediente` con **ruta absoluta**. Confundir las dos rutas es la
+causa número uno de que nada funcione.
 
 ## Paso 1 — Crear el expediente
 
@@ -62,6 +73,17 @@ Solo estas cuatro, ahora. El resto sale de los documentos.
 2. **¿Fuiste residente fiscal en Colombia ese año?** Más de 183 días en el país, continuos o no, en un período de 365 días. Si dice que no, **detente**: tributa por otras reglas que este motor no cubre.
 3. **¿Cómo te pagaron?** Plataforma (Deel, Wise, Payoneer, Upwork), transferencia directa, nómina, mixto. Esto te dice qué adaptador vas a necesitar.
 4. **¿Ya declaraste antes?** Si sí, pídele la declaración del año anterior: trae el patrimonio inicial, que la DIAN usa para la ecuación patrimonial.
+
+5. **¿Tuviste algo de esto en el año?** Salario de una relación laboral · pensión · venta de un inmueble, un carro o acciones · arriendos · herencia o lotería.
+
+   Esta pregunta existe para **detectar lo que este motor NO cubre**, y hay que hacerla al principio, no al final. Cada una tiene una regla propia:
+
+   - **Pensión** → exenta hasta 1.000 UVT mensuales (art. 206 num. 5). El motor le aplicaría el 25% de rentas de trabajo, que no procede.
+   - **Ganancia ocasional** (activo poseído más de 2 años, herencia, lotería) → cédula aparte al 15% o al 20% (arts. 314 y 317). Meterla como renta ordinaria sobreestima el impuesto en decenas de millones.
+   - **Salario** → no detrae costos; la opción del art. 336 num. 4 no le aplica.
+   - **Arriendos** → son renta de capital, van en su renglón.
+
+   Si aparece alguna de las tres primeras: **dilo de una vez**, explica que el borrador cubrirá solo la parte de honorarios, y que esa porción va al contador señalada explícitamente. No sigas como si nada y lo menciones al final.
 
 **No preguntes nada más todavía.** La entrevista larga viene después de leer los documentos, y así te ahorras la mitad de las preguntas.
 

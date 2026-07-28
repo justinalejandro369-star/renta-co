@@ -4,12 +4,12 @@
 #    a ningún repositorio ni lo pegues en un issue.
 #
 #  Todo en pesos colombianos. Los ingresos en moneda extranjera se convierten
-#  con TRM diaria por `python -m engine.cli importar` antes de llegar acá.
+#  con TRM diaria por `bin/renta importar` antes de llegar acá.
 #
 #  Deja en 0 lo que no aplique. El motor distingue "es cero" de "no lo
 #  sabemos" y te avisa de lo segundo — pero solo si no lo llenas a la ligera.
 #
-#  Verifica en cualquier momento:  python -m engine.cli verificar
+#  Verifica en cualquier momento:  bin/renta verificar --expediente <ruta>
 
 [contribuyente]
 anio_gravable = 2025
@@ -67,9 +67,14 @@ aportes_voluntarios = 0
 compras_con_factura_electronica = 0
 
 # Cantidad de dependientes, máximo 4. 72 UVT cada uno, FUERA del tope del 40%.
-# Cuentan: hijos < 18; hijos 18-23 estudiando; hijos > 23 con dependencia
-# certificada; cónyuge o compañero(a) permanente y PADRES Y HERMANOS con
-# ingresos anuales < 260 UVT o dependencia física o psicológica.
+# Cuentan (definición actualizada por la Ley 2411 de 2024, desde AG2025):
+#   · hijos hasta 18 años
+#   · hijos de 18 a 25 estudiando, si tú financias su educación superior
+#   · hijos mayores de 18 con dependencia certificada por el Ministerio de
+#     Salud y Protección Social
+#   · cónyuge o compañero(a) permanente, y PADRES Y HERMANOS, con ingresos
+#     anuales < 260 UVT (certificado por contador público) o con dependencia
+#     física o psicológica
 #
 # ⚠ Esta es la línea que más plata mueve de todo el archivo, y la que más
 #   gente deja en 0 sin verificar. Pregunta por tus papás.
@@ -80,7 +85,12 @@ dependientes = 0
 # Solo con certificación de una entidad del Régimen Tributario Especial,
 # firmada por representante legal y contador o revisor fiscal.
 # Una transferencia a una persona, a una colecta o a una causa informal
-# vale $0 tributariamente. Da el 25% del valor donado como descuento.
+# vale $0 tributariamente.
+#
+# Da un DESCUENTO del 25% del valor donado, topado al 25% del impuesto
+# (art. 257 y art. 258). Ojo con la aritmética: donar $100 ahorra $25, así
+# que como jugada fiscal siempre pierdes. Tiene sentido si ibas a donar de
+# todas formas.
 donaciones_certificadas_rte = 0
 
 # ── Anticipos ─────────────────────────────────────────────────────────
@@ -90,13 +100,20 @@ saldo_a_favor_anio_anterior = 0
 
 # ── Verificaciones de riesgo ──────────────────────────────────────────
 [verificaciones]
-# TOTAL de lo que ENTRÓ a todas tus cuentas en el año, incluidos traslados
-# entre cuentas propias y plata de terceros que redistribuiste.
-# NO es lo mismo que tu ingreso.
+# Consignaciones PROVENIENTES DE ACTIVIDADES GRAVADAS CON IVA.
 #
-# ⚠ Umbral de 3.500 UVT. Si lo superas, pierdes la calidad de no responsable
-#   de IVA aunque tu ingreso propio esté muy por debajo. Es la contingencia
-#   más grande y menos mirada del perfil freelance. Cuantifícala.
+# El art. 437 par. 3 num. 6 no dice "todo lo que entró": dice consignaciones
+# «provenientes de actividades gravadas con el impuesto sobre las ventas».
+# Entonces NO cuentan los traslados entre tus propias cuentas, los préstamos
+# recibidos, ni el dinero de terceros en tránsito. Y si tu actividad es
+# exportación de servicios (art. 481 lit. c) o está excluida, esta cifra
+# puede ser cero aunque por tus cuentas pasen cientos de millones.
+#
+# ⚠ Umbral de 3.500 UVT (4.000 si tus ingresos vienen de contratos con el
+#   Estado, par. 5). Se mide sobre consignaciones y no sobre tu ingreso, así
+#   que quien recibe plata de clientes y la redistribuye puede superarlo sin
+#   que su ingreso se acerque. Es la contingencia menos mirada de este
+#   perfil, y la que más se cuantifica mal. Sepárala con tu contador.
 consignaciones_totales_anio = 0
 
 # ¿Tienes la planilla PILA de cada contratista al que le pagaste?
@@ -107,9 +124,14 @@ tiene_documento_soporte_de_pagos = false
 
 # ── Patrimonio a 31 de diciembre del año gravable ─────────────────────
 # TODO: cuentas, billeteras, wallets, cripto, brokers, vehículos, inmuebles.
-# Lo que esté en moneda extranjera va a la TRM del 31 de diciembre.
+#
+# Moneda extranjera: art. 269 ET, TRM del RECONOCIMIENTO INICIAL de cada
+# partida, no la del 31 de diciembre. La regla del cierre es el texto viejo,
+# derogado por la Ley 1819 de 2016.
+#
 # Un activo omitido que la DIAN detecte se grava como renta líquida sin
-# derecho a costo (art. 239-1 ET), más sanción por inexactitud.
+# derecho a costo (art. 239-1 ET), más sanción por inexactitud del 200%
+# (art. 648 num. 1) — el doble de la ordinaria, justamente por omitir activos.
 
 # [[patrimonio.activos]]
 # nombre = "Cuenta de ahorros"

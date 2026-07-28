@@ -75,7 +75,13 @@ Para servicios profesionales las tarifas son altas y **no admiten costos ni dedu
 
 Si el año pasado quedó cerca de las 3.500 UVT de consignaciones, este año hay que vigilarlo **antes** de pasarse, no después.
 
-Opciones: separar las cuentas por las que pasa plata de terceros, o inscribirse voluntariamente y estructurar la actividad como exportación de servicios exenta.
+**Abrir otra cuenta propia no sirve:** el umbral se mide sobre las consignaciones del contribuyente, no por cuenta. Y ese consejo se lee como esconder el flujo, que es lo contrario de lo que hace esta herramienta.
+
+Lo que sí funciona:
+
+- **Separar el flujo de terceros de verdad.** Que el cliente le pague directo a cada contratista, en vez de que todo pase por ti. Cambia el hecho, no la apariencia.
+- **Verificar el calificador.** Solo cuentan las consignaciones provenientes de actividades **gravadas con IVA**. Si tu actividad es exportación de servicios (art. 481 lit. c), la cifra relevante puede ser cero: lo que hay que hacer es dejar el registro en el RUT y el contrato en orden.
+- **Inscribirse y facturar a tarifa 0%** si de todos modos se supera. Obliga a declarar IVA, pero a tarifa cero y sin sanción.
 
 ## Cierre
 

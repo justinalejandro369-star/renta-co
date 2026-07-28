@@ -15,7 +15,9 @@ Está ordenado por pesos ahorrados por minuto de conversación.
 
 72 UVT por dependiente, hasta 4. **Fuera del tope del 40%.** No exige factura ni desembolso: se acredita la **condición**, no un gasto.
 
-En AG2025 son **$3.585.528 por dependiente**, hasta $14.342.112 de base eliminada.
+En AG2025 son **$3.585.528 por dependiente** de **base eliminada**, hasta $14.342.112.
+
+> No confundas base con impuesto. $3.585.528 de base a una tarifa marginal del 28% son ~$1.004.000 de impuesto ahorrado. Cuando le digas una cifra al usuario, di cuál de las dos es — y para "cuánto vale", usa siempre la de la tabla de sensibilidad, que ya viene en impuesto.
 
 Pregunta exactamente esto, no una versión resumida:
 

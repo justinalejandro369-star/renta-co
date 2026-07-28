@@ -19,24 +19,48 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Tests
-        run: python -m unittest discover -s engine/tests -t . -v
+        run: python3 -m unittest discover -s engine/tests -t . -v
 
       - name: Benchmark (invariantes + diferencial + anclas)
-        run: python -m benchmark.correr
+        run: python3 -m benchmark.correr
 
       - name: Expediente de ejemplo
-        run: python -m engine.cli calcular --expediente expediente.ejemplo
+        run: python3 -m engine.cli calcular --expediente expediente.ejemplo
 
       - name: Parámetros
-        run: python -m engine.cli parametros --anio 2025
+        run: python3 -m engine.cli parametros --anio 2025
 
   privacidad:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historia completa: un PR que agrega un dato personal en un commit
+          # y lo borra en el siguiente dejaba el árbol limpio y CI en verde,
+          # con el dato vivo en la historia para siempre.
+          fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Sin datos personales en el repositorio
-        run: python scripts/escanear_privacidad.py .
+      - name: Sin datos personales en el árbol
+        run: python3 scripts/escanear_privacidad.py .
+
+      - name: Sin datos personales en los commits del PR
+        if: github.event_name == 'pull_request'
+        run: |
+          set -e
+          BASE="origin/${{ github.base_ref }}"
+          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}"
+          # Las líneas AGREGADAS por el PR, sin el prefijo '+' del diff.
+          git log -p "$BASE..HEAD" -- . \
+            | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//' > /tmp/pr-agregado.txt
+          echo "Líneas agregadas por el PR: $(wc -l < /tmp/pr-agregado.txt)"
+          python3 scripts/escanear_privacidad.py /tmp/pr-agregado.txt
+
+      - name: El archivo de exclusiones no puede vaciar el escaneo
+        run: |
+          set -e
+          ANTES=$(python3 scripts/escanear_privacidad.py --estricto . | tail -1)
+          echo "modo estricto: $ANTES"

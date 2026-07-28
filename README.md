@@ -209,7 +209,9 @@ Los datos y el código viven separados, físicamente. `renta-co` es lo que insta
 
 `PRIVACY.md` dice también lo que casi nadie dice: **el contenido de tus documentos pasa por el modelo de lenguaje que estés usando**, bajo los términos que ya aceptaste con tu proveedor. `renta-co` no controla eso. Si te preocupa, el motor corre entero sin modelo.
 
-Además: `.gitignore` generado en el setup, escáner de PII con enmascaramiento, hook opcional de pre-commit, y CI que falla si entra un dato personal al repositorio.
+Además: `.gitignore` generado en el setup, escáner de PII con enmascaramiento, hook opcional de pre-commit que lee el índice de git, y CI que escanea el árbol y las líneas que cada PR agrega a la historia.
+
+El escáner es una heurística con límites declarados —no lee PDF ni XLSX, y clasifica por confianza para no ahogarte en falsos positivos—. Es una red de seguridad, no una prueba de ausencia. `PRIVACY.md` los enumera.
 
 → [PRIVACY.md](PRIVACY.md)
 

@@ -43,7 +43,7 @@ Con `--perfil` también busca los nombres propios que aparezcan en el perfil, qu
 No basta con decir "encontré 12 coincidencias". Da archivo, línea, tipo, y el fragmento **enmascarado**:
 
 ```
-expediente/04-entregables/memo-contadora.md
+expediente/04-entregables/memo-contador.md
   línea  3  cédula          1.0XX.XXX.781
   línea 14  cuenta bancaria XXXXXXX931
   línea 22  correo          j****@gmail.com

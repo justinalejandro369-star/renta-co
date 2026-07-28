@@ -72,8 +72,8 @@ def cmd_calcular(args) -> int:
     for i, ren in enumerate(a.renglones):
         rb = b.renglones[i]
         if ren.concepto != rb.concepto:
-            etiqueta = "= SALDO (a pagar si es positivo, a favor si es negativo)"
-            va, vb = a.saldo, b.saldo
+            etiqueta = "= SALDO  (+ a pagar · − a favor)"
+            va, vb = round(a.saldo), round(b.saldo)
         else:
             etiqueta, va, vb = ren.concepto, ren.valor, rb.valor
         print(f"{_recortar(etiqueta, 52):<52}{cop(va):>15}{cop(vb):>15}")
@@ -176,7 +176,7 @@ def _escribir_csv(destino: Path, a, b) -> None:
                 # Signo explícito: el CSV lo lee un contador, y "SALDO A
                 # PAGAR 6.704.873" cuando son a favor es un error caro.
                 w.writerow(["= SALDO (positivo a pagar, negativo a favor)",
-                            a.saldo, b.saldo, ren.fuente])
+                            round(a.saldo), round(b.saldo), ren.fuente])
             else:
                 w.writerow([ren.concepto, ren.valor, rb.valor, ren.fuente])
 

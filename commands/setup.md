@@ -10,9 +10,11 @@ Argumentos: $ARGUMENTS
 - `--con-hooks` → además instala el hook `pre-commit` que corre
   `scripts/escanear_privacidad.py --staged` y bloquea el commit si encuentra
   datos personales.
-- `--sin-red` → deja anotado en `expediente/perfil.toml` que la TRM no se
-  descarga, y explica cómo cargar la serie a mano en
-  `expediente/02-datos/trm-cache.csv` (columnas `fecha,trm`).
+- `--sin-red` → el motor NO guarda esta preferencia; el flag vive en
+  `importar`. Explícale al usuario que tendrá que pasar `--sin-red` cada vez
+  que importe, y cómo cargar la serie a mano en
+  `expediente/02-datos/trm-cache.csv` (columnas `fecha,trm`). Déjalo anotado
+  en `expediente/00-crudo/LEEME.md` para que no se le olvide.
 - `--anio N` → año gravable. Por defecto, el año anterior al actual.
 
 Orden estricto, sin saltarse pasos:

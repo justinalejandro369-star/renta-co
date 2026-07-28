@@ -7,10 +7,10 @@
 #  Sirve para: ver el flujo completo sin exponer nada, y como test de
 #  regresión del motor.
 #
-#      python -m engine.cli calcular --expediente expediente.ejemplo
+#      bin/renta calcular --expediente "$PWD/expediente.ejemplo"
 #
-#  Fíjate en el resultado: la Ruta A gana por poco, pero la palanca más
-#  grande de la tabla de sensibilidad NO es la elección de ruta.
+#  Fíjate en el resultado: la Ruta A gana, R-01 y R-02 salen en rojo, y las
+#  dos palancas más grandes de la tabla cuestan más de lo que ahorran.
 
 [contribuyente]
 anio_gravable = 2025
@@ -19,7 +19,7 @@ residente_fiscal = true
 # ── Ingresos ──────────────────────────────────────────────────────────
 # En pesos, ya convertidos con TRM diaria por engine/ledger.py.
 [ingresos]
-rentas_trabajo_honorarios = 186_400_000   # USD 44.000 aprox, TRM diaria
+rentas_trabajo_honorarios = 184_700_786   # sale de 02-datos/ledger.csv, TRM diaria
 rentas_capital            = 1_240_000     # rendimientos, certificado del banco
 otras_rentas_no_laborales = 0
 
@@ -62,8 +62,9 @@ saldo_a_favor_anio_anterior = 0
 
 # ── Verificaciones de riesgo ──────────────────────────────────────────
 [verificaciones]
-# TODO lo que entró a las cuentas, incluidos traslados propios y plata de
-# clientes que se redistribuyó. NO es lo mismo que el ingreso.
+# Consignaciones PROVENIENTES DE ACTIVIDADES GRAVADAS CON IVA (art. 437 par.
+# 3 num. 6). No es "todo lo que entró": los traslados entre cuentas propias y
+# el dinero de terceros en tránsito no cuentan. Tampoco es el ingreso propio.
 consignaciones_totales_anio        = 198_000_000
 contratistas_con_pila_verificada   = false   # ← riesgo R-02 abierto
 tiene_documento_soporte_de_pagos   = false   # ← riesgo R-03 abierto

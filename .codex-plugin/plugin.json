@@ -6,21 +6,63 @@
   "homepage": "https://github.com/justinalejandro369-star/renta-co",
   "instructions": "../AGENTS.md",
   "skills": [
-    { "name": "renta-onboarding", "path": "../skills/renta-onboarding/SKILL.md" },
-    { "name": "renta-clasificar", "path": "../skills/renta-clasificar/SKILL.md" },
-    { "name": "renta-ingresos", "path": "../skills/renta-ingresos/SKILL.md" },
-    { "name": "renta-patrimonio", "path": "../skills/renta-patrimonio/SKILL.md" },
-    { "name": "renta-deducciones", "path": "../skills/renta-deducciones/SKILL.md" },
-    { "name": "renta-rutas", "path": "../skills/renta-rutas/SKILL.md" },
-    { "name": "renta-riesgos", "path": "../skills/renta-riesgos/SKILL.md" },
-    { "name": "renta-entregables", "path": "../skills/renta-entregables/SKILL.md" },
-    { "name": "renta-planeacion", "path": "../skills/renta-planeacion/SKILL.md" },
-    { "name": "renta-privacidad", "path": "../skills/renta-privacidad/SKILL.md" }
+    {
+      "name": "renta-onboarding",
+      "path": "../skills/renta-onboarding/SKILL.md"
+    },
+    {
+      "name": "renta-clasificar",
+      "path": "../skills/renta-clasificar/SKILL.md"
+    },
+    {
+      "name": "renta-ingresos",
+      "path": "../skills/renta-ingresos/SKILL.md"
+    },
+    {
+      "name": "renta-patrimonio",
+      "path": "../skills/renta-patrimonio/SKILL.md"
+    },
+    {
+      "name": "renta-deducciones",
+      "path": "../skills/renta-deducciones/SKILL.md"
+    },
+    {
+      "name": "renta-rutas",
+      "path": "../skills/renta-rutas/SKILL.md"
+    },
+    {
+      "name": "renta-riesgos",
+      "path": "../skills/renta-riesgos/SKILL.md"
+    },
+    {
+      "name": "renta-entregables",
+      "path": "../skills/renta-entregables/SKILL.md"
+    },
+    {
+      "name": "renta-planeacion",
+      "path": "../skills/renta-planeacion/SKILL.md"
+    },
+    {
+      "name": "renta-privacidad",
+      "path": "../skills/renta-privacidad/SKILL.md"
+    }
   ],
   "prompts": [
-    { "name": "renta-setup", "path": "../commands/setup.md" },
-    { "name": "renta-auditar", "path": "../commands/auditar.md" },
-    { "name": "renta-privacidad", "path": "../commands/privacidad.md" },
-    { "name": "renta-estado", "path": "../commands/estado.md" }
+    {
+      "name": "renta-setup",
+      "path": "../commands/setup.md"
+    },
+    {
+      "name": "renta-auditar",
+      "path": "../commands/auditar.md"
+    },
+    {
+      "name": "renta-revisar-privacidad",
+      "path": "../commands/privacidad.md"
+    },
+    {
+      "name": "renta-estado",
+      "path": "../commands/estado.md"
+    }
   ]
 }

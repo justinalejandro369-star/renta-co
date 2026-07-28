@@ -5,7 +5,7 @@ description: Produce los entregables finales — checklist de documentos, compar
 
 # Entregables
 
-Cuatro archivos en `expediente/04-entregables/`. Plantillas en `templates/`.
+Cinco archivos en `expediente/04-entregables/`. Cada uno tiene su plantilla en `templates/`, con el mismo nombre.
 
 ## 1. `checklist-documentos.md`
 
@@ -32,6 +32,8 @@ Agrupa en cuatro bloques:
 
 Poner el valor en pesos al lado de cada papel es lo que hace que la gente efectivamente los consiga.
 
+⚠ **Usa siempre impuesto ahorrado, no base deducida.** Son la tabla de sensibilidad y el perfil, respectivamente, y se diferencian por la tarifa marginal. Mezclarlas en la misma lista infla los números entre 3 y 5 veces y destruye la confianza cuando el usuario lo nota.
+
 ## 2. `comparativo.md`
 
 La salida de `"$RAIZ/bin/renta" calcular --csv`, en prosa:
@@ -42,7 +44,7 @@ La salida de `"$RAIZ/bin/renta" calcular --csv`, en prosa:
 - **Los supuestos**, marcados como tales, con qué documento los convierte en dato.
 - La lista de partidas que **no** son deducibles y por qué — para que nadie las meta después.
 
-## 3. `memo-contadora.md`
+## 3. `memo-contador.md`
 
 El más importante y el que casi nadie escribe. Está hecho para que un contador lo lea en cinco minutos y pueda objetar con precisión.
 
@@ -86,9 +88,9 @@ Revisar con contador público antes de radicar.
 Generado por renta-co el <fecha>. Ver DISCLAIMER.md.
 ```
 
-## 5. Planeación
+## 5. `planeacion-<año en curso>.md`
 
-Invoca `renta-planeacion` para `planeacion-<año siguiente>.md`.
+Invoca `renta-planeacion`. Plantilla en `templates/planeacion.md`.
 
 ## Reglas de escritura
 

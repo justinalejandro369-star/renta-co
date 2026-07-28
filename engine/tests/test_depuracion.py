@@ -431,3 +431,60 @@ class TestAdaptadorNoSecuestraArchivos(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             deel.importar(ruta)
         self.assertIn("moneda", str(ctx.exception))
+
+
+class TestEtiquetaDelSaldo(unittest.TestCase):
+    """Una ruta puede dar saldo a pagar y la otra saldo a favor.
+
+    El comparativo imprime las dos columnas por posición. Usar la etiqueta de
+    la Ruta A para ambas hacía que un saldo A FAVOR apareciera bajo el rótulo
+    "SALDO A PAGAR", con el valor en absoluto: el signo del resultado quedaba
+    invertido en pantalla y en el CSV que se lleva el contador. Y pasaba en el
+    caso más común, retenciones mayores al impuesto de una de las rutas.
+    """
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+
+    def _perfil(self, retenciones):
+        datos = {
+            "contribuyente": {"anio_gravable": 2025, "residente_fiscal": True},
+            "ingresos": {"rentas_trabajo_honorarios": 130_000_000},
+            "costos": {"otros": 40_000_000},
+            "anticipos": {"retenciones_practicadas": retenciones},
+        }
+        d, sup = PF._completar(datos)
+        return PF.Perfil(d, None, sup)
+
+    def test_las_dos_rutas_emiten_los_mismos_renglones(self):
+        """Requisito para poder imprimirlas por posición."""
+        for retenciones in (0, 8_322_360, 900_000_000):
+            p = self._perfil(retenciones)
+            a = liquidar(p, self.par, "A")
+            b = liquidar(p, self.par, "B")
+            self.assertEqual(len(a.renglones), len(b.renglones))
+            for i, (ra, rb) in enumerate(zip(a.renglones, b.renglones)):
+                if i < len(a.renglones) - 1:
+                    self.assertEqual(ra.concepto, rb.concepto,
+                                     f"renglón {i} desalineado con ret={retenciones}")
+
+    def test_signos_opuestos_en_el_ultimo_renglon(self):
+        """Con la retención entre los dos impuestos, A y B caen a lados
+        distintos. Es el caso que rompía la salida."""
+        p = self._perfil(8_322_360)
+        a = liquidar(p, self.par, "A")
+        b = liquidar(p, self.par, "B")
+        self.assertLess(a.saldo, 0, "la Ruta A debería dar saldo a favor")
+        self.assertGreater(b.saldo, 0, "la Ruta B debería dar saldo a pagar")
+        # Y las etiquetas del último renglón DIFIEREN: eso es lo que el CLI
+        # detecta para cambiar a la fila con signo explícito.
+        self.assertNotEqual(a.renglones[-1].concepto, b.renglones[-1].concepto)
+
+    def test_el_saldo_del_objeto_conserva_el_signo(self):
+        """El renglón guarda el valor absoluto, pero .saldo no: es lo que
+        consumen el CLI, el CSV y el benchmark."""
+        p = self._perfil(900_000_000)
+        for ruta in ("A", "B"):
+            L = liquidar(p, self.par, ruta)
+            self.assertLess(L.saldo, 0)
+            self.assertGreater(L.renglones[-1].valor, 0)
