@@ -1,0 +1,23 @@
+{
+  "name": "renta-co",
+  "owner": {
+    "name": "renta-co contributors",
+    "url": "https://github.com/justinalejandro369-star/renta-co"
+  },
+  "metadata": {
+    "description": "Herramientas de declaración de renta para personas naturales en Colombia y, más adelante, el resto de Latinoamérica.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "renta-co",
+      "source": "./",
+      "description": "Declaración de renta de persona natural en Colombia. Suelta tus extractos en una carpeta y sale el borrador del 210, con las dos rutas comparadas y la tabla de cuánto vale cada deducción.",
+      "version": "0.1.0",
+      "author": { "name": "renta-co contributors" },
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["impuestos", "colombia", "dian", "taxes", "freelance"]
+    }
+  ]
+}

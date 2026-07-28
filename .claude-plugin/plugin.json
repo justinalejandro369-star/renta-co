@@ -1,0 +1,23 @@
+{
+  "name": "renta-co",
+  "version": "0.1.0",
+  "description": "Declaración de renta de persona natural en Colombia, conducida por tu agente. Clasifica tus soportes, aplica TRM diaria, compara las dos rutas del art. 336 num. 4 ET y dice cuánto vale cada deducción en pesos.",
+  "author": {
+    "name": "renta-co contributors"
+  },
+  "homepage": "https://github.com/justinalejandro369-star/renta-co",
+  "repository": "https://github.com/justinalejandro369-star/renta-co",
+  "license": "MIT",
+  "keywords": [
+    "impuestos",
+    "colombia",
+    "dian",
+    "declaracion-de-renta",
+    "formulario-210",
+    "freelance",
+    "taxes",
+    "tributario"
+  ],
+  "skills": "./skills",
+  "commands": "./commands"
+}
