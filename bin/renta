@@ -1,0 +1,51 @@
+#!/usr/bin/env sh
+#
+# Lanzador de renta-co.
+#
+# Resuelve su propia ubicación, así que funciona desde cualquier directorio y
+# sin importar dónde quedó instalado el plugin. Es lo que hace que los mismos
+# comandos sirvan clonando el repo y con el plugin instalado.
+#
+#   bin/renta calcular  --expediente ./expediente
+#   bin/renta importar  --expediente ./expediente
+#   bin/renta verificar --expediente ./expediente
+#   bin/renta privacidad ./expediente/04-entregables
+#
+# Requiere Python 3.11 o superior (tomllib es stdlib desde ahí). Se busca
+# explícitamente python3: en muchas máquinas `python` es un shim que apunta a
+# una versión vieja.
+
+set -e
+
+RAIZ=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+PY=${RENTA_CO_PYTHON:-python3}
+
+if ! command -v "$PY" >/dev/null 2>&1; then
+    echo "✗ No se encontró '$PY'." >&2
+    echo "  Instala Python 3.11+ o exporta RENTA_CO_PYTHON con la ruta correcta." >&2
+    exit 1
+fi
+
+VERSION_OK=$("$PY" -c 'import sys; print(sys.version_info >= (3, 11) and ".".join(map(str, sys.version_info[:3])) or "")' 2>/dev/null) || VERSION_OK=""
+if [ -z "$VERSION_OK" ]; then
+    echo "✗ '$PY' no es un Python 3.11 o superior utilizable." >&2
+    echo "  El motor usa tomllib, que es stdlib desde 3.11." >&2
+    echo "  Exporta RENTA_CO_PYTHON con la ruta a un intérprete válido." >&2
+    exit 1
+fi
+
+# El escáner de privacidad es un script suelto; el resto va por el CLI.
+if [ "$1" = "privacidad" ]; then
+    shift
+    exec "$PY" "$RAIZ/scripts/escanear_privacidad.py" "$@"
+fi
+
+if [ "$1" = "benchmark" ]; then
+    shift
+    cd "$RAIZ"
+    exec "$PY" -m benchmark.correr "$@"
+fi
+
+cd "$RAIZ"
+exec "$PY" -m engine.cli "$@"

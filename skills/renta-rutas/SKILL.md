@@ -30,7 +30,7 @@ Reglamentado por el art. 1.2.1.20.5 del Decreto 1625 de 2016, que recoge la sent
 **No por opinión. Se corre el motor.**
 
 ```bash
-python3 -m engine.cli calcular --expediente ./expediente
+"$RAIZ/bin/renta" calcular --expediente "$PWD/expediente"
 ```
 
 Sale el comparativo renglón por renglón y la diferencia en pesos.

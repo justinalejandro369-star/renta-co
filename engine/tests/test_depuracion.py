@@ -214,16 +214,50 @@ class TestComparacion(unittest.TestCase):
         r = comparar(PF.Perfil(d, None, s), self.par)
         self.assertEqual(r["mejor_ruta"], "B")
 
-    def test_sensibilidad_ordenada_y_positiva(self):
+    def test_sensibilidad_positiva_y_agrupada_por_costo(self):
+        """La tabla se ordena por ahorro DENTRO de cada grupo, no en global.
+
+        Un desembolso de $56 M que ahorra $12 M no puede encabezar una lista
+        titulada "cuánto vale cada palanca": lo que la gente lee ahí es qué
+        perseguir primero, y perseguir eso les cuesta plata.
+        """
+        from engine.depuracion import DESEMBOLSO
+
         datos = {
             "contribuyente": {"anio_gravable": 2025, "residente_fiscal": True},
             "ingresos": {"rentas_trabajo_honorarios": 200_000_000},
         }
         d, s = PF._completar(datos)
         r = comparar(PF.Perfil(d, None, s), self.par)
-        ahorros = [p.ahorro_max for p in r["sensibilidad"]]
-        self.assertEqual(ahorros, sorted(ahorros, reverse=True))
-        self.assertTrue(all(a > 0 for a in ahorros))
+        sens = r["sensibilidad"]
+
+        self.assertTrue(all(p.ahorro_max > 0 for p in sens))
+
+        gratis = [p.ahorro_max for p in sens if p.tipo != DESEMBOLSO]
+        self.assertEqual(gratis, sorted(gratis, reverse=True))
+
+        tipos = [p.tipo for p in sens]
+        primero = next((i for i, x in enumerate(tipos) if x == DESEMBOLSO), len(tipos))
+        self.assertTrue(all(x == DESEMBOLSO for x in tipos[primero:]),
+                        "los desembolsos deben quedar agrupados al final")
+
+    def test_donar_nunca_conviene_como_jugada_fiscal(self):
+        """El descuento es del 25%: donar $100 ahorra $25. Siempre pierdes."""
+        from engine.depuracion import DESEMBOLSO
+
+        datos = {
+            "contribuyente": {"anio_gravable": 2025, "residente_fiscal": True},
+            "ingresos": {"rentas_trabajo_honorarios": 300_000_000},
+        }
+        d, s = PF._completar(datos)
+        r = comparar(PF.Perfil(d, None, s), self.par)
+        donacion = next(
+            (p for p in r["sensibilidad"] if "Donaciones" in p.etiqueta), None
+        )
+        self.assertIsNotNone(donacion)
+        self.assertEqual(donacion.tipo, DESEMBOLSO)
+        self.assertFalse(donacion.conviene)
+        self.assertLess(donacion.neto, 0)
 
     def test_riesgo_iva_se_dispara(self):
         datos = {

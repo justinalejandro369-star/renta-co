@@ -294,6 +294,15 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
 # Sensibilidad — cuánto vale cada palanca, en pesos
 # ---------------------------------------------------------------------
 
+# Qué le cuesta al contribuyente activar cada palanca. La tabla se ordena
+# por ahorro, pero sin esta distinción es engañosa: "donar $5.400.000 para
+# ahorrar $1.350.000" aparecía como palanca al lado de "pedir un certificado
+# gratis", y son cosas opuestas.
+PAPEL = "papel"            # conseguir un documento. No cuesta plata
+CONDICION = "condicion"    # depende de un hecho que se cumple o no
+DESEMBOLSO = "desembolso"  # exige sacar plata del bolsillo
+
+
 @dataclass
 class Palanca:
     etiqueta: str
@@ -301,10 +310,27 @@ class Palanca:
     ahorro_b: float
     solo_ruta: str | None
     nota: str
+    tipo: str = PAPEL
+    costo: float = 0.0        # plata que hay que desembolsar, si aplica
 
     @property
     def ahorro_max(self) -> float:
         return max(self.ahorro_a, self.ahorro_b)
+
+    @property
+    def neto(self) -> float:
+        """Ahorro menos lo que hay que desembolsar para conseguirlo."""
+        return self.ahorro_max - self.costo
+
+    @property
+    def conviene(self) -> bool:
+        """Un desembolso solo conviene si el ahorro supera lo desembolsado.
+
+        Casi nunca pasa con donaciones (descuento del 25%) ni con prepagada.
+        Sí pasa con los aportes voluntarios cuando la tarifa marginal es alta,
+        porque la plata no se pierde: cambia de bolsillo.
+        """
+        return self.tipo != DESEMBOLSO or self.neto > 0
 
 
 def _saldo(p: Perfil, par: Parametros, ruta: str) -> float:
@@ -324,11 +350,11 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
     ingreso = max(p.ingresos_brutos, 1)
     palancas: list[Palanca] = []
 
-    def probar(etiqueta, cambios, nota, solo_ruta=None):
+    def probar(etiqueta, cambios, nota, solo_ruta=None, tipo=PAPEL, costo=0.0):
         alt = p.copia_con(**cambios)
         pa, pb = _saldo(alt, par, "A"), _saldo(alt, par, "B")
         palancas.append(
-            Palanca(etiqueta, base_a - pa, base_b - pb, solo_ruta, nota)
+            Palanca(etiqueta, base_a - pa, base_b - pb, solo_ruta, nota, tipo, costo)
         )
 
     # --- dependientes ---------------------------------------------------
@@ -339,7 +365,9 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
             f"Acreditar {n} dependiente(s) — hoy tienes {actuales}",
             {"deducciones__dependientes": n},
             "FUERA del tope del 40%. No exige factura ni desembolso: se acredita "
-            "la condición. Padres y hermanos con ingresos anuales < 260 UVT cuentan.",
+            "la condición. Padres y hermanos con ingresos anuales < 260 UVT "
+            "cuentan; hijos estudiando, hasta los 25 (Ley 2411 de 2024).",
+            tipo=CONDICION,
         )
 
     # --- seguridad social ------------------------------------------------
@@ -349,8 +377,11 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         probar(
             f"Aportes obligatorios salud+pensión del año (~{_cop(estimado)})",
             {"incrngo__aportes_obligatorios_salud_pension": estimado},
-            "Es INCRNGO, no deducción: resta ANTES del tope del 40% y no lo consume. "
-            "Exige planillas PILA pagadas. También reduce tu exposición ante la UGPP.",
+            "Es INCRNGO, no deducción: resta ANTES del tope del 40% y no lo "
+            "consume. Exige planillas PILA pagadas. Si ya cotizaste, es solo "
+            "conseguir el papel; si no, es un desembolso que además cierra tu "
+            "exposición ante la UGPP.",
+            tipo=CONDICION,
         )
 
     # --- aportes voluntarios ----------------------------------------------
@@ -359,9 +390,12 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         probar(
             f"Aportes voluntarios AFP/AFC al tope (~{_cop(techo)})",
             {"deducciones__aportes_voluntarios": round(techo)},
-            "⚠ Solo sirve si se hicieron ANTES del 31 de diciembre del año gravable. "
-            "Si el año ya cerró, este número es tu costo de oportunidad — planéalo "
-            "para el año en curso.",
+            "⚠ Solo sirve si se hicieron ANTES del 31 de diciembre del año "
+            "gravable. Si el año ya cerró, este número es tu costo de "
+            "oportunidad para el año en curso. Es un desembolso, pero la plata "
+            "no se pierde: queda en tu fondo, inmovilizada bajo las reglas de "
+            "los arts. 126-1 y 126-4.",
+            tipo=DESEMBOLSO, costo=round(techo),
         )
 
     # --- medicina prepagada -------------------------------------------------
@@ -371,7 +405,10 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
             f"Medicina prepagada al tope ({_cop(techo)})",
             {"deducciones__medicina_prepagada": round(techo)},
             "Dentro del tope del 40%: en Ruta B compite contra la renta exenta y "
-            "puede no agregar nada. Exige certificado de la aseguradora.",
+            "puede no agregar nada. Si YA la pagas, es solo pedir el "
+            "certificado; contratarla para ahorrar impuesto casi nunca sale a "
+            "cuenta.",
+            tipo=DESEMBOLSO, costo=round(techo),
         )
 
     # --- intereses de vivienda ----------------------------------------------
@@ -380,7 +417,9 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         probar(
             f"Intereses de crédito de vivienda (~{_cop(techo)})",
             {"deducciones__intereses_vivienda": round(techo)},
-            "Certificado anual del banco. Dentro del tope del 40%.",
+            "Solo aplica si YA tienes crédito de vivienda: es pedirle el "
+            "certificado al banco. Nadie se endeuda para deducir intereses.",
+            tipo=CONDICION,
         )
 
     # --- costos, solo ruta A --------------------------------------------------
@@ -389,10 +428,11 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         probar(
             f"Costos y gastos soportados (~{_cop(estimado)})",
             {"costos__otros": estimado},
-            "SOLO RUTA A. Sin tope, pero cada peso exige factura electrónica o "
-            "documento soporte, y los pagos a contratistas exigen verificar sus "
-            "aportes a seguridad social.",
-            solo_ruta="A",
+            "SOLO RUTA A, y solo con costos que YA existen y estén soportados. "
+            "Cada peso exige factura electrónica o documento soporte, y los "
+            "pagos a contratistas exigen verificar sus aportes. Esto NO es una "
+            "invitación a inventar gastos: si no ocurrieron, no van.",
+            solo_ruta="A", tipo=CONDICION,
         )
 
     # --- factura electrónica ---------------------------------------------------
@@ -401,8 +441,10 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         probar(
             f"Compras con factura electrónica a tu cédula (~{_cop(compras)})",
             {"deducciones__compras_con_factura_electronica": compras},
-            "Deduce el 1%, tope 240 UVT, FUERA del tope del 40%. Exige que la "
-            "factura salga a tu NIT/cédula y que el pago sea electrónico.",
+            "Deduce el 1%, tope 240 UVT, FUERA del tope del 40%. Sobre compras "
+            "que ya hiciste: se trata de pedir la factura a tu NIT/cédula y "
+            "pagar por medio electrónico, no de comprar más.",
+            tipo=CONDICION,
         )
 
     # --- donaciones ------------------------------------------------------------
@@ -411,11 +453,20 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         probar(
             f"Donaciones certificadas a entidad del RTE (~{_cop(monto)})",
             {"descuentos__donaciones_certificadas_rte": monto},
-            "Es DESCUENTO del 25% sobre el impuesto, no deducción. Exige "
-            "certificación firmada. Una transferencia a una persona o colecta vale $0.",
+            "Es DESCUENTO del 25% sobre el impuesto, no deducción. Ojo con la "
+            "aritmética: donar $100 ahorra $25, así que como jugada fiscal "
+            "SIEMPRE pierdes plata. Tiene sentido si ibas a donar de todas "
+            "formas — y entonces lo que importa es exigir el certificado de "
+            "una entidad del RTE, sin el cual la donación vale $0.",
+            tipo=DESEMBOLSO, costo=monto,
         )
 
-    palancas.sort(key=lambda x: x.ahorro_max, reverse=True)
+    # Primero lo que solo exige un papel o una condición ya cumplida, y
+    # dentro de cada grupo por ahorro. Un desembolso que pierde plata en neto
+    # se manda al final: se muestra para que se entienda por qué no conviene,
+    # no como recomendación.
+    orden = {PAPEL: 0, CONDICION: 0, DESEMBOLSO: 1}
+    palancas.sort(key=lambda x: (orden[x.tipo], not x.conviene, -x.ahorro_max))
     return [x for x in palancas if x.ahorro_max > 0]
 
 
@@ -549,13 +600,15 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
     })
 
     # costos sin verificación de aportes
-    if p.total_costos > 0 and not p.get("verificaciones.contratistas_con_pila_verificada"):
+    pagos_contratistas = p.get("costos.pagos_a_contratistas")
+    if pagos_contratistas > 0 and not p.get("verificaciones.contratistas_con_pila_verificada"):
         checks.append({
             "id": "R-02",
             "titulo": "Costos por pagos a contratistas sin verificar aportes",
             "estado": "SIN VERIFICAR",
             "detalle": (
-                f"Tienes {_cop(p.total_costos)} en costos. El art. 108 par. 2 ET exige "
+                f"Tienes {_cop(pagos_contratistas)} en pagos a contratistas. El "
+                f"art. 108 par. 2 ET exige "
                 f"verificar la afiliación y el pago de aportes a seguridad social de "
                 f"cada contratista. Si no cotizaron, la DIAN puede rechazar la "
                 f"totalidad del costo y la Ruta A pierde su fundamento. Pide la "

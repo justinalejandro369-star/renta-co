@@ -216,6 +216,59 @@ class Ledger:
         }
 
 
+def escribir_sugerencia_perfil(ledger: Ledger, destino: Path) -> Path:
+    """Escribe las cifras del ledger en formato perfil.toml, para copiar.
+
+    NO sobrescribe el perfil del usuario. Ese paso —revisar cada cifra y
+    decidir si entra— es del usuario, y es donde se atrapan las
+    clasificaciones equivocadas. Antes este puente no existía: el mapeo del
+    ledger al perfil quedaba a cargo del modelo, transcribiendo a mano, que
+    es exactamente lo que el proyecto dice no hacer.
+    """
+    p = ledger.a_perfil()
+    pendientes = ledger.sin_clasificar()
+    cons = ledger.consignaciones()
+
+    lineas = [
+        "#  SUGERENCIA generada por `renta importar` — NO es tu perfil.",
+        "#",
+        "#  Revisa cada cifra y cópiala a expediente/perfil.toml si estás de",
+        "#  acuerdo. Si un número no cuadra, casi siempre es una clasificación",
+        "#  equivocada en 02-datos/ledger.csv: arréglala ahí y vuelve a correr.",
+        "",
+    ]
+    if pendientes:
+        lineas += [
+            f"#  ⚠ {len(pendientes)} movimiento(s) SIN CLASIFICAR no están sumados",
+            "#    en ninguna cifra de abajo. Clasifícalos antes de usar esto.",
+            "",
+        ]
+
+    for seccion, campos in p.items():
+        lineas.append(f"[{seccion}]")
+        for campo, valor in campos.items():
+            # Formato TOML con guion bajo de miles: 180_000_000
+            lineas.append(f"{campo} = {valor:_}")
+        lineas.append("")
+
+    lineas += [
+        "# ── Consignaciones ───────────────────────────────────────────────",
+        "#  NO se sugiere un valor a propósito. El umbral del art. 437 par. 3",
+        "#  num. 6 solo cuenta lo PROVENIENTE DE ACTIVIDADES GRAVADAS CON IVA,",
+        "#  y hay que descartar el mismo giro contado dos veces.",
+        "#",
+        f"#  Entradas brutas de todas las fuentes: {cons['entradas_brutas']:,}".replace(",", "."),
+    ]
+    for fuente, valor in cons["por_fuente"].items():
+        lineas.append(f"#    · {fuente}: {valor:,}".replace(",", "."))
+    for aviso in cons["avisos"]:
+        lineas.append(f"#  {aviso}")
+
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    return destino
+
+
 def comparar_trm_diaria_vs_promedio(ledger: Ledger, trm: TRM) -> dict:
     """Cuánta base gravable mueve usar promedio en vez de TRM diaria.
 

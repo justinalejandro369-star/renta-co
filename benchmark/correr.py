@@ -74,13 +74,23 @@ def invariantes(par) -> list[str]:
     fallos = []
 
     # Monotonía y no negatividad sobre un barrido fino de la tarifa.
+    #
+    # Las fronteras del art. 241 se excluyen a propósito. La tabla del
+    # Estatuto redondea los UVT adicionales (116, 788, 2.296, 5.901, 10.352),
+    # y ese redondeo produce saltos de unos pocos miles de pesos justo en
+    # 1.700, 8.670 y 31.000 UVT: en dos de ellos el impuesto BAJA al subir la
+    # base. No es un bug del motor — es la norma, y "corregirlo" sería
+    # apartarse de ella. Se verifica aparte, en discontinuidades_del_241(),
+    # para que quede documentado y no se confunda con una regresión.
+    FRONTERAS = {1_090, 1_700, 4_100, 8_670, 18_970, 31_000}
     anterior = -1
     for uvt in range(0, 40_000, 7):
         imp = impuesto_241(uvt * par.uvt, par)
         if imp < 0:
             fallos.append(f"impuesto negativo en {uvt} UVT: {imp}")
             break
-        if imp < anterior:
+        cerca_de_frontera = any(abs(uvt - f) <= 7 for f in FRONTERAS)
+        if imp < anterior and not cerca_de_frontera:
             fallos.append(f"impuesto NO monótono en {uvt} UVT: {imp} < {anterior}")
             break
         anterior = imp
@@ -127,12 +137,27 @@ def invariantes(par) -> list[str]:
         if r["mejor_ruta"] == "B" and b > a:
             fallos.append(f"{pid}: eligió B siendo A mejor")
 
-        # La sensibilidad nunca reporta ahorros negativos ni desordenados.
-        ahorros = [x.ahorro_max for x in r["sensibilidad"]]
-        if any(x <= 0 for x in ahorros):
+        # La sensibilidad nunca reporta ahorros no positivos, y viene
+        # ordenada DENTRO de cada grupo. El orden entre grupos es
+        # deliberado: primero lo que solo exige un papel, después lo que
+        # exige desembolsar. Una palanca de $12 M que cuesta $56 M no puede
+        # encabezar una lista titulada "cuánto vale cada palanca".
+        from engine.depuracion import DESEMBOLSO
+
+        sens = r["sensibilidad"]
+        if any(x.ahorro_max <= 0 for x in sens):
             fallos.append(f"{pid}: sensibilidad con ahorro no positivo")
-        if ahorros != sorted(ahorros, reverse=True):
-            fallos.append(f"{pid}: sensibilidad desordenada")
+
+        gratis = [x.ahorro_max for x in sens if x.tipo != DESEMBOLSO]
+        if gratis != sorted(gratis, reverse=True):
+            fallos.append(f"{pid}: palancas sin desembolso desordenadas")
+
+        tipos = [x.tipo for x in sens]
+        primer_desembolso = next(
+            (i for i, t in enumerate(tipos) if t == DESEMBOLSO), len(tipos)
+        )
+        if any(t != DESEMBOLSO for t in tipos[primer_desembolso:]):
+            fallos.append(f"{pid}: los desembolsos no quedaron agrupados al final")
 
     return fallos
 
@@ -228,6 +253,26 @@ def tabla(par):
     linea()
 
 
+def discontinuidades_del_241(par) -> list[str]:
+    """Mide los saltos en las fronteras del art. 241 y verifica que sigan
+    dentro de lo que explica el redondeo de la norma.
+
+    Si alguna crece mucho, es señal de que alguien tocó la tabla de tarifas.
+    """
+    hallazgos = []
+    for frontera in (1_090, 1_700, 4_100, 8_670, 18_970, 31_000):
+        base = frontera * par.uvt
+        antes = impuesto_241(base - 1, par)
+        despues = impuesto_241(base + 1, par)
+        salto = despues - antes
+        if abs(salto) > 6_000:
+            hallazgos.append(
+                f"salto anómalo de {salto:+,} pesos en {frontera:,} UVT — "
+                f"revisa la tabla de tarifas".replace(",", ".")
+            )
+    return hallazgos
+
+
 def rendimiento(par) -> float:
     inicio = time.perf_counter()
     for _ in range(20):
@@ -252,6 +297,8 @@ def main(argv=None) -> int:
         ("INVARIANTES", lambda: invariantes(par)),
         ("DIFERENCIAL (motor vs. referencia independiente)", lambda: diferencial(par, args.verbose)),
         ("ANCLAS (calculadas a mano con la norma)", lambda: anclas(par)),
+        ("FRONTERAS DEL ART. 241 (saltos por redondeo de la norma)",
+         lambda: discontinuidades_del_241(par)),
     ):
         fallos = fn()
         resultados.append((etiqueta, fallos))

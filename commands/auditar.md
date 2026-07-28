@@ -6,8 +6,8 @@ argument-hint: "[--anio 2025]"
 Corre el motor y presenta el resultado. Argumentos: $ARGUMENTS
 
 ```bash
-python3 -m engine.cli verificar --expediente ./expediente
-python3 -m engine.cli calcular  --expediente ./expediente --csv
+"$RAIZ/bin/renta" verificar --expediente "$PWD/expediente"
+"$RAIZ/bin/renta" calcular  --expediente "$PWD/expediente" --csv
 ```
 
 Presenta la salida en este orden, que es el orden en que le importa a la

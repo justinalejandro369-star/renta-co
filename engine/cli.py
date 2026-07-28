@@ -97,15 +97,37 @@ def cmd_calcular(args) -> int:
     if not r["sensibilidad"]:
         print("  No hay palancas pendientes: todo lo modelable ya está cargado.")
     else:
-        print(f"{'PALANCA':<52}{'RUTA A':>15}{'RUTA B':>15}")
-        linea()
-        for pal in r["sensibilidad"]:
-            marca = f" [solo {pal.solo_ruta}]" if pal.solo_ruta else ""
-            print(f"{_recortar(pal.etiqueta + marca, 52):<52}"
-                  f"{cop(pal.ahorro_a):>15}{cop(pal.ahorro_b):>15}")
-            for tramo in _envolver(pal.nota, ANCHO - 6):
-                print(f"      {tramo}")
+        from .depuracion import DESEMBOLSO
+
+        gratis = [x for x in r["sensibilidad"] if x.tipo != DESEMBOLSO]
+        cuestan = [x for x in r["sensibilidad"] if x.tipo == DESEMBOLSO]
+
+        def bloque(titulo_bloque, items, subtitulo):
+            if not items:
+                return
+            print(f"  {titulo_bloque}")
+            print(f"  {subtitulo}")
             print()
+            print(f"{'PALANCA':<52}{'RUTA A':>15}{'RUTA B':>15}")
+            linea()
+            for pal in items:
+                marca = f" [solo {pal.solo_ruta}]" if pal.solo_ruta else ""
+                print(f"{_recortar(pal.etiqueta + marca, 52):<52}"
+                      f"{cop(pal.ahorro_a):>15}{cop(pal.ahorro_b):>15}")
+                if pal.tipo == DESEMBOLSO:
+                    signo = "queda a favor" if pal.neto > 0 else "PIERDES"
+                    print(f"      Desembolso {cop(pal.costo)} → {signo} "
+                          f"{cop(abs(pal.neto))} en neto")
+                for tramo in _envolver(pal.nota, ANCHO - 6):
+                    print(f"      {tramo}")
+                print()
+
+        bloque("SIN SACAR PLATA DEL BOLSILLO",
+               gratis,
+               "Conseguir un papel, o acreditar algo que ya es cierto.")
+        bloque("EXIGEN DESEMBOLSAR",
+               cuestan,
+               "El ahorro NO es ganancia: compáralo contra lo que hay que poner.")
 
     # --- verificaciones ----------------------------------------------
     titulo("VERIFICACIONES DE OBLIGACIÓN Y RIESGO")
@@ -180,7 +202,7 @@ def _envolver(texto: str, ancho: int) -> list[str]:
 
 def cmd_importar(args) -> int:
     from . import adapters
-    from .ledger import Ledger
+    from .ledger import Ledger, escribir_sugerencia_perfil
     from .trm import TRM, SinTRM
 
     exp = Path(args.expediente)
@@ -251,9 +273,24 @@ def cmd_importar(args) -> int:
         for tramo in _envolver(aviso, ANCHO - 4):
             print(f"  ⚠ {tramo}" if tramo == _envolver(aviso, ANCHO - 4)[0] else f"    {tramo}")
 
-    print(f"\nConsignaciones totales (entradas): {cop(ledger.consignaciones())}")
-    print("  Este es el número del umbral de 3.500 UVT de IVA. Incluye traslados")
-    print("  entre cuentas propias, que NO son ingreso pero SÍ consignan.")
+    # --- puente al perfil ---------------------------------------------
+    sugerido = escribir_sugerencia_perfil(ledger, exp / "02-datos" / "sugerido-perfil.toml")
+    print(f"\nSugerencia de perfil → {sugerido}")
+    print("  Revisa cada cifra y cópiala a perfil.toml. NO se sobrescribe tu")
+    print("  perfil: ese paso es tuyo, y es donde se atrapan las clasificaciones")
+    print("  equivocadas antes de que lleguen al impuesto.")
+
+    # --- consignaciones -------------------------------------------------
+    cons = ledger.consignaciones()
+    print(f"\nEntradas brutas de todas las fuentes: {cop(cons['entradas_brutas'])}")
+    for fuente, valor in cons["por_fuente"].items():
+        print(f"    · {fuente:<40} {cop(valor):>18}")
+    print()
+    print("  ⚠ Esto NO es la cifra del umbral de 3.500 UVT de IVA. Léelo antes")
+    print("    de usarlo:")
+    for aviso in cons["avisos"]:
+        for i, tramo in enumerate(_envolver(aviso, ANCHO - 8)):
+            print(f"      {'·' if i == 0 else ' '} {tramo}")
     return 0
 
 

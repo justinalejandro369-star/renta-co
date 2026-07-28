@@ -72,7 +72,7 @@ Cuando diga que ya cargó: invoca **`renta-clasificar`**.
 ## Paso 4 — Construir el ledger
 
 ```bash
-python3 -m engine.cli importar --expediente ./expediente
+"$RAIZ/bin/renta" importar --expediente "$PWD/expediente"
 ```
 
 Si quedan movimientos sin clasificar, resuélvelos **uno por uno** con el usuario antes de seguir. Un ingreso mal clasificado cambia el impuesto; un traslado contado como ingreso duplica la base.
@@ -86,8 +86,8 @@ De todo el proceso, **la pregunta de dependientes es la que más plata mueve**. 
 ## Paso 6 — Calcular
 
 ```bash
-python3 -m engine.cli verificar --expediente ./expediente   # qué falta
-python3 -m engine.cli calcular  --expediente ./expediente --csv
+"$RAIZ/bin/renta" verificar --expediente "$PWD/expediente"   # qué falta
+"$RAIZ/bin/renta" calcular  --expediente "$PWD/expediente" --csv
 ```
 
 Presenta el resultado en este orden, que es el orden en que importa:

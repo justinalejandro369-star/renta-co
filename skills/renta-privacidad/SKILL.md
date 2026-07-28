@@ -18,8 +18,8 @@ Un expediente tributario es de lo más sensible que hay: cédula, patrimonio, mo
 ## Cómo
 
 ```bash
-python3 scripts/escanear_privacidad.py expediente/04-entregables/
-python3 scripts/escanear_privacidad.py --perfil expediente/perfil.toml archivo.md
+"$RAIZ/bin/renta" privacidad expediente/04-entregables/
+"$RAIZ/bin/renta" privacidad --perfil expediente/perfil.toml archivo.md
 ```
 
 Con `--perfil` también busca los nombres propios que aparezcan en el perfil, que es lo que un patrón genérico nunca va a atrapar.

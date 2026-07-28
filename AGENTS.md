@@ -43,14 +43,41 @@ y síguela.** Es el punto de entrada y conduce todo el proceso.
 /renta-co:privacidad   escanea datos personales antes de compartir
 ```
 
-## Motor
+## Cómo invocar el motor — LEE ESTO ANTES DE CORRER NADA
+
+El motor vive junto a este archivo. El expediente del usuario vive en **su**
+proyecto, que es otro directorio. Son dos rutas distintas y confundirlas es
+la causa número uno de que nada funcione.
+
+**Usa siempre el lanzador `bin/renta`**, que resuelve su propia ubicación:
 
 ```bash
-python3 -m engine.cli verificar  --expediente ./expediente   # qué falta
-python3 -m engine.cli importar   --expediente ./expediente   # ledger con TRM diaria
-python3 -m engine.cli calcular   --expediente ./expediente   # dos rutas + sensibilidad
-python3 -m engine.cli parametros --anio 2025                 # UVT, topes, tarifa
-python3 -m unittest discover -s engine/tests -t .            # tests
+# RAIZ = el directorio que contiene este AGENTS.md.
+# Instalado como plugin en Claude Code es $CLAUDE_PLUGIN_ROOT; clonado, es
+# la raíz del repo. Resuélvelo UNA vez al empezar y reúsalo.
+
+"$RAIZ/bin/renta" verificar  --expediente "$PWD/expediente"
+"$RAIZ/bin/renta" importar   --expediente "$PWD/expediente"
+"$RAIZ/bin/renta" calcular   --expediente "$PWD/expediente" --csv
+"$RAIZ/bin/renta" parametros --anio 2025
+"$RAIZ/bin/renta" privacidad "$PWD/expediente/04-entregables"
+```
+
+Reglas:
+
+- **`--expediente` siempre con ruta absoluta.** El lanzador hace `cd` a su
+  propia raíz; una ruta relativa apuntaría al sitio equivocado.
+- Si `bin/renta` no es ejecutable en el entorno, el equivalente es
+  `cd "$RAIZ" && python3 -m engine.cli <subcomando> --expediente <ruta absoluta>`.
+- Nunca uses `python` a secas: en muchas máquinas es un shim que apunta a una
+  versión anterior a 3.11 y falla por `tomllib`.
+
+Para desarrollar sobre el repo:
+
+```bash
+make test        # 64 tests
+make benchmark   # 14 personas, tres capas
+make verificar   # todo lo que corre CI
 ```
 
 ## Reglas que no se rompen

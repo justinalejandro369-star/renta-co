@@ -34,7 +34,7 @@ Poner el valor en pesos al lado de cada papel es lo que hace que la gente efecti
 
 ## 2. `comparativo.md`
 
-La salida de `python3 -m engine.cli calcular --csv`, en prosa:
+La salida de `"$RAIZ/bin/renta" calcular --csv`, en prosa:
 
 - Tabla renglón por renglón, ambas rutas.
 - Cuál gana y por cuánto.

@@ -6,7 +6,7 @@ Revisa el estado del expediente y di, en menos de quince líneas, dónde va y
 qué sigue.
 
 ```bash
-python3 -m engine.cli verificar --expediente ./expediente
+"$RAIZ/bin/renta" verificar --expediente "$PWD/expediente"
 ```
 
 Revisa también:
