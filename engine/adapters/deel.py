@@ -21,7 +21,8 @@ from pathlib import Path
 
 from ..ledger import Movimiento
 from .generico import (abrir_csv, aviso_de_filas_saltadas,
-                       convencion_del_archivo, parse_fecha, parse_monto)
+                       convencion_del_archivo, convencion_de_fecha,
+                       moneda_de, parse_fecha, parse_monto)
 
 NOMBRE = "Deel"
 
@@ -45,13 +46,21 @@ COLUMNAS_FORMA = [
 # y clasificarlo como costo borra el ingreso del ledger Y lo suma como gasto
 # deducible — doble error, los dos a favor del contribuyente.
 REGLAS = [
-    (("invoice", "payment received", "salary", "milestone", "bonus", "payment from",
-      "contract payment", "pago recibido"), "ingreso_trabajo"),
-    (("withdraw", "retiro", "payout to bank", "bank transfer out", "transfer to bank"),
+    # Los traslados a TU PROPIA cuenta van primero, y solo con frases que no
+    # dejan duda ("to bank", "to your bank"). Un retiro trae con frecuencia
+    # el número de la factura que lo originó —"Invoice INV-001 payout to bank
+    # account"— y con los ingresos primero eso volvía a contar como ingreso
+    # el dinero que ya se había contado. Base gravable al doble.
+    (("payout to bank", "payout to your bank", "to your bank account",
+      "transfer to bank", "bank transfer out", "withdraw", "retiro"),
      "traslado"),
     (("internal transfer", "balance transfer", "move funds", "transferencia interna"),
      "traslado"),
+    # Los pagos SALIENTES a terceros, antes que los ingresos: "Payment to
+    # contractor for milestone 2" trae "milestone", y es dinero que sale.
     (("payment to", "contractor payment", "pago a", "payout to contractor"), "costo"),
+    (("invoice", "payment received", "salary", "milestone", "bonus", "payment from",
+      "contract payment", "pago recibido"), "ingreso_trabajo"),
     (("platform fee", "service charge", "wise charged", "transfer fee",
       "comision", "comisión"), "costo"),
 ]
@@ -90,6 +99,44 @@ def detecta(cabeceras: list[str], nombre: str = "") -> bool:
 ENTRANTES = {"ingreso_trabajo", "ingreso_capital"}
 
 
+# El campo `Type` de Deel es ESTRUCTURADO: lo escribe la plataforma, no una
+# persona. La descripción es texto libre. Cuando los dos hablan, manda el
+# estructurado — y no lo hacía: `blob = f"{tipo} {descripcion}"` los mezclaba
+# en una sola cadena y ganaba la primera regla que coincidiera con
+# cualquiera de los dos.
+#
+# El resultado, en un reporte de payouts (montos sin signo + columna de
+# tipo, que es su forma normal):
+#
+#     Type=Withdrawal · "Invoice INV-001 payout to bank account"
+#         → la palabra "invoice" gana → ingreso_trabajo
+#
+# O sea el retiro del dinero que ya se había contado como ingreso se cuenta
+# OTRA VEZ como ingreso. Base gravable al doble, sin un solo aviso, y sin
+# que el veto por signo pueda hacer nada porque el monto viene positivo.
+TIPOS = [
+    # `payout` NO está acá a propósito: en Deel significa tanto "payout to
+    # your bank" (traslado) como "payout to contractor" (costo). Se deja que
+    # decida la descripción, donde las frases de banco van primero.
+    (("withdrawal", "withdraw", "retiro", "cash out"), "traslado"),
+    (("exchange", "conversion", "conversión"), "traslado"),
+    (("payment", "invoice", "salary", "bonus", "milestone", "deposit",
+      "pago", "factura", "payout", "transfer", "transferencia", "fee",
+      "charge"), None),   # ambiguo por sí solo: decide la descripción
+]
+
+
+def _por_tipo(tipo: str) -> str | None:
+    """Categoría que impone el campo estructurado, si impone alguna."""
+    t = tipo.strip().lower()
+    if not t:
+        return None
+    for palabras, categoria in TIPOS:
+        if any(p in t for p in palabras):
+            return categoria
+    return None
+
+
 def _clasificar(tipo: str, descripcion: str, monto: float) -> str:
     """Categoría tributaria de un movimiento de Deel.
 
@@ -109,7 +156,20 @@ def _clasificar(tipo: str, descripcion: str, monto: float) -> str:
     Un ingreso no puede ser una salida de dinero. Cuando el texto dice
     ingreso y el signo dice lo contrario, no se elige uno de los dos: se
     manda a `desconocido`, que es lo que obliga al usuario a mirarlo.
+
+    Y por encima de todo eso manda el campo estructurado `Type`. Ver TIPOS:
+    un `Withdrawal` es un traslado aunque su descripción diga "invoice", y
+    esa era la vía por la que el retiro del dinero ya contado como ingreso
+    se volvía a contar como ingreso.
     """
+    # 1. El campo estructurado, cuando dice algo inequívoco.
+    impuesta = _por_tipo(tipo)
+    if impuesta is not None:
+        if impuesta in ENTRANTES and monto < 0:
+            return "desconocido"
+        return impuesta
+
+    # 2. Si no, el texto libre, con el signo de veto.
     blob = f"{tipo} {descripcion}".lower()
     for palabras, categoria in REGLAS:
         if any(p in blob for p in palabras):
@@ -165,16 +225,19 @@ def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
         sep, avisos_sep = convencion_del_archivo(
             fila.get(c_monto, "") for fila in filas
         )
-        avisos += [f"{ruta.name}: {a}" for a in avisos_sep]
+        conv_fecha, avisos_fecha = convencion_de_fecha(
+            fila.get(c_fecha, "") for fila in filas
+        )
+        avisos += [f"{ruta.name}: {a}" for a in avisos_sep + avisos_fecha]
 
         malas: list[str] = []
         for i, fila in enumerate(filas, start=2):
             crudo = (fila.get(c_fecha) or "").strip()
             if not crudo:
                 continue
-            moneda = (fila.get(c_moneda) or "USD").strip().upper()
             try:
-                fecha = parse_fecha(crudo)
+                moneda = moneda_de(fila, c_moneda, "USD")
+                fecha = parse_fecha(crudo, conv_fecha)
                 monto = parse_monto(fila.get(c_monto, "0"), sep, moneda)
             except ValueError as e:
                 malas.append(f"línea {i}: {e}")

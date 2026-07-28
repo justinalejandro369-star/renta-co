@@ -25,7 +25,8 @@ from pathlib import Path
 
 from engine import adapters
 from engine.adapters import bancolombia, deel, generico, wise
-from engine.adapters.generico import convencion_del_archivo, parse_monto
+from engine.adapters.generico import (convencion_de_fecha,
+                                      convencion_del_archivo, parse_monto)
 
 
 def csv_temporal(nombre: str, contenido: str) -> Path:
@@ -295,11 +296,18 @@ CASOS_DEEL = [
     ("fee", "Wise charged a fee", -40, "costo"),
     ("fee", "Transfer fee", -30, "costo"),
     ("fee", "Comision de la plataforma", -20, "costo"),
-    # Los cuatro que abrió el reordenamiento: texto de ingreso, dinero que SALE.
-    ("payment", "Payment to contractor for milestone 2", -1000, "desconocido"),
-    ("payment", "Payment to Juan - salary March", -900, "desconocido"),
-    ("payment", "Bonus payment to contractor Ana", -600, "desconocido"),
-    ("withdrawal", "Withdrawal - invoice #002 payout", -1500, "desconocido"),
+    # Los cuatro que abrió el reordenamiento de la ronda 4: texto de ingreso,
+    # dinero que SALE. Los pagos a terceros son COSTO —que es lo correcto, no
+    # solo 'no ingreso'— desde que las reglas de salida van antes que las de
+    # ingreso; el retiro es un traslado.
+    ("payment", "Payment to contractor for milestone 2", -1000, "costo"),
+    ("payment", "Payment to Juan - salary March", -900, "costo"),
+    ("payment", "Bonus payment to contractor Ana", -600, "costo"),
+    # Un retiro es un traslado aunque su descripción traiga el número de la
+    # factura que lo originó. Antes salía `ingreso_trabajo` —el dinero ya
+    # contado como ingreso, contado otra vez— y el arreglo por signo lo
+    # dejaba en `desconocido`, que era mejor pero seguía sin ser correcto.
+    ("withdrawal", "Withdrawal - invoice #002 payout", -1500, "traslado"),
 ]
 
 
@@ -333,6 +341,63 @@ class TestSignoEnLaClasificacion(unittest.TestCase):
                         {"ingreso_trabajo", "ingreso_capital"},
                         f"{modulo.NOMBRE}: {palabra!r} en negativo entró como ingreso",
                     )
+
+    def test_el_campo_type_le_gana_a_la_descripcion(self):
+        """`Type` lo escribe Deel; la descripción la escribe una persona.
+        Un `Withdrawal` cuya descripción solo dice "Invoice INV-001" es el
+        retiro del dinero que YA se contó como ingreso: contarlo otra vez
+        duplica la base, y no hay signo que lo delate porque un reporte de
+        payouts trae los montos en positivo."""
+        for tipo in ("Withdrawal", "withdraw", "Retiro", "Cash out"):
+            self.assertEqual(
+                deel._clasificar(tipo, "Invoice INV-001", 9800),
+                "traslado",
+                f"Type={tipo!r} no le ganó a la palabra 'invoice'",
+            )
+        for tipo in ("Exchange", "Conversion"):
+            self.assertEqual(deel._clasificar(tipo, "Salary March", 9800), "traslado")
+
+    def test_pero_un_type_ambiguo_deja_decidir_a_la_descripcion(self):
+        """`Payout` en Deel es tanto "payout to your bank" (traslado) como
+        "payout to contractor" (costo). No puede imponer nada."""
+        self.assertEqual(
+            deel._clasificar("Payout", "Payout to contractor Luis", -650), "costo")
+        self.assertEqual(
+            deel._clasificar("Payout", "Milestone 2 payout to your bank", 9800),
+            "traslado")
+
+    def test_bancolombia_no_manda_a_retencion_cualquier_mencion(self):
+        """`retencion` como subcadena se llevaba a este renglón un pago a
+        proveedor y una ReteICA. Y esta categoría no resta de la base: resta
+        del IMPUESTO, peso por peso, contra un renglón que la DIAN cruza con
+        los certificados de cada agente retenedor."""
+        for desc, esperada in (
+            ("RETENCION EN LA FUENTE", "retencion"),
+            ("RTE FTE HONORARIOS", "retencion"),
+            ("RETEFUENTE MARZO", "retencion"),
+            ("PAGO A PROVEEDOR RETENCION APLICADA", "desconocido"),
+            ("PAGO PSE RETENCION ICA", "desconocido"),
+            ("TRASLADO RETENCION ICA MUNICIPIO", "desconocido"),
+        ):
+            self.assertEqual(
+                bancolombia._clasificar(desc, -1_000_000), esperada,
+                f"{desc!r} se clasificó mal",
+            )
+
+    def test_wise_no_cuenta_como_ingreso_fondear_tu_propia_cuenta(self):
+        """Wise escribe "Received money from <tu nombre> ... top up" cuando
+        te fondeas desde tu banco. En positivo, así que ningún veto de signo
+        lo toca, y contar un traslado como ingreso duplica la base."""
+        self.assertEqual(
+            wise._clasificar("Received money from Justin Diaz with reference top up",
+                             3000),
+            "traslado")
+
+    def test_pero_un_pago_de_cliente_convertido_sigue_siendo_ingreso(self):
+        """El arreglo anterior no puede tragarse el caso de la ronda 2."""
+        self.assertEqual(
+            wise._clasificar("Received money from Cliente SAS, converted to COP", 5000),
+            "ingreso_trabajo")
 
     def test_el_mismo_texto_en_positivo_sigue_siendo_ingreso(self):
         """El veto del signo no puede tragarse los ingresos de verdad."""
@@ -399,6 +464,104 @@ class TestAvisosDeSigno(unittest.TestCase):
 # ---------------------------------------------------------------------
 # 3. Las filas que no se pueden leer
 # ---------------------------------------------------------------------
+
+class TestMoneda(unittest.TestCase):
+    """La segunda ambigüedad que el proyecto no había atacado.
+
+    El separador decimal se resolvió deduciéndolo del archivo. La moneda
+    seguía resolviéndose con constantes del adaptador, que es exactamente el
+    patrón que causó el ×1000 — solo que acá el factor es la TRM, o sea
+    ~4.000.
+    """
+
+    def test_bancolombia_lee_la_columna_de_moneda_si_existe(self):
+        """Bancolombia tiene cuentas en dólares y de compensación. La moneda
+        estaba cableada a COP: 20.000 USD entraban como 20.000 pesos."""
+        ruta = csv_temporal("extracto-usd.csv",
+                            "Fecha,Documento,Descripcion,Moneda,Valor\n"
+                            "15/03/2025,001,ABONO EXTERIOR,USD,20000.00\n")
+        movs = bancolombia.importar(ruta)
+        self.assertEqual(movs[0].moneda, "USD")
+
+    def test_sin_columna_de_moneda_bancolombia_sigue_siendo_pesos(self):
+        ruta = csv_temporal("extracto.csv",
+                            "Fecha,Documento,Descripcion,Valor\n"
+                            "15/03/2025,001,ABONO,2.500.000\n")
+        self.assertEqual(bancolombia.importar(ruta)[0].moneda, "COP")
+
+    def test_una_celda_de_moneda_vacia_es_fila_ilegible_y_no_el_defecto(self):
+        """`(fila.get(c_moneda) or "USD")` convertía 23.000.000 COP en
+        23.000.000 USD por una celda en blanco, en una sola fila del archivo:
+        corrupción parcial que ningún cuadre de totales detecta."""
+        ruta = csv_temporal("deel.csv",
+                            "Payment ID,Fecha,Tipo,Moneda,Monto,Cliente\n"
+                            "P-001,2025-03-15,Pago recibido,COP,15.000.000,A\n"
+                            "P-002,2025-06-16,Pago recibido,,23.000.000,B\n")
+        avisos: list[str] = []
+        movs = deel.importar(ruta, avisos=avisos)
+        self.assertEqual(len(movs), 1)
+        self.assertEqual(movs[0].moneda, "COP")
+        self.assertTrue(any("moneda" in a for a in avisos), avisos)
+
+    def test_una_moneda_que_no_es_iso_tampoco_se_supone(self):
+        """Con TODAS las filas ilegibles se lanza, que es lo correcto: no hay
+        nada que importar y un ledger vacío parecería un año sin ingresos."""
+        ruta = csv_temporal("deel.csv",
+                            "Date,Type,Amount,Currency,Description\n"
+                            "2025-03-14,invoice,3800.00,dólares,Payment received\n")
+        with self.assertRaises(ValueError) as ctx:
+            deel.importar(ruta)
+        self.assertIn("moneda", str(ctx.exception))
+
+    def test_una_fila_con_moneda_mala_entre_buenas_se_salta_y_se_cuenta(self):
+        ruta = csv_temporal("deel.csv",
+                            "Date,Type,Amount,Currency,Description\n"
+                            "2025-03-14,invoice,3800.00,USD,Payment received\n"
+                            "2025-04-14,invoice,3800.00,dólares,Payment received\n")
+        avisos: list[str] = []
+        movs = deel.importar(ruta, avisos=avisos)
+        self.assertEqual(len(movs), 1)
+        self.assertTrue(any("no se pudieron leer" in a for a in avisos), avisos)
+
+
+class TestConvencionDeFecha(unittest.TestCase):
+    """La tercera ambigüedad. Mover un movimiento de mes le cambia la TRM y,
+    en la frontera del año, lo saca del año gravable."""
+
+    def test_un_dia_mayor_que_doce_prueba_la_convencion(self):
+        self.assertEqual(convencion_de_fecha(["01/05/2025", "01/13/2025"])[0], "mdy")
+        self.assertEqual(convencion_de_fecha(["01/05/2025", "13/01/2025"])[0], "dmy")
+
+    def test_un_archivo_en_mm_dd_se_lee_en_mm_dd(self):
+        ruta = csv_temporal("payoneer.csv",
+                            "Date,Description,Currency,Amount\n"
+                            "01/05/2025,Payment from ACME,USD,5000.00\n"
+                            "01/13/2025,Payment from ACME,USD,5000.00\n"
+                            "03/09/2025,Payment from ACME,USD,5000.00\n")
+        avisos: list[str] = []
+        movs = generico.importar(ruta, avisos=avisos)
+        self.assertEqual([m.fecha.isoformat() for m in movs],
+                         ["2025-01-05", "2025-01-13", "2025-03-09"])
+        self.assertTrue(any("mm/dd" in a for a in avisos), avisos)
+
+    def test_un_archivo_colombiano_sigue_leyendose_dd_mm(self):
+        ruta = csv_temporal("banco.csv",
+                            "fecha,descripcion,valor\n"
+                            "05/01/2025,PAGO,1.500.000\n"
+                            "13/01/2025,PAGO,2.500.000\n")
+        movs = generico.importar(ruta)
+        self.assertEqual([m.fecha.isoformat() for m in movs],
+                         ["2025-01-05", "2025-01-13"])
+
+    def test_un_archivo_indecidible_avisa(self):
+        _, avisos = convencion_de_fecha(["01/05/2025", "02/06/2025"])
+        self.assertTrue(any("ambiguas" in a for a in avisos), avisos)
+
+    def test_convenciones_contradictorias_no_inventan_una(self):
+        conv, avisos = convencion_de_fecha(["13/01/2025", "01/13/2025"])
+        self.assertIsNone(conv)
+        self.assertTrue(avisos)
+
 
 class TestCodificaciones(unittest.TestCase):
     """latin-1 acepta cualquier byte, así que nunca falla y el respaldo con

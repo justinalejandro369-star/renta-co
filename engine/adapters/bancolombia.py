@@ -17,7 +17,8 @@ from pathlib import Path
 
 from ..ledger import Movimiento
 from .generico import (abrir_csv, aviso_de_filas_saltadas,
-                       convencion_del_archivo, parse_fecha, parse_monto)
+                       convencion_del_archivo, convencion_de_fecha,
+                       moneda_de, parse_fecha, parse_monto)
 
 NOMBRE = "Bancolombia"
 
@@ -28,7 +29,18 @@ SENALES = {"bancolombia", "sucursal", "descripcion", "descripción", "documento"
 # cualquier pago a un tercero por Nequi, que es como se le paga a medio país.
 REGLAS = [
     (("gmf", "4x1000", "4 x 1000", "gravamen movimiento"), "gasto_personal"),
-    (("retencion", "retención", "rte fte", "retefuente"), "retencion"),
+    # `retencion` a secas se llevaba a este renglón cualquier descripción
+    # que mencionara la palabra: "PAGO A PROVEEDOR RETENCION APLICADA" (un
+    # costo) y "PAGO PSE RETENCION ICA" (un impuesto municipal, que NO es
+    # acreditable en renta). Y esta categoría no resta de la base: resta del
+    # IMPUESTO, peso por peso, contra un renglón que la DIAN cruza con los
+    # certificados de cada agente retenedor. Fabricar crédito acá es de lo
+    # más caro que puede hacer la herramienta.
+    #
+    # Se piden frases de retención EN LA FUENTE. Lo demás va a revisión.
+    (("retencion en la fuente", "retención en la fuente", "rte fte",
+      "retefuente", "rte.fte", "retencion fuente", "retención fuente"),
+     "retencion"),
     (("rendimiento", "intereses ganados", "abono intereses"), "ingreso_capital"),
     # Frases, no subcadenas sueltas: "NEQUI" a secas convertía en traslado
     # cualquier pago a un tercero. Pero tampoco tan literales que dejen de
@@ -80,6 +92,13 @@ def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
         c_monto = col("valor", "monto", "valor total", "importe")
         c_desc = col("descripcion", "descripción", "concepto", "detalle")
         c_doc = col("documento", "referencia", "numero documento")
+        # La moneda se LEE si el archivo la trae. Estaba cableada a "COP", y
+        # Bancolombia sí tiene cuentas en dólares y de compensación: un
+        # extracto en USD reclamado por este adaptador salía como pesos, o
+        # sea dividido por la TRM. Factor ~4.000 de subdeclaración, en
+        # silencio y con código de salida 0. Sin columna, COP es correcto:
+        # es un banco colombiano.
+        c_moneda = col("moneda", "currency", "divisa", "ccy")
 
         if not c_fecha or not c_monto:
             raise ValueError(
@@ -96,7 +115,10 @@ def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
         sep, avisos_sep = convencion_del_archivo(
             fila.get(c_monto, "") for fila in filas
         )
-        avisos += [f"{ruta.name}: {a}" for a in avisos_sep]
+        conv_fecha, avisos_fecha = convencion_de_fecha(
+            fila.get(c_fecha, "") for fila in filas
+        )
+        avisos += [f"{ruta.name}: {a}" for a in avisos_sep + avisos_fecha]
 
         malas: list[str] = []
         for i, fila in enumerate(filas, start=2):
@@ -104,8 +126,9 @@ def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
             if not crudo:
                 continue
             try:
-                fecha = parse_fecha(crudo)
-                monto = parse_monto(fila.get(c_monto, "0"), sep, "COP")
+                moneda = moneda_de(fila, c_moneda, "COP")
+                fecha = parse_fecha(crudo, conv_fecha)
+                monto = parse_monto(fila.get(c_monto, "0"), sep, moneda)
             except ValueError as e:
                 malas.append(f"línea {i}: {e}")
                 continue
@@ -116,7 +139,7 @@ def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
                 fecha=fecha,
                 descripcion=desc or "movimiento bancario",
                 monto_origen=monto,
-                moneda="COP",
+                moneda=moneda,
                 categoria=_clasificar(desc, monto),
                 contraparte=((fila.get(c_doc) or "").strip() if c_doc else ""),
                 fuente=ruta.name,

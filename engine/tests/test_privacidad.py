@@ -343,10 +343,31 @@ class TestEnmascarar(unittest.TestCase):
         """Sirve para ubicarlo en el archivo, no para reconstruirlo."""
         self.assertEqual(esc.enmascarar("1016086781"), "1XXXXXX781")
 
-    def test_un_correo_no_sale_con_el_usuario_completo(self):
-        salida = esc.enmascarar("juan.perez@gmail.com")
+    def test_un_correo_no_sale_ni_con_el_usuario_ni_con_el_dominio(self):
+        """El dominio también identifica: "@bufete-gomez-abogados.com.co"
+        señala a una persona tan bien como el usuario. Se conserva el TLD,
+        que es lo único que ayuda a ubicar el hallazgo sin delatarlo."""
+        salida = esc.enmascarar("juan.perez@bufete-gomez.com.co")
         self.assertNotIn("juan.perez", salida)
-        self.assertTrue(salida.endswith("@gmail.com"))
+        self.assertNotIn("bufete-gomez", salida)
+        self.assertTrue(salida.endswith(".co"))
+
+    def test_una_ruta_de_usuario_no_sale_con_el_nombre(self):
+        """El patrón "ruta de usuario" existe para atrapar el nombre de la
+        cuenta del sistema, y `enmascarar` solo tapaba dígitos: lo alfabético
+        —o sea el dato— salía íntegro en el reporte."""
+        for ruta, nombre in (("/Users/fulanito", "fulanito"),
+                             ("/home/mariafernanda", "mariafernanda"),
+                             (r"C:\Users\JuanPerez", "JuanPerez")):
+            salida = esc.enmascarar(ruta)
+            self.assertNotIn(nombre, salida, f"{ruta!r} salió como {salida!r}")
+
+    def test_una_direccion_no_sale_con_el_barrio(self):
+        salida = esc.enmascarar("Calle 100 #45-20 Apto 301 Barrio Chapinero")
+        self.assertNotIn("Chapinero", salida)
+        # El vocabulario de vía sí se conserva: sin él, el hallazgo no se
+        # puede ubicar en el archivo.
+        self.assertIn("Calle", salida)
 
     def test_los_numeros_cortos_se_borran_enteros(self):
         """Con cuatro dígitos o menos, dejar el primero y los tres últimos
@@ -422,6 +443,56 @@ class TestHookDePreCommit(unittest.TestCase):
         archivo.write_text("sin datos\n", encoding="utf-8")
         r = self._correr("--staged")
         self.assertEqual(r.returncode, 1, f"leyó el disco y no el índice:\n{r.stdout}")
+
+    def test_un_nombre_con_tilde_no_deja_ciego_al_hook(self):
+        """`git diff --cached --name-only` entrecomilla y escapa los nombres
+        no ASCII, así que "cédula.csv" llegaba como "c\\303\\251dula.csv", el
+        `git show` fallaba, el except se lo tragaba y el hook decía "no hay
+        nada en el índice" y salía 0. En Colombia los nombres con tilde y con
+        ñ son el caso normal, no el raro."""
+        import subprocess
+
+        for nombre in ("cédula.csv", "nómina-empleados.csv", "año 2025.csv"):
+            archivo = self.repo / nombre
+            archivo.write_text("cedula: 1016086781\n", encoding="utf-8")
+            subprocess.run(["git", "add", nombre], cwd=self.repo, check=True,
+                           capture_output=True)
+            r = self._correr("--staged")
+            self.assertEqual(r.returncode, 1,
+                             f"{nombre!r} salió 0 con una cédula dentro:\n{r.stdout}")
+            subprocess.run(["git", "rm", "-q", "--cached", nombre], cwd=self.repo,
+                           check=True, capture_output=True)
+
+    def test_lo_que_no_se_puede_leer_detiene_el_commit(self):
+        """Un PDF, un XLSX o una foto de la cédula en el índice imprimían
+        "revísalo a mano" y salían 0: el hook aprobando lo que no miró."""
+        import subprocess
+
+        for nombre, contenido in (("extracto.pdf", b"%PDF-1.4 falso\n"),
+                                  ("soporte.xlsx", b"PK\x03\x04falso"),
+                                  ("cedula.png", b"\x89PNG\r\n\x1a\n")):
+            (self.repo / nombre).write_bytes(contenido)
+            subprocess.run(["git", "add", "-f", nombre], cwd=self.repo, check=True,
+                           capture_output=True)
+            r = self._correr("--staged")
+            self.assertEqual(r.returncode, 1,
+                             f"{nombre} pasó el hook sin poder leerse:\n{r.stdout}")
+            subprocess.run(["git", "rm", "-q", "--cached", nombre], cwd=self.repo,
+                           check=True, capture_output=True)
+
+    def test_la_cedula_en_el_NOMBRE_del_archivo_rompe_el_commit(self):
+        """Un nombre de archivo con la cédula queda en el árbol de GitHub,
+        en el diff y en la URL, indexable, aunque el contenido esté limpio.
+        Así los nombra un banco colombiano."""
+        import subprocess
+
+        nombre = "extracto-cc-1016086781-juan-perez.txt"
+        (self.repo / nombre).write_text("sin datos\n", encoding="utf-8")
+        subprocess.run(["git", "add", nombre], cwd=self.repo, check=True,
+                       capture_output=True)
+        r = self._correr("--staged")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("NOMBRE DEL ARCHIVO", r.stdout)
 
     def test_fuera_de_un_repositorio_no_finge_que_reviso(self):
         import shutil

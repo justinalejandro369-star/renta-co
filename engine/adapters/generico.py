@@ -60,13 +60,87 @@ def _mapear(cabeceras: list[str]) -> dict[str, str]:
     return mapa
 
 
-def parse_fecha(texto: str):
+# Fecha numérica de tres grupos: 01/05/2025. Es la forma ambigua.
+_FECHA_NUMERICA = re.compile(r"^\s*(\d{1,4})[/-](\d{1,2})[/-](\d{2,4})")
+
+
+def convencion_de_fecha(textos) -> tuple[str | None, list[str]]:
+    """¿El archivo escribe dd/mm o mm/dd? Lo decide el ARCHIVO, no la fila.
+
+    Misma clase de problema que el separador decimal, y sin resolver hasta
+    ahora. `FORMATOS_FECHA` prueba `%d/%m/%Y` antes que `%m/%d/%Y`, así que
+    un export en mm/dd —Payoneer, PayPal, cualquier reporte gringo— se lee
+    fila por fila:
+
+        01/05/2025  → 5 de enero      (era 1 de mayo)
+        01/13/2025  → 13 de enero     (correcto, dd/mm no aplica)
+        03/09/2025  → 9 de marzo      (era 3 de septiembre)
+
+    Dos filas transpuestas y una correcta en el MISMO archivo, sin un solo
+    aviso. Y mover un movimiento de mes no es cosmético: en la frontera del
+    año lo saca del año gravable, y con TRM diaria le cambia la tasa.
+
+    La señal que lo resuelve es la misma de siempre: mirar el archivo
+    completo. Un solo `13/01` prueba dd/mm, y un solo `01/13` prueba mm/dd.
+
+    Devuelve ("dmy" | "mdy" | None, avisos). None significa indecidible: se
+    usa el orden por defecto y se avisa.
+    """
+    dmy = mdy = 0
+    ambiguos = 0
+    for crudo in textos:
+        m = _FECHA_NUMERICA.match(str(crudo or ""))
+        if not m:
+            continue
+        a, b = int(m.group(1)), int(m.group(2))
+        if a > 31 or (a > 12 and b > 12):
+            continue                      # ISO o basura: no vota
+        if a > 12:
+            dmy += 1
+        elif b > 12:
+            mdy += 1
+        else:
+            ambiguos += 1
+
+    avisos: list[str] = []
+    if dmy and mdy:
+        avisos.append(
+            f"El archivo trae fechas que solo tienen sentido como dd/mm "
+            f"({dmy}) Y fechas que solo tienen sentido como mm/dd ({mdy}). No "
+            f"se deduce una convención: revisa la columna de fecha antes de "
+            f"dar el ledger por bueno, porque cambiar de mes un movimiento le "
+            f"cambia la TRM y puede sacarlo del año gravable."
+        )
+        return None, avisos
+    if dmy:
+        return "dmy", avisos
+    if mdy:
+        avisos.append(
+            f"El archivo usa fechas en formato mm/dd (lo delatan {mdy} fila(s) "
+            f"con día mayor que 12). Se leen así. Si en realidad eran dd/mm, "
+            f"los movimientos quedaron en el mes equivocado."
+        )
+        return "mdy", avisos
+    if ambiguos:
+        avisos.append(
+            f"Las {ambiguos} fecha(s) numéricas del archivo son ambiguas: "
+            f"ninguna tiene un día mayor que 12, así que nada distingue dd/mm "
+            f"de mm/dd. Se leen como dd/mm, que es lo colombiano. Si el export "
+            f"es de una plataforma gringa, verifica un par contra el original."
+        )
+    return None, avisos
+
+
+def parse_fecha(texto: str, convencion: str | None = None):
     """Fecha de un movimiento, en hora de Colombia.
 
     Los exports de Deel y Wise traen marcas ISO con zona ("2026-01-01T02:30:00Z").
     Cortar la cadena a 19 caracteres descartaba el offset y dejaba la fecha en
     UTC: en la frontera del año gravable eso mueve un movimiento de diciembre
     a enero, y `filtrar_anio` lo bota del ledger.
+
+    `convencion` viene de `convencion_de_fecha()`, o sea de lo que el archivo
+    entero prueba. Nunca de una suposición del adaptador.
     """
     texto = texto.strip()
     if not texto:
@@ -82,7 +156,11 @@ def parse_fecha(texto: str):
             momento = momento.astimezone(HORA_COLOMBIA)
         return momento.date()
 
-    for fmt in FORMATOS_FECHA:
+    formatos = list(FORMATOS_FECHA)
+    if convencion == "mdy":
+        formatos = ["%m/%d/%Y", "%m/%d/%y"] + [f for f in formatos
+                                               if f not in ("%m/%d/%Y",)]
+    for fmt in formatos:
         try:
             recorte = texto[:19] if (" " in texto or "T" in texto) else texto
             return datetime.strptime(recorte, fmt).date()
@@ -428,6 +506,37 @@ def abrir_csv(ruta: Path, avisos: list[str] | None = None):
     return open(ruta, newline="", encoding="utf-8", errors="replace")
 
 
+def moneda_de(fila: dict, columna: str | None, defecto: str) -> str:
+    """Moneda de una fila. Vacía NO es el defecto: es una fila ilegible.
+
+    `(fila.get(c_moneda) or "USD")` parecía inofensivo y era un factor de
+    ~4.000. La guarda de `ErrorSinRespaldo` solo dispara cuando falta la
+    COLUMNA entera; una celda vacía en una fila suelta —lo normal en un
+    export de plataforma de pagos— caía al defecto sin decir nada. En un
+    archivo colombiano con una sola celda vacía, esa fila salía multiplicada
+    por la TRM: corrupción parcial dentro del mismo archivo, que ningún
+    cuadre de totales detecta.
+
+    Es la misma regla que ya aplica a los montos: cuando el dato no está, no
+    se supone. Se marca la fila y se cuenta.
+    """
+    if columna is None:
+        return defecto
+    crudo = (fila.get(columna) or "").strip().upper()
+    if not crudo:
+        raise ValueError(
+            "la celda de moneda está vacía y el archivo SÍ trae columna de "
+            "moneda. No se supone una: suponerla cambia el monto por el "
+            "factor de la TRM. Complétala en el CSV."
+        )
+    if not re.fullmatch(r"[A-Z]{3}", crudo):
+        raise ValueError(
+            f"{crudo!r} no es un código de moneda ISO de tres letras (COP, "
+            f"USD, EUR)."
+        )
+    return crudo
+
+
 def aviso_de_filas_saltadas(nombre: str, malas: list[str], leidas: int) -> str:
     """Mensaje único para las filas que no se pudieron leer.
 
@@ -464,7 +573,10 @@ def importar(ruta: Path, mapa: dict[str, str] | None = None,
         sep, avisos_sep = convencion_del_archivo(
             fila.get(cols["monto"], "") for fila in filas
         )
-        avisos += [f"{ruta.name}: {a}" for a in avisos_sep]
+        conv_fecha, avisos_fecha = convencion_de_fecha(
+            fila.get(cols["fecha"], "") for fila in filas
+        )
+        avisos += [f"{ruta.name}: {a}" for a in avisos_sep + avisos_fecha]
 
         movimientos = []
         descartadas = 0
@@ -473,9 +585,9 @@ def importar(ruta: Path, mapa: dict[str, str] | None = None,
             crudo = (fila.get(cols["fecha"]) or "").strip()
             if not crudo:
                 continue
-            moneda = (fila.get(cols.get("moneda", ""), "") or "COP").strip().upper() or "COP"
             try:
-                fecha = parse_fecha(crudo)
+                moneda = moneda_de(fila, cols.get("moneda"), "COP")
+                fecha = parse_fecha(crudo, conv_fecha)
                 monto = parse_monto(fila.get(cols["monto"], "0"), sep, moneda)
             except ValueError as e:
                 malas.append(f"línea {i}: {e}")

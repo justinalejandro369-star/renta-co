@@ -59,6 +59,12 @@ class TestAlcanceDelMotor(unittest.TestCase):
             datos.setdefault(seccion, {}).update(campos)
         return PF.validar(perfil_con(**datos), P.anios_disponibles())
 
+    def _perfil(self, **cambios):
+        datos = {k: dict(v) for k, v in self.BASE.items()}
+        for seccion, campos in cambios.items():
+            datos.setdefault(seccion, {}).update(campos)
+        return perfil_con(**datos)
+
     def test_el_perfil_base_si_se_puede_calcular(self):
         """El control: sin esto, cualquier guarda pasaría por rechazarlo todo."""
         self.assertEqual(self._errores(), [])
@@ -89,6 +95,58 @@ class TestAlcanceDelMotor(unittest.TestCase):
     def test_un_monto_negativo_se_detiene(self):
         errores = self._errores(costos={"otros": -1_000_000})
         self.assertTrue(any("negativo" in e for e in errores), errores)
+
+    def test_un_punto_de_miles_en_un_campo_de_pesos_se_detiene(self):
+        """`180.000` es TOML VÁLIDO: el float 180.0. Pasaba la validación con
+        un ✓, el motor liquidaba sobre ciento ochenta pesos y devolvía
+        "saldo $0" — la respuesta más cara que puede dar esta herramienta,
+        con el sello de validada puesto. La señal es limpia: un monto en
+        pesos es un entero."""
+        errores = self._errores(ingresos={"rentas_trabajo_honorarios": 180.000})
+        self.assertTrue(errores, "180.000 pasó la validación")
+        self.assertTrue(any("180_000_000" in e for e in errores), errores)
+
+    def test_un_monto_con_centavos_tambien_se_detiene(self):
+        errores = self._errores(costos={"otros": 1_500_000.75})
+        self.assertTrue(any("decimales" in e for e in errores), errores)
+
+    def test_un_entero_de_verdad_no_molesta(self):
+        """El control: la guarda no puede rechazar lo que sí es correcto."""
+        self.assertEqual(self._errores(costos={"otros": 1_500_000}), [])
+
+    def test_el_patrimonio_tambien_se_valida(self):
+        """Era la única sección con montos fuera de ESQUEMA, así que no se
+        validaba nada: un `valor = "350.000.000"` reventaba con un TypeError
+        crudo antes de que nadie pudiera decir qué estaba mal."""
+        errores = self._errores(patrimonio={"activos": [{"valor": "350.000.000"}]})
+        self.assertTrue(any("debe ser un número" in e for e in errores), errores)
+        self.assertTrue(any("patrimonio" in e for e in errores), errores)
+
+    def test_un_activo_negativo_se_detiene(self):
+        """Es la casilla que el art. 648 num. 1 sanciona al 200% por activos
+        omitidos, y pasaba en silencio. Un pasivo negativo, además, AUMENTA
+        el patrimonio líquido: el signo se invierte."""
+        for grupo in ("activos", "pasivos"):
+            errores = self._errores(patrimonio={grupo: [{"valor": -350_000_000}]})
+            self.assertTrue(any("no puede ser negativo" in e for e in errores),
+                            f"{grupo} negativo pasó: {errores}")
+
+    def test_un_patrimonio_con_punto_de_miles_no_revienta_al_cargar(self):
+        """`cargar()` llama a `revisar_faltantes()`, que suma el patrimonio,
+        ANTES de que nadie valide. Tiene que salir el mensaje, no un
+        traceback."""
+        import tempfile
+
+        exp = Path(tempfile.mkdtemp())
+        (exp / "perfil.toml").write_text(
+            "[contribuyente]\nanio_gravable = 2025\nresidente_fiscal = true\n"
+            "[ingresos]\nrentas_trabajo_honorarios = 240_000_000\n"
+            '[[patrimonio.activos]]\nnombre = "Apto"\nvalor = "350.000.000"\n',
+            encoding="utf-8",
+        )
+        p = PF.cargar(exp)                       # no debe lanzar
+        self.assertEqual(p.patrimonio_bruto, 0)
+        self.assertTrue(PF.validar(p, P.anios_disponibles()))
 
     def test_un_texto_donde_va_un_numero_se_detiene(self):
         """En TOML los miles se escriben con guion bajo. Quien los escribe

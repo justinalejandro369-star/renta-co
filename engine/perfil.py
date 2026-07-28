@@ -149,13 +149,33 @@ class Perfil:
     def total_costos(self) -> float:
         return sum(self.get(f"costos.{k}") for k in ESQUEMA["costos"])
 
+    def _suma_patrimonio(self, grupo: str) -> float:
+        """Suma un grupo del patrimonio ignorando lo que no sea un número.
+
+        Tolerante a propósito: `cargar()` llama a `revisar_faltantes()`, que
+        lee estas dos propiedades, ANTES de que nadie haya podido validar
+        nada. Con un `valor = "350.000.000"` —el punto de miles, otra vez, y
+        en el campo donde es más probable— esto reventaba con un TypeError
+        crudo y sin mensaje. Lo que no es número se ignora acá y `validar()`
+        lo reporta con el mensaje que explica cómo se escriben los miles en
+        TOML.
+        """
+        partidas = self.datos.get("patrimonio", {}).get(grupo, [])
+        if not isinstance(partidas, list):
+            return 0.0
+        return sum(
+            p["valor"] for p in partidas
+            if isinstance(p, dict) and isinstance(p.get("valor"), (int, float))
+            and not isinstance(p["valor"], bool)
+        )
+
     @property
     def patrimonio_bruto(self) -> float:
-        return sum(a.get("valor", 0) for a in self.datos.get("patrimonio", {}).get("activos", []))
+        return self._suma_patrimonio("activos")
 
     @property
     def pasivos(self) -> float:
-        return sum(p.get("valor", 0) for p in self.datos.get("patrimonio", {}).get("pasivos", []))
+        return self._suma_patrimonio("pasivos")
 
 
 def _completar(datos: dict) -> tuple[dict, list[str]]:
@@ -181,6 +201,57 @@ def _completar(datos: dict) -> tuple[dict, list[str]]:
     return resultado, supuestos
 
 
+# Campos numéricos que NO son pesos, y por lo tanto sí pueden no ser enteros
+# o quedar fuera de la banda de plausibilidad de un monto.
+NO_SON_PESOS = {"contribuyente.anio_gravable", "deducciones.dependientes"}
+
+MENSAJE_MILES = (
+    "En TOML los miles se escriben con guion bajo, como 180_000_000, o sin "
+    "separador. Nunca con puntos."
+)
+
+
+def _errores_de_monto(ruta: str, valor) -> list[str]:
+    """Valida un campo en pesos: tipo, signo y forma.
+
+    La validación de FORMA existe por el error de tipeo más caro del archivo,
+    y el más natural para alguien que escribe pesos en Colombia:
+
+        rentas_trabajo_honorarios = 180.000     # quiso decir 180 millones
+
+    En TOML eso no es un error de sintaxis: es el float 180.0. Pasaba la
+    validación con un ✓, el motor liquidaba sobre ciento ochenta pesos y
+    devolvía "saldo $0" — la respuesta más cara que puede dar esta
+    herramienta, entregada con el sello de validada puesto. El caso de dos
+    grupos (180.000.000) sí reventaba, con un mensaje excelente que nunca se
+    alcanzaba con un solo grupo.
+
+    La señal es limpia: **un monto en pesos es un entero**. Nadie declara
+    centavos ante la DIAN, y el art. 577 ET manda aproximar al múltiplo de
+    mil más cercano. Un `float` en un campo de pesos es, casi siempre, un
+    punto de miles que TOML se comió. Es la misma idea que la banda
+    TRM_MINIMA/TRM_MAXIMA de trm.py: rechazar lo que no puede ser un dato.
+    """
+    if not isinstance(valor, (int, float)) or isinstance(valor, bool):
+        return [f"{ruta} debe ser un número, no {valor!r}. {MENSAJE_MILES}"]
+    if valor < 0:
+        return [f"{ruta} no puede ser negativo ({valor})"]
+    if isinstance(valor, float) and not valor.is_integer():
+        return [
+            f"{ruta} = {valor} tiene decimales, y un monto en pesos es un "
+            f"entero. {MENSAJE_MILES}"
+        ]
+    if isinstance(valor, float):
+        # Entero pero escrito como float: `180.000` es float 180.0 y `180000`
+        # es int. La diferencia de tipo es justo la huella del punto de miles.
+        return [
+            f"{ruta} = {valor:g} está escrito con punto decimal, así que TOML "
+            f"lo leyó como {valor:g} y no como los {int(valor)}.000 que "
+            f"probablemente querías decir. {MENSAJE_MILES}"
+        ]
+    return []
+
+
 def validar(perfil: Perfil, anios_disponibles: list[int] | None = None) -> list[str]:
     """Errores que impiden calcular. Distinto de 'faltantes', que solo avisan."""
     errores = []
@@ -191,16 +262,44 @@ def validar(perfil: Perfil, anios_disponibles: list[int] | None = None) -> list[
     #        los mensajes que ya se habían recolectado.
     for seccion, campos in ESQUEMA.items():
         for campo, defecto in campos.items():
-            if not isinstance(defecto, bool) and isinstance(defecto, (int, float)):
-                valor = perfil.get(f"{seccion}.{campo}")
+            if isinstance(defecto, bool) or not isinstance(defecto, (int, float)):
+                continue
+            ruta = f"{seccion}.{campo}"
+            valor = perfil.get(ruta)
+            if ruta in NO_SON_PESOS:
                 if not isinstance(valor, (int, float)) or isinstance(valor, bool):
                     errores.append(
-                        f"{seccion}.{campo} debe ser un número, no {valor!r}. "
-                        f"En TOML los miles se escriben con guion bajo, como "
-                        f"180_000_000, o sin separador. Nunca con puntos."
+                        f"{ruta} debe ser un número, no {valor!r}. {MENSAJE_MILES}"
                     )
                 elif valor < 0:
-                    errores.append(f"{seccion}.{campo} no puede ser negativo ({valor})")
+                    errores.append(f"{ruta} no puede ser negativo ({valor})")
+                continue
+            errores += _errores_de_monto(ruta, valor)
+
+    # Patrimonio: la única sección con montos que NO está en ESQUEMA, porque
+    # es una lista de longitud libre. Quedaba sin validar por completo, y
+    # `cargar()` toca `patrimonio_bruto` antes de que nadie valide nada: un
+    # `valor = "350.000.000"` reventaba con un TypeError crudo, sin mensaje,
+    # en el campo donde el punto de miles es más probable. Y un activo
+    # negativo pasaba en silencio — es la casilla que el art. 648 num. 1
+    # sanciona al 200% por activos omitidos.
+    for grupo in ("activos", "pasivos"):
+        partidas = perfil.datos.get("patrimonio", {}).get(grupo, [])
+        if not isinstance(partidas, list):
+            errores.append(f"patrimonio.{grupo} debe ser una lista de partidas.")
+            continue
+        for i, partida in enumerate(partidas, start=1):
+            if not isinstance(partida, dict):
+                errores.append(
+                    f"patrimonio.{grupo}[{i}] debe ser un bloque "
+                    f"[[patrimonio.{grupo}]] con nombre y valor."
+                )
+                continue
+            errores += _errores_de_monto(
+                f"patrimonio.{grupo}[{i}].valor ({partida.get('nombre', 'sin nombre')})",
+                partida.get("valor", 0),
+            )
+
     if errores:
         return errores
 

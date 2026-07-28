@@ -149,21 +149,100 @@ RUIDO = re.compile(
 
 # ---------------------------------------------------------------------
 
+# Palabras que pueden salir en claro dentro de una dirección o una ruta:
+# son vocabulario, no identidad. Todo lo demás se tapa.
+PALABRAS_NEUTRAS = {
+    "calle", "cll", "cl", "carrera", "cra", "kra", "kr", "avenida", "av",
+    "autopista", "diagonal", "dg", "transversal", "tv", "manzana", "mz",
+    "apto", "apartamento", "torre", "bloque", "interior", "int", "piso",
+    "barrio", "km", "via", "users", "home", "c", "d", "documents",
+}
+
+
+def _tapar_palabra(palabra: str) -> str:
+    """Deja la inicial y tapa el resto, salvo que sea vocabulario."""
+    limpia = normalizar(palabra.strip(".,;:()[]\"'"))
+    if not palabra or not any(c.isalpha() for c in palabra):
+        return palabra
+    if limpia in PALABRAS_NEUTRAS or len(limpia) <= 2:
+        return palabra
+    return palabra[0] + "*" * (len(palabra) - 1)
+
+
 def enmascarar(texto: str) -> str:
+    """Versión publicable de un hallazgo.
+
+    El reporte del escáner se pega en un issue, se manda por correo y lo lee
+    el contador. Si `enmascarar` devuelve el dato entero, el informe es él
+    mismo la fuga que el escáner existe para evitar. PRIVACY.md dice
+    "siempre enmascarado" y la skill dice "nunca imprimas el dato completo".
+
+    Tapaba solo los dígitos, así que lo alfabético salía intacto y los dos
+    hallazgos cuyo valor ES alfabético salían enteros:
+
+        "/Users/fulanito"          → "/Users/fulanito"
+        "Calle 100 #45-20 Apto 301 Barrio Chico"
+                                     → "Calle 1XX #XX-XX Apto 301 Barrio Chico"
+
+    El patrón "ruta de usuario" existe justamente para atrapar el nombre de
+    la cuenta del sistema. Ahora se tapan las dos cosas: los dígitos y las
+    palabras que no son vocabulario de dirección.
+    """
     if "@" in texto:
         usuario, _, dominio = texto.partition("@")
-        return f"{usuario[:1]}{'*' * max(len(usuario) - 1, 3)}@{dominio}"
-    digitos = [c for c in texto if c.isdigit()]
-    if len(digitos) <= 4:
-        return re.sub(r"\d", "X", texto)
-    total, vistos, salida = len(digitos), 0, []
-    for c in texto:
-        if c.isdigit():
-            vistos += 1
-            salida.append(c if vistos <= 1 or vistos > total - 3 else "X")
+        # El dominio también se tapa: "@bufete-gomez-abogados.com.co"
+        # identifica a una persona tan bien como el usuario.
+        nombre_dominio, punto, tld = dominio.rpartition(".")
+        dominio_tapado = f"{_tapar_palabra(nombre_dominio)}{punto}{tld}" if punto else dominio
+        return f"{usuario[:1]}{'*' * max(len(usuario) - 1, 3)}@{dominio_tapado}"
+
+    # Los dígitos se cuentan sobre el texto COMPLETO: en "1.016.086.781" hay
+    # que dejar el primero y los tres últimos del número entero, no de cada
+    # grupo. Se decide aquí y se aplica al recorrer.
+    total = sum(1 for c in texto if c.isdigit())
+    vistos = 0
+    salida = []
+    # Se recorre por trozos para poder tratar distinto lo alfabético puro
+    # —donde vive el nombre— y lo que lleva dígitos.
+    for trozo in re.split(r"([^\w]+)", texto):
+        if not trozo:
+            continue
+        if any(c.isdigit() for c in trozo):
+            for c in trozo:
+                if c.isdigit():
+                    vistos += 1
+                    # Con cuatro dígitos o menos se tapan todos: dejar el
+                    # primero y los tres últimos sería dejarlo entero.
+                    visible = total > 4 and (vistos <= 1 or vistos > total - 3)
+                    salida.append(c if visible else "X")
+                else:
+                    salida.append(c)
+        elif re.fullmatch(r"[^\w]+", trozo):
+            salida.append(trozo)
         else:
-            salida.append(c)
+            salida.append(_tapar_palabra(trozo))
     return "".join(salida)
+
+
+# Un nombre de archivo con la cédula queda en el árbol de GitHub, en el diff
+# y en la URL — indexable — aunque el contenido esté limpio.
+# "extracto-cc-1016086781-juan-perez.pdf" es exactamente como los nombra un
+# banco colombiano. Ni `escanear` ni `escanear_indice` miraban la ruta.
+def hallazgos_del_nombre(ruta) -> list[tuple[int, str, str, str]]:
+    nombre = Path(ruta).name
+    hallazgos = []
+    for etiqueta, patron, modo in PATRONES:
+        if modo == "luhn" or etiqueta == "ruta de usuario":
+            continue
+        for m in patron.finditer(nombre):
+            bruto = m.group(0).strip()
+            if bruto:
+                hallazgos.append(
+                    (0, f"{etiqueta} EN EL NOMBRE DEL ARCHIVO",
+                     enmascarar(bruto), "alta")
+                )
+                break
+    return hallazgos
 
 
 def normalizar(texto: str) -> str:
@@ -507,10 +586,20 @@ def escanear_indice(nombres) -> tuple[list[tuple[str, list]], int]:
     lo que se iba a commitear era el blob con el dato.
     """
     try:
+        # `-z` y NO `--name-only` a secas: con la configuración por defecto
+        # (`core.quotePath = true`) git ENTRECOMILLA y escapa los nombres que
+        # no son ASCII puro, así que "cédula.csv" llegaba como
+        # "c\303\251dula.csv". El `git show` de ese nombre inventado fallaba,
+        # el `except ... continue` se tragaba el error, `revisados` quedaba en
+        # cero y el hook imprimía "no hay nada en el índice" y salía 0.
+        #
+        # En Colombia los nombres con tilde y con ñ no son un caso raro: son
+        # el caso normal. `declaración.csv`, `nómina.csv`, `cédula.pdf`. El
+        # hook estaba ciego justo para los archivos que peor pinta tienen.
         salida = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
-            capture_output=True, text=True, check=True,
-        ).stdout
+            ["git", "diff", "--cached", "-z", "--name-only", "--diff-filter=ACMR"],
+            capture_output=True, check=True,
+        ).stdout.decode("utf-8", errors="surrogateescape")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         raise SinIndice(
             f"No se pudo leer el índice de git desde {Path.cwd()} ({e}). "
@@ -518,23 +607,41 @@ def escanear_indice(nombres) -> tuple[list[tuple[str, list]], int]:
             f"está revisando."
         ) from e
 
-    rutas = [p for p in salida.split("\n") if p.strip()]
+    rutas = [p for p in salida.split("\0") if p.strip()]
     resultados, revisados = [], 0
     for ruta in rutas:
-        if Path(ruta).suffix.lower() in BINARIAS:
+        sufijo = Path(ruta).suffix.lower()
+        revisados += 1
+        # Lo que el escáner NO PUEDE leer se reporta y BLOQUEA, no se salta.
+        # Antes un `.pdf`, un `.xlsx` o un `.png` en el índice imprimían
+        # "revísalo a mano" y salían 0: el hook aprobaba un archivo que no
+        # había podido mirar. Un extracto en PDF y una foto de la cédula son
+        # los dos soportes más comunes que existen.
+        if sufijo in BINARIAS or sufijo in OPACAS:
+            resultados.append((ruta, [(0, "formato no legible", sufijo or "(sin extensión)",
+                                       "opaca")]))
             continue
         try:
             blob = subprocess.run(
                 ["git", "show", f":{ruta}"],
                 capture_output=True, check=True,
-            ).stdout.decode("utf-8", errors="replace")
-        except subprocess.CalledProcessError:
+            ).stdout
+        except subprocess.CalledProcessError as e:
+            # Tampoco se salta en silencio: si no se pudo leer el blob, el
+            # hook no tiene con qué aprobar el commit.
+            resultados.append((ruta, [(0, "no se pudo leer del índice",
+                                       str(e.returncode), "opaca")]))
             continue
-        revisados += 1
-        if Path(ruta).suffix.lower() in OPACAS:
-            resultados.append((ruta, [(0, "formato no legible", Path(ruta).suffix, "opaca")]))
+        if b"\0" in blob[:8192]:
+            resultados.append((ruta, [(0, "contenido binario", sufijo or "(sin extensión)",
+                                       "opaca")]))
             continue
-        h = escanear_texto(blob, nombres, Path(ruta).suffix.lower())
+        if len(blob) > MAX_BYTES:
+            resultados.append((ruta, [(0, "archivo muy grande",
+                                       f"{len(blob) // 1024} KB", "opaca")]))
+            continue
+        h = escanear_texto(blob.decode("utf-8", errors="replace"), nombres, sufijo)
+        h += hallazgos_del_nombre(ruta)
         if h:
             resultados.append((ruta, h))
     return resultados, revisados
@@ -639,6 +746,21 @@ def main(argv=None) -> int:
         print("    · Se queda en expediente/   → está bien, ahí debe estar.")
         print("    · Va al contador            → lo necesita; confirma el destinatario.")
         print("    · Va a un repo o a un issue → quítalo o usa un placeholder.")
+        return 1
+
+    # En modo hook, lo que NO se pudo leer bloquea. Un PDF, un XLSX o una
+    # foto de la cédula en el índice salían con "revísalo a mano" y código 0,
+    # o sea el hook aprobando un archivo que no pudo mirar. Y el extracto en
+    # PDF y la foto de la cédula son los dos soportes más comunes que hay.
+    #
+    # Fuera del hook no bloquea: ahí el escaneo es informativo y el usuario
+    # está mirando la salida.
+    if args.staged and opacas:
+        print(f"⚠ {opacas} archivo(s) del índice que este escáner NO PUDO LEER.")
+        print()
+        print("  El commit se detiene: no se puede aprobar lo que no se revisó.")
+        print("  Míralos a mano y, si están bien, saca el archivo del índice o")
+        print("  commitea con --no-verify a sabiendas de lo que llevas.")
         return 1
 
     print(f"✓ Sin datos personales de confianza alta en {revisados} archivo(s).")

@@ -12,7 +12,8 @@ from pathlib import Path
 
 from ..ledger import Movimiento
 from .generico import (abrir_csv, aviso_de_filas_saltadas,
-                       convencion_del_archivo, parse_fecha, parse_monto)
+                       convencion_del_archivo, convencion_de_fecha,
+                       moneda_de, parse_fecha, parse_monto)
 
 NOMBRE = "Wise"
 
@@ -24,9 +25,19 @@ SENALES = {"transferwise", "running balance", "exchange from", "exchange to"}
 # los traslados porque "Received money from Cliente — converted to COP" trae
 # las dos palabras, y clasificarlo como traslado borra un ingreso del ledger.
 REGLAS = [
+    # PRIMERO, y solo las frases que NO admiten otra lectura: fondear tu
+    # propia cuenta. Wise escribe literalmente "Received money from <tu
+    # nombre> with reference top up", así que con los ingresos primero eso
+    # entraba como ingreso_trabajo, en positivo —ningún veto de signo lo
+    # tocaba— y contar un traslado como ingreso duplica la base, que es
+    # justo lo que este módulo dice prevenir.
+    #
+    # "converted" y "exchange" NO van acá: un pago de cliente convertido a
+    # pesos los trae, y mandarlo a traslado borraría un ingreso del ledger.
+    # Esos siguen abajo, después de los ingresos, como estaban.
+    (("top up", "topped up", "top-up", "sent money to your"), "traslado"),
     (("received money from", "incoming payment", "deposit from"), "ingreso_trabajo"),
-    (("exchange from", "exchange to", "balance transfer", "converted",
-      "sent money to your", "topped up"), "traslado"),
+    (("exchange from", "exchange to", "balance transfer", "converted"), "traslado"),
     (("wise charged", "fee for", "transfer fee"), "costo"),
     (("sent money to",), "desconocido"),   # puede ser costo o gasto personal
 ]
@@ -101,16 +112,19 @@ def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
         sep, avisos_sep = convencion_del_archivo(
             fila.get(c_monto, "") for fila in filas
         )
-        avisos += [f"{ruta.name}: {a}" for a in avisos_sep]
+        conv_fecha, avisos_fecha = convencion_de_fecha(
+            fila.get(c_fecha, "") for fila in filas
+        )
+        avisos += [f"{ruta.name}: {a}" for a in avisos_sep + avisos_fecha]
 
         malas: list[str] = []
         for i, fila in enumerate(filas, start=2):
             crudo = (fila.get(c_fecha) or "").strip()
             if not crudo:
                 continue
-            moneda = (fila.get(c_moneda) or "USD").strip().upper()
             try:
-                fecha = parse_fecha(crudo)
+                moneda = moneda_de(fila, c_moneda, "USD")
+                fecha = parse_fecha(crudo, conv_fecha)
                 monto = parse_monto(fila.get(c_monto, "0"), sep, moneda)
             except ValueError as e:
                 malas.append(f"línea {i}: {e}")
