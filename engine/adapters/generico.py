@@ -141,6 +141,45 @@ def _forma(t: str) -> tuple[list[str], list[str], list[int]] | None:
 SIN_FRACCION_SIGNIFICATIVA = {"COP", "CLP", "PYG", "IDR", "VND", "KRW", "JPY"}
 
 
+def _relleno_de_ceros(entero: str) -> bool:
+    """¿La parte entera viene rellena con ceros a la izquierda?
+
+    "054.937" y "0054.937" son montos con cero de relleno —los extractos los
+    traen— y leerlos como decimales los divide por mil. El relleno solo
+    existe sobre enteros: nadie escribe 0,5 como "00,5".
+
+    Es la señal que faltaba y que costó una regresión: la excepción se
+    escribió como `startswith("0")`, que también atrapa al cero solo, y
+    "054.937" pasó a valer 55 pesos.
+    """
+    return len(entero) > 1 and entero[0] == "0"
+
+
+def _resolver_ambiguo(entero: str, sep: str, sep_decimal: str | None,
+                      moneda: str | None) -> list[int]:
+    """Un separador con tres dígitos detrás: ¿miles o decimal?
+
+    Devuelve [0] si es decimal, [] si es de miles. Es el único punto del
+    parser donde una decisión equivocada cambia el valor por un factor de
+    mil, así que vive aparte y con las señales en orden explícito.
+    """
+    # "0.500": ningún grupo de miles empieza en cero solo. Es decimal.
+    if entero == "0":
+        return [0]
+    # "054.937": cero de relleno, o sea entero. Es de miles.
+    if _relleno_de_ceros(entero):
+        return []
+    # "12500.750": cinco dígitos de parte entera no son un grupo de miles.
+    if len(entero) > 3:
+        return [0]
+    # Banda de moneda: un movimiento en pesos de "1,234" no es un peso con
+    # veintitrés centavos.
+    if (moneda or "").strip().upper() in SIN_FRACCION_SIGNIFICATIVA:
+        return []
+    # Y solo al final, lo que el ARCHIVO haya probado.
+    return [0] if sep_decimal == sep else []
+
+
 def parse_monto(texto: str, sep_decimal: str | None = None,
                 moneda: str | None = None) -> float:
     """Convierte un monto a float. Formato colombiano y anglosajón.
@@ -170,12 +209,14 @@ def parse_monto(texto: str, sep_decimal: str | None = None,
     colombiano por debajo del millón, así que resolverlo mal no es un caso
     raro: es la mitad de un extracto.
 
-    Se resuelve por tres señales, en este orden, y ninguna es una constante
-    del adaptador:
+    Se resuelve por tres señales, en este orden —ver `_resolver_ambiguo`— y
+    ninguna es una constante del adaptador:
 
-      1. La estructura del propio número — "12500.750" tiene cinco dígitos
-         de parte entera, así que no es un grupo de miles; "0.500" empieza
-         en cero solo, y un grupo de miles no lo hace.
+      1. La estructura del propio número. "0.500" empieza en cero solo, y un
+         grupo de miles no lo hace: es decimal. "054.937" empieza en cero
+         PERO tiene más dígitos, o sea que es relleno, y el relleno solo
+         existe sobre enteros: es de miles. "12500.750" tiene cinco dígitos
+         de parte entera, así que tampoco es un grupo de miles: es decimal.
       2. La MONEDA. Un movimiento en pesos de "1,234" no son un peso con
          veintitrés centavos. Ver SIN_FRACCION_SIGNIFICATIVA.
       3. `sep_decimal`, que ahora solo puede venir de
@@ -210,16 +251,7 @@ def parse_monto(texto: str, sep_decimal: str | None = None,
     grupos, seps, decimales = forma
 
     if not decimales and len(seps) == 1:
-        entero = grupos[0]
-        # `entero == "0"` y no `startswith("0")`: "054.937" es un monto con
-        # cero de relleno —los extractos los traen— y leerlo como decimal lo
-        # dividía por mil. Solo el cero solo delata un decimal.
-        if len(entero) > 3 or entero == "0":
-            decimales = [0]
-        elif (moneda or "").strip().upper() in SIN_FRACCION_SIGNIFICATIVA:
-            pass                              # banda de moneda: es de miles
-        elif sep_decimal == seps[0]:
-            decimales = [0]
+        decimales = _resolver_ambiguo(grupos[0], seps[0], sep_decimal, moneda)
 
     if len(decimales) > 1:
         raise malo("hay más de un separador decimal")
@@ -238,8 +270,13 @@ def parse_monto(texto: str, sep_decimal: str | None = None,
 
     if seps_miles and len(set(seps_miles)) > 1:
         raise malo("mezcla puntos y comas como separadores de miles")
-    if len(entero_grupos) > 1 and len(entero_grupos[0]) > 3:
-        raise malo(f"el primer grupo de miles tiene {len(entero_grupos[0])} dígitos")
+    # El primer grupo se mide SIN sus ceros de relleno: "0054.937" es un
+    # monto de cinco cifras escrito con relleno, no un agrupamiento
+    # malformado. Los demás grupos sí van tal cual, porque un cero a la
+    # izquierda dentro de un grupo de miles es normal ("1.054.937").
+    primero = entero_grupos[0].lstrip("0") or "0"
+    if len(entero_grupos) > 1 and len(primero) > 3:
+        raise malo(f"el primer grupo de miles tiene {len(primero)} dígitos")
 
     valor = float("".join(entero_grupos) + ("." + fraccion if fraccion else ""))
     if not math.isfinite(valor):
@@ -289,7 +326,12 @@ def convencion_del_archivo(valores) -> tuple[str | None, list[str]]:
             decimales.add(seps[-1])
             miles.update(seps[:-1])
         elif len(seps) == 1:
-            if len(grupos[0]) > 3 or grupos[0] == "0":
+            entero = grupos[0]
+            if _relleno_de_ceros(entero):
+                # "054.937" no vota como decimal: es un entero con relleno, y
+                # dejarlo votar contaminaría la lectura del resto del archivo.
+                miles.add(seps[0])
+            elif len(entero) > 3 or entero == "0":
                 decimales.add(seps[0])
             else:
                 ambiguos += 1

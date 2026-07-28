@@ -25,6 +25,26 @@ rentas_trabajo_honorarios = 0
 rentas_capital = 0
 otras_rentas_no_laborales = 0
 
+#  ── Lo que este motor NO liquida ────────────────────────────────────
+#  Estos tres campos existen para que los DECLARES si te aplican. El motor
+#  los detecta y se detiene, en vez de meterlos en la cédula equivocada y
+#  darte un número creíble y equivocado.
+#
+#  Si dejas cualquiera de los tres en 0 sin que sea cierto, el borrador va
+#  a salir completo, con aspecto de estar bien, y va a estar mal. Es el
+#  único error de esta herramienta que no se ve mirando el resultado.
+#
+#  Salario de una relación laboral. Un asalariado no detrae costos: la
+#  opción del art. 336 num. 4 solo ata a quien percibe honorarios.
+rentas_laborales_salario = 0
+#  Pensión. Exenta hasta 1.000 UVT mensuales (art. 206 num. 5), por una
+#  regla distinta a la del 25% de rentas de trabajo.
+rentas_pension = 0
+#  Ganancia ocasional: venta de un activo poseído más de 2 años, herencia,
+#  lotería, rifa. Tributa en cédula aparte al 15% o al 20% (arts. 314 y
+#  317), no en la tabla del art. 241.
+ganancia_ocasional = 0
+
 # ── Ingresos no constitutivos de renta ────────────────────────────────
 # Restan ANTES del tope del 40% y no lo consumen: es la mejor posición
 # posible. No los pongas como deducción — les quita valor.

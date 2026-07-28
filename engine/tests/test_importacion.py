@@ -181,6 +181,43 @@ class TestBandaDeMoneda(unittest.TestCase):
             self.assertEqual(parse_monto("12500.750", ".", moneda), 12500.75)
 
 
+class TestCerosDeRelleno(unittest.TestCase):
+    """La excepción con el predicado demasiado ancho, del historial.
+
+    `entero == "0"` distingue el cero SOLO —que sí delata un decimal, porque
+    ningún grupo de miles empieza en cero— de un cero de RELLENO, que los
+    extractos traen. Escrito como `startswith("0")`, "054.937" se leía como
+    55 pesos: un factor de mil, y en la dirección que hace que el número se
+    vea razonable.
+
+    Ninguna aserción lo cubría porque los montos de prueba no tenían ceros
+    de relleno, que es exactamente la forma del dato real.
+    """
+
+    def test_un_cero_de_relleno_no_convierte_el_monto_en_decimal(self):
+        for texto, esperado in (("054.937", 54_937), ("0054.937", 54_937),
+                                ("007.500", 7_500), ("0123.456", 123_456)):
+            for pista in (None, ".", ","):
+                for moneda in ("COP", "USD", None):
+                    self.assertEqual(
+                        parse_monto(texto, pista, moneda), esperado,
+                        f"{texto!r} con pista {pista!r} y moneda {moneda} "
+                        f"no dio {esperado}",
+                    )
+
+    def test_el_cero_solo_si_delata_un_decimal(self):
+        """Nadie escribe quinientos como '0.500'."""
+        self.assertEqual(parse_monto("0.500", None, "USD"), 0.5)
+        self.assertEqual(parse_monto("0,500", None, "USD"), 0.5)
+
+    def test_un_archivo_con_ceros_de_relleno_no_prueba_una_convencion_falsa(self):
+        """'054.937' no puede votar como si el punto fuera decimal: si lo
+        hiciera, contaminaría la lectura del resto del archivo."""
+        sep, _ = convencion_del_archivo(["054.937", "150.000", "2.500.000"])
+        self.assertIsNone(sep)
+        self.assertEqual(parse_monto("150.000", sep, "COP"), 150_000)
+
+
 class TestNingunAdaptadorSuponeLaConvencion(unittest.TestCase):
     """La causa raíz: una constante del adaptador decidiendo el factor de mil.
 

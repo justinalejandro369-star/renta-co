@@ -67,7 +67,11 @@ Confirma con una frase corta y da la instrucción:
 
 ## Paso 2 — Preguntas de arranque
 
-Solo estas cuatro, ahora. El resto sale de los documentos.
+Solo estas cinco, ahora. El resto sale de los documentos.
+
+La quinta no es opcional ni es un extra: es la que decide **si este motor
+aplica**. Sin ella, un pensionado obtiene una liquidación completa de
+honorarios sin una sola advertencia.
 
 1. **¿Qué año gravable?** Si no lo sabe: el año pasado. Verifica que exista `knowledge/ag<año>/`.
 2. **¿Fuiste residente fiscal en Colombia ese año?** Más de 183 días en el país, continuos o no, en un período de 365 días. Si dice que no, **detente**: tributa por otras reglas que este motor no cubre.

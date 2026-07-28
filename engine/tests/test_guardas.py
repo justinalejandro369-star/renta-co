@@ -1,0 +1,541 @@
+"""Las guardas: lo que impide un número creíble y equivocado.
+
+Por qué existe este archivo
+───────────────────────────
+La medición de la ronda 5 encontró que el núcleo tributario detectaba 19 de
+20 mutaciones, y que las GUARDAS alrededor no detectaban casi ninguna:
+
+  · `perfil.validar()`: 0%. Escapaban las seis — no residente, pensión,
+    ganancia ocasional, salario, montos negativos, `str` donde va número.
+  · Los veredictos de `verificar_obligaciones`: el benchmark solo comprobaba
+    que existieran los `id` y que la severidad fuera válida. Escapaban el
+    umbral de patrimonio ×10, R-01 comparando contra el umbral equivocado y
+    R-09 invertido. El titular más peligroso de la herramienta —«¿estás
+    obligado a declarar?»— no tenía una sola aserción de contenido.
+  · `_validar_tarifa`: 4 de sus 5 chequeos eran verificación muerta, porque
+    el único test pasaba por la rama `tarifas[-1] <= 0` sin importar cuál de
+    las otras estuviera viva. Acá va uno por chequeo.
+
+La regla es la misma en todo el archivo: se afirma el CONTENIDO del
+veredicto, no que el veredicto exista.
+"""
+
+from __future__ import annotations
+
+import tempfile
+import unittest
+from datetime import date, timedelta
+from pathlib import Path
+
+from engine import parametros as P
+from engine import perfil as PF
+from engine.depuracion import verificar_obligaciones
+from engine.ledger import Ledger, Movimiento
+from engine.parametros import ParametrosNoEncontrados
+from engine.trm import TRM, SinTRM
+
+RAIZ = Path(__file__).resolve().parent.parent.parent
+
+
+def perfil_con(**secciones) -> PF.Perfil:
+    datos, supuestos = PF._completar(secciones)
+    return PF.Perfil(datos, None, supuestos)
+
+
+# ---------------------------------------------------------------------
+# perfil.validar() — las seis que escapaban
+# ---------------------------------------------------------------------
+
+class TestAlcanceDelMotor(unittest.TestCase):
+    """Cada una de estas liquidaría de más o de menos por decenas de
+    millones si el motor siguiera adelante. Y el resultado se ve bien."""
+
+    BASE = {"contribuyente": {"anio_gravable": 2025, "residente_fiscal": True},
+            "ingresos": {"rentas_trabajo_honorarios": 180_000_000}}
+
+    def _errores(self, **cambios):
+        datos = {k: dict(v) for k, v in self.BASE.items()}
+        for seccion, campos in cambios.items():
+            datos.setdefault(seccion, {}).update(campos)
+        return PF.validar(perfil_con(**datos), P.anios_disponibles())
+
+    def test_el_perfil_base_si_se_puede_calcular(self):
+        """El control: sin esto, cualquier guarda pasaría por rechazarlo todo."""
+        self.assertEqual(self._errores(), [])
+
+    def test_un_no_residente_se_detiene(self):
+        errores = self._errores(contribuyente={"residente_fiscal": False})
+        self.assertTrue(any("FUERA DE ALCANCE" in e and "residente" in e
+                            for e in errores), errores)
+
+    def test_la_pension_se_detiene(self):
+        errores = self._errores(ingresos={"rentas_pension": 30_000_000})
+        self.assertTrue(any("FUERA DE ALCANCE" in e and "pensión" in e.lower()
+                            for e in errores), errores)
+        self.assertTrue(any("206" in e for e in errores),
+                        "el mensaje no cita el art. 206 num. 5")
+
+    def test_la_ganancia_ocasional_se_detiene(self):
+        errores = self._errores(ingresos={"ganancia_ocasional": 50_000_000})
+        self.assertTrue(any("FUERA DE ALCANCE" in e and "ocasional" in e
+                            for e in errores), errores)
+        self.assertTrue(any("314" in e for e in errores))
+
+    def test_el_salario_se_detiene(self):
+        errores = self._errores(ingresos={"rentas_laborales_salario": 60_000_000})
+        self.assertTrue(any("FUERA DE ALCANCE" in e and "336" in e
+                            for e in errores), errores)
+
+    def test_un_monto_negativo_se_detiene(self):
+        errores = self._errores(costos={"otros": -1_000_000})
+        self.assertTrue(any("negativo" in e for e in errores), errores)
+
+    def test_un_texto_donde_va_un_numero_se_detiene(self):
+        """En TOML los miles se escriben con guion bajo. Quien los escribe
+        como en Colombia —180.000.000— produce un float de 180 o un str."""
+        errores = self._errores(ingresos={"rentas_trabajo_honorarios": "180.000.000"})
+        self.assertTrue(any("debe ser un número" in e for e in errores), errores)
+
+    def test_el_error_de_tipo_corta_antes_de_hacer_aritmetica(self):
+        """Va PRIMERO y devuelve solo: el resto de las validaciones hace
+        cuentas y reventaría con un traceback."""
+        errores = self._errores(ingresos={"rentas_trabajo_honorarios": "mucho"},
+                                deducciones={"dependientes": 99})
+        self.assertTrue(all("debe ser un número" in e for e in errores), errores)
+
+    def test_mas_de_cuatro_dependientes_se_detiene(self):
+        errores = self._errores(deducciones={"dependientes": 5})
+        self.assertTrue(any("máximo 4" in e for e in errores), errores)
+
+    def test_un_anio_sin_parametros_se_detiene(self):
+        errores = self._errores(contribuyente={"anio_gravable": 1999})
+        self.assertTrue(any("1999" in e for e in errores), errores)
+
+    def test_todas_las_guardas_de_alcance_estan_probadas(self):
+        """Cierra la clase: si alguien agrega un cuarto campo fuera de
+        alcance a ESQUEMA['ingresos'] y no lo prueba, esto falla."""
+        fuera_de_alcance = {"rentas_laborales_salario", "rentas_pension",
+                            "ganancia_ocasional"}
+        for campo in fuera_de_alcance:
+            self.assertIn(campo, PF.ESQUEMA["ingresos"])
+            errores = self._errores(ingresos={campo: 1_000_000})
+            self.assertTrue(any("FUERA DE ALCANCE" in e for e in errores),
+                            f"{campo} no detiene el cálculo")
+        # Y los que SÍ liquida no pueden haberse colado en la lista.
+        for campo in PF.Perfil.INGRESOS_CEDULA_GENERAL:
+            self.assertNotIn(campo, fuera_de_alcance)
+
+
+# ---------------------------------------------------------------------
+# verificar_obligaciones — el contenido, no la forma
+# ---------------------------------------------------------------------
+
+class TestVeredictosDeObligacion(unittest.TestCase):
+    def setUp(self):
+        self.par = P.cargar(2025)
+        self.uvt = self.par.uvt
+
+    def _check(self, id_, **secciones):
+        datos = {"contribuyente": {"anio_gravable": 2025, "residente_fiscal": True}}
+        for seccion, campos in secciones.items():
+            datos.setdefault(seccion, {}).update(campos)
+        checks = verificar_obligaciones(perfil_con(**datos), self.par)
+        encontrado = next((c for c in checks if c["id"] == id_), None)
+        self.assertIsNotNone(encontrado, f"no se emitió {id_}: {[c['id'] for c in checks]}")
+        return encontrado
+
+    # ---- OBL-01: el titular más peligroso de la herramienta -----------
+
+    def test_obl01_dispara_justo_en_el_umbral_de_ingresos(self):
+        """1.400 UVT exactas ya obligan: el art. 594-3 dice «igual o superior».
+        Un ×10 en el umbral, o un > donde va >=, cambia el veredicto."""
+        tope = 1400 * self.uvt
+        justo = self._check("OBL-01", ingresos={"rentas_trabajo_honorarios": tope})
+        self.assertEqual(justo["estado"], "SÍ")
+        self.assertIn("ingresos brutos", justo["detalle"])
+
+        debajo = self._check(
+            "OBL-01",
+            ingresos={"rentas_trabajo_honorarios": tope - 1},
+            patrimonio={},
+        )
+        self.assertNotEqual(debajo["estado"], "SÍ")
+
+    def test_obl01_usa_4500_uvt_para_patrimonio_y_no_el_de_ingresos(self):
+        """El umbral de patrimonio es 4.500 UVT, no 1.400. Confundirlos hace
+        que alguien con 1.500 UVT de patrimonio y sin ingresos crea que
+        tiene que declarar, o al revés."""
+        entre_los_dos = 2_000 * self.uvt
+        c = self._check("OBL-01",
+                        patrimonio={"activos": [{"valor": entre_los_dos}]})
+        self.assertNotEqual(
+            c["estado"], "SÍ",
+            "2.000 UVT de patrimonio no superan el umbral de 4.500")
+
+        arriba = self._check("OBL-01",
+                             patrimonio={"activos": [{"valor": 4_500 * self.uvt}]})
+        self.assertEqual(arriba["estado"], "SÍ")
+        self.assertIn("patrimonio bruto", arriba["detalle"])
+
+    def test_obl01_no_afirma_que_no_cuando_el_perfil_esta_a_medias(self):
+        """«NO estás obligado» con el perfil vacío es la afirmación que
+        termina en sanción por extemporaneidad."""
+        c = self._check("OBL-01")
+        self.assertIn("NO SE PUEDE AFIRMAR", c["estado"])
+        self.assertEqual(c["severidad"], "media")
+
+    def test_obl01_solo_dice_que_no_con_los_tres_insumos_cargados(self):
+        c = self._check(
+            "OBL-01",
+            ingresos={"rentas_trabajo_honorarios": 10_000_000},
+            patrimonio={"activos": [{"valor": 5_000_000}]},
+            verificaciones={"consignaciones_totales_anio": 5_000_000},
+        )
+        self.assertEqual(c["estado"], "NO por los datos cargados")
+        self.assertIn("tarjeta de", c["detalle"],
+                      "no advierte de los dos umbrales que no modela")
+
+    # ---- R-01: el umbral de IVA --------------------------------------
+
+    def test_r01_compara_contra_3500_uvt_y_no_contra_otro_umbral(self):
+        tope = 3_500 * self.uvt
+        dentro = self._check("R-01",
+                             verificaciones={"consignaciones_totales_anio": tope})
+        self.assertEqual(dentro["estado"], "DENTRO DEL UMBRAL",
+                         "3.500 UVT exactas todavía NO superan el umbral")
+
+        fuera = self._check("R-01",
+                            verificaciones={"consignaciones_totales_anio": tope + 1})
+        self.assertEqual(fuera["estado"], "UMBRAL SUPERADO")
+        self.assertEqual(fuera["severidad"], "alta")
+
+    def test_r01_lee_la_clave_de_consignaciones_y_no_una_vecina(self):
+        """En AG2025 `ingresos_brutos_uvt` y `consignaciones_uvt` valen los
+        dos 3.500, así que confundirlos no cambia ni un peso y ninguna
+        aserción sobre el resultado lo notaría. Se prueba con parámetros
+        donde los umbrales vecinos son DISTINTOS, que es lo único que
+        distingue «lee la clave correcta» de «da el número correcto por
+        casualidad».
+        """
+        par = P.Parametros(
+            {
+                "uvt": {"valor": 100},
+                "umbrales": {
+                    "obligado_a_declarar": {"ingresos_brutos_uvt": 1_400},
+                    "no_responsable_iva": {
+                        "ingresos_brutos_uvt": 9_000,
+                        "consignaciones_uvt": 3_500,
+                        "consignaciones_uvt_contratistas_del_estado": 4_000,
+                    },
+                },
+                "tarifa": {"rangos": [{"desde_uvt": 0, "hasta_uvt": 0,
+                                       "tarifa": 0.39, "adicional_uvt": 0}]},
+            },
+            set(), 2025,
+        )
+        perfil = perfil_con(
+            contribuyente={"anio_gravable": 2025, "residente_fiscal": True},
+            verificaciones={"consignaciones_totales_anio": 3_500 * 100 + 1},
+        )
+        r01 = next(c for c in verificar_obligaciones(perfil, par) if c["id"] == "R-01")
+        self.assertEqual(r01["estado"], "UMBRAL SUPERADO")
+
+        justo_debajo = perfil_con(
+            contribuyente={"anio_gravable": 2025, "residente_fiscal": True},
+            verificaciones={"consignaciones_totales_anio": 3_500 * 100},
+        )
+        r01 = next(c for c in verificar_obligaciones(justo_debajo, par)
+                   if c["id"] == "R-01")
+        self.assertEqual(r01["estado"], "DENTRO DEL UMBRAL")
+
+    def test_r01_sin_cuantificar_no_se_lee_como_estar_dentro(self):
+        c = self._check("R-01")
+        self.assertEqual(c["estado"], "SIN CUANTIFICAR")
+        self.assertEqual(c["severidad"], "media")
+
+    def test_r01_siempre_repite_el_calificador_de_actividad_gravada(self):
+        """El art. 437 par. 3 num. 6 mide consignaciones PROVENIENTES DE
+        ACTIVIDADES GRAVADAS. Omitirlo convierte la advertencia en una
+        alarma falsa que empuja a inscribirse como responsable de IVA."""
+        for consig in (0, 1_000_000, 4_000 * self.uvt):
+            c = self._check("R-01",
+                            verificaciones={"consignaciones_totales_anio": consig})
+            self.assertIn("gravadas con IVA", c["detalle"])
+
+    # ---- R-09: el tope indicativo del 60% ----------------------------
+
+    def test_r09_se_emite_por_encima_del_60_y_no_por_debajo(self):
+        """Invertir la comparación es la mutación obvia, y produce el aviso
+        exactamente en los perfiles a los que no aplica."""
+        ingresos = 100_000_000
+        arriba = verificar_obligaciones(
+            perfil_con(contribuyente={"anio_gravable": 2025, "residente_fiscal": True},
+                       ingresos={"rentas_trabajo_honorarios": ingresos},
+                       costos={"otros": 61_000_000}),
+            self.par,
+        )
+        self.assertIn("R-09", [c["id"] for c in arriba])
+
+        abajo = verificar_obligaciones(
+            perfil_con(contribuyente={"anio_gravable": 2025, "residente_fiscal": True},
+                       ingresos={"rentas_trabajo_honorarios": ingresos},
+                       costos={"otros": 59_000_000}),
+            self.par,
+        )
+        self.assertNotIn("R-09", [c["id"] for c in abajo])
+
+    def test_r09_cita_el_articulo_que_lo_sustenta(self):
+        c = self._check("R-09",
+                        ingresos={"rentas_trabajo_honorarios": 100_000_000},
+                        costos={"otros": 70_000_000})
+        self.assertIn("336-1", c["fuente"])
+        self.assertEqual(c["severidad"], "alta")
+
+    # ---- R-02 ---------------------------------------------------------
+
+    def test_r02_se_emite_solo_si_hay_pagos_sin_pila_verificada(self):
+        con = self._check("R-02", costos={"pagos_a_contratistas": 48_000_000})
+        self.assertEqual(con["severidad"], "alta")
+        self.assertIn("108", con["fuente"])
+
+        sin = verificar_obligaciones(
+            perfil_con(contribuyente={"anio_gravable": 2025, "residente_fiscal": True},
+                       costos={"pagos_a_contratistas": 48_000_000},
+                       verificaciones={"contratistas_con_pila_verificada": True}),
+            self.par,
+        )
+        self.assertNotIn("R-02", [c["id"] for c in sin])
+
+
+# ---------------------------------------------------------------------
+# _validar_tarifa — un test por chequeo
+# ---------------------------------------------------------------------
+
+TARIFA_2025 = [
+    (0, 1090, 0.00, 0), (1090, 1700, 0.19, 0), (1700, 4100, 0.28, 116),
+    (4100, 8670, 0.33, 788), (8670, 18970, 0.35, 2296),
+    (18970, 31000, 0.37, 5901), (31000, 0, 0.39, 10352),
+]
+
+
+class TestValidarTarifa(unittest.TestCase):
+    """`_fusionar` reemplaza las listas enteras: un hijo que declare un solo
+    `[[tarifa.rangos]]` borra los otros seis y el motor liquida cero para
+    cualquier base. Los cinco chequeos existen por eso, y cuatro estaban
+    muertos porque el único test pasaba siempre por el quinto."""
+
+    def _knowledge(self, rangos) -> Path:
+        base = Path(tempfile.mkdtemp())
+        carpeta = base / "ag2025"
+        carpeta.mkdir()
+        lineas = ["[meta]", "anio_gravable = 2025", "completo = true", "",
+                  "[uvt]", "valor = 49799", 'fuente = "prueba"', "",
+                  "[tarifa]", 'fuente = "ET art. 241"', ""]
+        for desde, hasta, tarifa, adicional in rangos:
+            lineas += ["[[tarifa.rangos]]", f"desde_uvt = {desde}",
+                       f"hasta_uvt = {hasta}", f"tarifa = {tarifa}",
+                       f"adicional_uvt = {adicional}", ""]
+        (carpeta / "parametros.toml").write_text("\n".join(lineas), encoding="utf-8")
+        return base
+
+    def _rechaza(self, rangos, fragmento):
+        with self.assertRaises(ParametrosNoEncontrados) as ctx:
+            P.cargar(2025, knowledge=self._knowledge(rangos))
+        self.assertIn(fragmento, str(ctx.exception))
+
+    def test_la_tarifa_buena_si_carga(self):
+        """El control. Sin esto, un `raise` incondicional pasaría los seis."""
+        par = P.cargar(2025, knowledge=self._knowledge(TARIFA_2025))
+        self.assertEqual(len(par.exigir("tarifa.rangos")), 7)
+
+    def test_rechaza_la_tabla_de_un_solo_rango(self):
+        """Es exactamente lo que deja una fusión que reemplazó la lista."""
+        self._rechaza([(0, 0, 0.39, 0)], "rango(s)")
+
+    def test_rechaza_una_tarifa_escrita_como_porcentaje(self):
+        rangos = [(0, 1090, 0.0, 0), (1090, 0, 39, 0)]
+        self._rechaza(rangos, "fuera de rango")
+
+    def test_rechaza_tarifas_que_no_crecen(self):
+        rangos = [(0, 1090, 0.39, 0), (1090, 0, 0.19, 0)]
+        self._rechaza(rangos, "de menor a mayor")
+
+    def test_rechaza_la_ultima_tarifa_en_cero(self):
+        """Con esto el impuesto sería cero para cualquier base."""
+        rangos = [(0, 1090, 0.0, 0), (1090, 0, 0.0, 0)]
+        self._rechaza(rangos, "cero para cualquier base")
+
+    def test_rechaza_un_hueco_entre_rangos(self):
+        rangos = [(0, 1090, 0.0, 0), (1700, 0, 0.19, 0)]
+        self._rechaza(rangos, "hueco")
+
+    def test_rechaza_una_tabla_que_no_empieza_en_cero(self):
+        rangos = [(100, 1090, 0.0, 0), (1090, 0, 0.19, 0)]
+        self._rechaza(rangos, "empezar en 0 UVT")
+
+    def test_rechaza_un_ultimo_rango_cerrado(self):
+        """Sin rango abierto, una base por encima del último tope no tiene
+        tarifa: el motor liquidaría cero justo para el que más debe."""
+        rangos = [(0, 1090, 0.0, 0), (1090, 31000, 0.19, 0)]
+        self._rechaza(rangos, "abierto")
+
+    def test_rechaza_un_adicional_negativo(self):
+        rangos = [(0, 1090, 0.0, 0), (1090, 0, 0.19, -500)]
+        self._rechaza(rangos, "adicional_uvt negativo")
+
+    def test_rechaza_la_ausencia_de_tarifa(self):
+        base = Path(tempfile.mkdtemp())
+        carpeta = base / "ag2025"
+        carpeta.mkdir()
+        (carpeta / "parametros.toml").write_text(
+            "[meta]\nanio_gravable = 2025\n[uvt]\nvalor = 49799\n", encoding="utf-8")
+        with self.assertRaises(ParametrosNoEncontrados) as ctx:
+            P.cargar(2025, knowledge=base)
+        self.assertIn("tarifa.rangos", str(ctx.exception))
+
+
+# ---------------------------------------------------------------------
+# Parametros: conversión, fuente y marca de herencia
+# ---------------------------------------------------------------------
+
+class TestParametros(unittest.TestCase):
+    def test_cop_multiplica_por_la_uvt(self):
+        """Devolver el número de UVT sin multiplicar deja todos los topes
+        cuatro órdenes de magnitud por debajo, y el motor recorta
+        deducciones que sí procedían."""
+        par = P.cargar(2025)
+        self.assertEqual(par.cop(1_340), 1_340 * par.uvt)
+        self.assertNotEqual(par.cop(1_340), 1_340)
+        self.assertEqual(par.cop(0), 0)
+
+    def test_fuente_cita_el_bloque_que_declara_el_valor(self):
+        par = P.cargar(2025)
+        self.assertIn("241", par.fuente("tarifa.rangos"))
+        self.assertEqual(par.fuente("no.existe.nada"), "sin fuente citada")
+
+    def test_un_anio_heredado_avisa_de_lo_que_no_esta_verificado(self):
+        """La advertencia de AG2026 es lo único que distingue «parámetro
+        verificado» de «copiado del año pasado». Si desaparece, el usuario
+        planea 2026 con las cifras de 2025 sin saberlo."""
+        par = P.cargar(2026)
+        avisos = par.advertencias()
+        self.assertTrue(par.heredados, "AG2026 dejó de marcar lo heredado")
+        self.assertTrue(any("heredados" in a for a in avisos), avisos)
+        self.assertTrue(any("INCOMPLETOS" in a for a in avisos), avisos)
+        self.assertFalse(par.completo)
+
+    def test_los_plazos_no_se_heredan(self):
+        """Las fechas de ag2025 son para declarar el año gravable 2025.
+        Mostrarlas en 2026 no es incompleto, es falso."""
+        par = P.cargar(2026)
+        self.assertFalse(par.get("plazos.tabla_cargada", False))
+        self.assertTrue(any("plazos" in a for a in par.advertencias()))
+
+    def test_un_ciclo_de_herencia_no_cuelga_el_motor(self):
+        base = Path(tempfile.mkdtemp())
+        for anio, padre in ((2030, "ag2031"), (2031, "ag2030")):
+            carpeta = base / f"ag{anio}"
+            carpeta.mkdir()
+            (carpeta / "parametros.toml").write_text(
+                f'[meta]\nanio_gravable = {anio}\nhereda_de = "{padre}"\n'
+                f"[uvt]\nvalor = 1\n", encoding="utf-8")
+        with self.assertRaises(ParametrosNoEncontrados) as ctx:
+            P.cargar(2030, knowledge=base)
+        self.assertIn("Ciclo", str(ctx.exception))
+
+
+# ---------------------------------------------------------------------
+# TRM y ledger: las guardas de la capa de datos
+# ---------------------------------------------------------------------
+
+class TestGuardasDeTRM(unittest.TestCase):
+    def setUp(self):
+        self.dia = date(2025, 3, 14)
+        self.trm = TRM({self.dia: 4_000.0})
+
+    def test_retrocede_hasta_una_semana_y_ni_un_dia_mas(self):
+        """El art. 288 exige la TRM de la fecha de realización. Retroceder al
+        último día hábil es correcto; rellenar un hueco de cuarenta días es
+        inventar el dato. El límite tiene que estar probado en su borde."""
+        self.assertEqual(self.trm.de(self.dia + timedelta(days=7)), 4_000.0)
+        with self.assertRaises(SinTRM):
+            self.trm.de(self.dia + timedelta(days=8))
+
+    def test_cada_dia_suplido_queda_registrado(self):
+        self.trm.de(self.dia + timedelta(days=2))
+        self.assertIn(self.dia + timedelta(days=2), self.trm.suplidas)
+
+    def test_un_hueco_largo_se_reporta_y_uno_de_fin_de_semana_no(self):
+        self.trm.de(self.dia + timedelta(days=1))       # sábado
+        self.assertEqual(self.trm.huecos_grandes(dias=3), [])
+        self.trm.de(self.dia + timedelta(days=6))
+        self.assertTrue(self.trm.huecos_grandes(dias=3))
+
+    def test_para_no_construye_la_serie_si_la_descarga_dejo_huecos(self):
+        """La fuente puede devolver un rango parcial. Sin este chequeo el
+        objeto se construía igual y `de()` rellenaba hacia atrás sin avisar."""
+        import engine.trm as T
+
+        original = T.descargar
+        T.descargar = lambda desde, hasta, timeout=30: {desde: 4_000.0}
+        try:
+            with self.assertRaises(SinTRM):
+                T.TRM.para(date(2025, 1, 1), date(2025, 12, 31), cache=None)
+        finally:
+            T.descargar = original
+
+    def test_sin_red_y_sin_cache_es_error_explicito(self):
+        with self.assertRaises(SinTRM) as ctx:
+            TRM.para(date(2025, 1, 1), date(2025, 1, 5), cache=None,
+                     permitir_red=False)
+        self.assertIn("red está desactivada", str(ctx.exception))
+
+
+class TestEntradasPorFuente(unittest.TestCase):
+    """Alimenta la cifra de consignaciones del umbral de IVA. Si cuenta las
+    SALIDAS, el numerador del art. 437 par. 3 num. 6 se infla con dinero que
+    salió, y alguien se inscribe como responsable de IVA sin deberlo."""
+
+    def _ledger(self):
+        return Ledger([
+            Movimiento(date(2025, 3, 1), "giro", 50_000_000, "COP",
+                       "ingreso_trabajo", fuente="deel.csv"),
+            Movimiento(date(2025, 3, 2), "retiro", -30_000_000, "COP",
+                       "traslado", fuente="deel.csv"),
+            Movimiento(date(2025, 3, 3), "abono", 30_000_000, "COP",
+                       "traslado", fuente="banco.csv"),
+        ]).convertir(None)
+
+    def test_solo_suma_las_entradas(self):
+        por_fuente = self._ledger().entradas_por_fuente()
+        self.assertEqual(por_fuente["deel.csv"], 50_000_000)
+        self.assertEqual(por_fuente["banco.csv"], 30_000_000)
+
+    def test_el_total_no_incluye_el_valor_absoluto_de_las_salidas(self):
+        cons = self._ledger().consignaciones()
+        self.assertEqual(cons["entradas_brutas"], 80_000_000)
+        self.assertNotEqual(cons["entradas_brutas"], 110_000_000)
+
+    def test_nunca_se_declara_listo_para_el_umbral(self):
+        cons = self._ledger().consignaciones()
+        self.assertFalse(cons["listo_para_el_umbral"])
+        self.assertTrue(any("gravada" in a for a in cons["avisos"]))
+
+
+class TestAvisoDeMezclaDeAnios(unittest.TestCase):
+    def test_un_ledger_con_dos_anios_avisa(self):
+        ledger = Ledger([
+            Movimiento(date(2024, 12, 31), "a", 100, "COP", "ingreso_trabajo"),
+            Movimiento(date(2025, 1, 1), "b", 200, "COP", "ingreso_trabajo"),
+        ]).convertir(None)
+        self.assertTrue(any("mezcla los años" in a for a in ledger.validar()))
+
+    def test_un_ledger_de_un_solo_anio_no_avisa(self):
+        ledger = Ledger([
+            Movimiento(date(2025, 1, 1), "b", 200, "COP", "ingreso_trabajo"),
+        ]).convertir(None)
+        self.assertFalse(any("mezcla los años" in a for a in ledger.validar()))
+
+
+if __name__ == "__main__":
+    unittest.main()
