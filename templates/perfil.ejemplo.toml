@@ -1,0 +1,120 @@
+#  perfil.toml — datos del contribuyente
+#
+#  ⚠ Este archivo se queda en TU máquina. Está en .gitignore. No lo subas
+#    a ningún repositorio ni lo pegues en un issue.
+#
+#  Todo en pesos colombianos. Los ingresos en moneda extranjera se convierten
+#  con TRM diaria por `python -m engine.cli importar` antes de llegar acá.
+#
+#  Deja en 0 lo que no aplique. El motor distingue "es cero" de "no lo
+#  sabemos" y te avisa de lo segundo — pero solo si no lo llenas a la ligera.
+#
+#  Verifica en cualquier momento:  python -m engine.cli verificar
+
+[contribuyente]
+anio_gravable = 2025
+# Residente fiscal: más de 183 días en Colombia, continuos o no, en un
+# período de 365 días. Si es false, este motor NO aplica: consulta un contador.
+residente_fiscal = true
+
+# ── Ingresos ──────────────────────────────────────────────────────────
+[ingresos]
+# Honorarios, compensación por servicios personales, prestación de servicios.
+rentas_trabajo_honorarios = 0
+# Rendimientos financieros, intereses, arrendamientos.
+rentas_capital = 0
+otras_rentas_no_laborales = 0
+
+# ── Ingresos no constitutivos de renta ────────────────────────────────
+# Restan ANTES del tope del 40% y no lo consumen: es la mejor posición
+# posible. No los pongas como deducción — les quita valor.
+[incrngo]
+aportes_obligatorios_salud_pension = 0   # planillas PILA del año
+componente_inflacionario           = 0   # certificado de rendimientos
+otros                              = 0
+
+# ── Costos y gastos — SOLO se restan en la Ruta A ─────────────────────
+# Cada peso exige factura electrónica o documento soporte. Los pagos a
+# contratistas además exigen verificar SUS aportes (art. 108 par. 2 ET):
+# si no cotizaron, la DIAN puede rechazar la totalidad del costo.
+[costos]
+pagos_a_contratistas  = 0
+comisiones_plataforma = 0
+equipo_tecnologico    = 0
+internet_software     = 0
+arriendo_oficina      = 0
+otros                 = 0
+
+# ── Deducciones ───────────────────────────────────────────────────────
+[deducciones]
+# TOTAL de 4x1000 pagado en el año, sumando todos los bancos.
+# El motor toma el 50%. Pide el certificado de GMF a cada banco.
+gmf_pagado = 0
+
+# Solo los INTERESES, no el abono a capital. Tope 1.200 UVT.
+intereses_vivienda = 0
+
+# Medicina prepagada o seguro de salud. Tope 16 UVT/mes = 192 UVT al año.
+medicina_prepagada = 0
+
+# ⚠ Solo cuenta lo aportado ANTES del 31 de diciembre del año gravable.
+# Si el año ya cerró y esto está en 0, mira la tabla de sensibilidad:
+# ese número es tu costo de oportunidad para el año en curso.
+aportes_voluntarios = 0
+
+# Base para la deducción del 1%: total de compras con factura electrónica
+# a TU NIT o cédula, pagadas por medio electrónico. Tope de deducción 240 UVT.
+compras_con_factura_electronica = 0
+
+# Cantidad de dependientes, máximo 4. 72 UVT cada uno, FUERA del tope del 40%.
+# Cuentan: hijos < 18; hijos 18-23 estudiando; hijos > 23 con dependencia
+# certificada; cónyuge o compañero(a) permanente y PADRES Y HERMANOS con
+# ingresos anuales < 260 UVT o dependencia física o psicológica.
+#
+# ⚠ Esta es la línea que más plata mueve de todo el archivo, y la que más
+#   gente deja en 0 sin verificar. Pregunta por tus papás.
+dependientes = 0
+
+# ── Descuentos (restan del impuesto, no de la base) ────────────────────
+[descuentos]
+# Solo con certificación de una entidad del Régimen Tributario Especial,
+# firmada por representante legal y contador o revisor fiscal.
+# Una transferencia a una persona, a una colecta o a una causa informal
+# vale $0 tributariamente. Da el 25% del valor donado como descuento.
+donaciones_certificadas_rte = 0
+
+# ── Anticipos ─────────────────────────────────────────────────────────
+[anticipos]
+retenciones_practicadas     = 0   # suma de todos los certificados de retención
+saldo_a_favor_anio_anterior = 0
+
+# ── Verificaciones de riesgo ──────────────────────────────────────────
+[verificaciones]
+# TOTAL de lo que ENTRÓ a todas tus cuentas en el año, incluidos traslados
+# entre cuentas propias y plata de terceros que redistribuiste.
+# NO es lo mismo que tu ingreso.
+#
+# ⚠ Umbral de 3.500 UVT. Si lo superas, pierdes la calidad de no responsable
+#   de IVA aunque tu ingreso propio esté muy por debajo. Es la contingencia
+#   más grande y menos mirada del perfil freelance. Cuantifícala.
+consignaciones_totales_anio = 0
+
+# ¿Tienes la planilla PILA de cada contratista al que le pagaste?
+contratistas_con_pila_verificada = false
+
+# ¿Existe documento soporte de esos pagos, con numeración consecutiva?
+tiene_documento_soporte_de_pagos = false
+
+# ── Patrimonio a 31 de diciembre del año gravable ─────────────────────
+# TODO: cuentas, billeteras, wallets, cripto, brokers, vehículos, inmuebles.
+# Lo que esté en moneda extranjera va a la TRM del 31 de diciembre.
+# Un activo omitido que la DIAN detecte se grava como renta líquida sin
+# derecho a costo (art. 239-1 ET), más sanción por inexactitud.
+
+# [[patrimonio.activos]]
+# nombre = "Cuenta de ahorros"
+# valor  = 0
+
+# [[patrimonio.pasivos]]
+# nombre = "Tarjeta de crédito (saldo a 31-dic)"
+# valor  = 0
