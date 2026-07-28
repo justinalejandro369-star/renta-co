@@ -400,6 +400,49 @@ class TestAvisosDeSigno(unittest.TestCase):
 # 3. Las filas que no se pueden leer
 # ---------------------------------------------------------------------
 
+class TestCodificaciones(unittest.TestCase):
+    """latin-1 acepta cualquier byte, así que nunca falla y el respaldo con
+    `errors="replace"` es inalcanzable. Eso no es código muerto inofensivo:
+    significa que un utf-8 corrupto se lee SIN ERROR como mojibake y entra
+    al ledger con las descripciones rotas — que son justo lo que usan las
+    reglas de clasificación."""
+
+    def test_un_extracto_en_latin1_conserva_sus_tildes(self):
+        ruta = Path(tempfile.mkdtemp()) / "banco.csv"
+        ruta.write_bytes(
+            "fecha,descripcion,valor\n14/03/2025,RETENCIÓN,1.500.000\n"
+            .encode("latin-1")
+        )
+        movs = generico.importar(ruta)
+        self.assertIn("RETENCIÓN", movs[0].descripcion)
+
+    def test_un_utf8_doble_codificado_avisa_en_vez_de_entrar_como_mojibake(self):
+        """El caso que de verdad pasa: un utf-8 leído como latin-1 y vuelto
+        a guardar como utf-8. El archivo es utf-8 VÁLIDO, decodifica sin un
+        solo error, y dice "RETENCIÃ³N"."""
+        ruta = Path(tempfile.mkdtemp()) / "banco.csv"
+        crudo = "fecha,descripcion,valor\n14/03/2025,RETENCIÓN,1.500.000\n"
+        doble = crudo.encode("utf-8").decode("latin-1").encode("utf-8")
+        ruta.write_bytes(doble)
+        avisos: list[str] = []
+        movs = generico.importar(ruta, avisos=avisos)
+        self.assertTrue(any("caracteres rotos" in a for a in avisos), avisos)
+        # Y aun así se importa: el monto está bien, lo roto es la descripción.
+        self.assertEqual(movs[0].monto_origen, 1_500_000)
+
+    def test_un_archivo_sano_no_produce_falsas_alarmas(self):
+        """El detector de mojibake no puede gritar sobre texto normal."""
+        ruta = Path(tempfile.mkdtemp()) / "banco.csv"
+        ruta.write_text(
+            "fecha,descripcion,valor\n"
+            "14/03/2025,RETENCIÓN Y GRAVAMEN — señor Muñoz,1.500.000\n",
+            encoding="utf-8",
+        )
+        avisos: list[str] = []
+        generico.importar(ruta, avisos=avisos)
+        self.assertEqual(avisos, [])
+
+
 class TestFilasIlegibles(unittest.TestCase):
     """Una celda mala en la fila 200 abortaba el archivo entero y borraba
     doce meses de ingreso. Saltarla es lo correcto; saltarla callado no."""

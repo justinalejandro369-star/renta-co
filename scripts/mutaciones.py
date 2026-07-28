@@ -212,6 +212,22 @@ MUTACIONES = [
     ("M50-cli-importar-sale-cero", "engine/cli.py",
      "        print()\n        return 1\n    return 0",
      "        print()\n        return 0\n    return 0"),
+    # ---- menores de la ronda 5 -------------------------------------
+    ("M51-sin-red-exige-fines-de-semana", "engine/trm.py",
+     "                       for i in range(cls.DIAS_DE_RESPALDO + 1))",
+     "                       for i in range(1))"),
+    ("M52-contraparte-fuera-de-contexto", "scripts/escanear_privacidad.py",
+     "    r\"contraparte|beneficiario|payee)\\b\",",
+     "    r\"zzz_no_existe)\\b\","),
+    ("M53-mojibake-no-se-detecta", "engine/adapters/generico.py",
+     "        roto = MOJIBAKE.search(texto)",
+     "        roto = None"),
+    ("M54-columnas-sin-comillas", "scripts/escanear_privacidad.py",
+     "        if c == '\"':\n            entre_comillas = not entre_comillas",
+     "        if False:\n            entre_comillas = not entre_comillas"),
+    ("M55-citas-hardcodeadas", "engine/depuracion.py",
+     "    citada = par.fuente(ruta_valor)",
+     "    citada = \"sin fuente citada\""),
 ]
 
 

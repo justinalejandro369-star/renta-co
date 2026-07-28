@@ -19,7 +19,14 @@ nota = "Verificar reforma tributaria y decretos reglamentarios de 2026 antes de 
 [uvt]
 valor = 52374
 fuente = "Resolución DIAN 000238 del 15 de diciembre de 2025"
+# La URL apunta a una fuente SECUNDARIA: es un blog, no la resolución. Se
+# deja porque es lo que hay hoy y es mejor que nada, pero está marcada como
+# tal a propósito — una cita cuya URL no lleva al texto oficial no es una
+# cita verificada, y este año gravable está marcado como incompleto
+# justamente por cosas así. Reemplázala por el PDF de la DIAN al verificar.
 url = "https://actualicese.com/uvt-2026/"
+url_verificada = false
+url_oficial_pendiente = "Buscar la Resolución 000238/2025 en https://normograma.dian.gov.co"
 
 # Los bloques [tarifa], [topes] y [sanciones] se heredan de
 # knowledge/ag2025/parametros.toml mientras no se sobreescriban acá.

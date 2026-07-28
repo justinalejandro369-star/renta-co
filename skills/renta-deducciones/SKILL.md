@@ -21,7 +21,7 @@ En AG2025 son **$3.585.528 por dependiente** de **base eliminada**, hasta $14.34
 
 Pregunta exactamente esto, no una versión resumida:
 
-> ¿Tienes hijos menores de 18? ¿Hijos entre 18 y 23 estudiando? ¿**Tus papás o tus hermanos** tuvieron ingresos por debajo de $12.947.740 en el año y dependen económicamente de ti? ¿Cónyuge o pareja permanente sin ingresos o con ingresos por debajo de ese monto?
+> ¿Tienes hijos menores de 18? ¿Hijos entre 18 y 25 estudiando? ¿**Tus papás o tus hermanos** tuvieron ingresos por debajo de $12.947.740 en el año y dependen económicamente de ti? ¿Cónyuge o pareja permanente sin ingresos o con ingresos por debajo de ese monto?
 
 **La pregunta de padres y hermanos es la que más gente pierde.** Mucha gente mantiene a su mamá y no sabe que eso vale $3,5 M de deducción. Insiste. Si la respuesta es "más o menos le ayudo", indaga: ¿con cuánto?, ¿ella tiene ingresos propios?, ¿de cuánto?
 

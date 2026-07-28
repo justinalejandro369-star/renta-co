@@ -65,7 +65,7 @@ def _clasificar(descripcion: str, monto: float = 0.0) -> str:
 def importar(ruta: Path, avisos: list[str] | None = None) -> list[Movimiento]:
     avisos = avisos if avisos is not None else []
     movimientos = []
-    with abrir_csv(ruta) as f:
+    with abrir_csv(ruta, avisos) as f:
         lector = csv.DictReader(f)
         campos = {c.lower().strip(): c for c in (lector.fieldnames or [])}
 

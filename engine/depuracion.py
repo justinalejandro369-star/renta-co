@@ -88,6 +88,31 @@ class Liquidacion:
 # Depuración de una ruta
 # ---------------------------------------------------------------------
 
+def _fuente(par: Parametros, ruta_valor: str, respaldo: str) -> str:
+    """Cita normativa de un renglón, tomada de knowledge/.
+
+    La cifra sale de `knowledge/<año>/parametros.toml` y la cita salía de un
+    literal en Python, así que las dos podían divergir — y divergían. Tres
+    ejemplos que encontró la ronda 5, todos con la cita del motor y la del
+    knowledge apuntando a normas distintas para el MISMO número:
+
+        medicina prepagada    motor: art. 387 num. 1
+                          knowledge: art. 387 inciso 2 lit. a) y b)
+        dependientes 72 UVT   motor: art. 336 par.
+                          knowledge: art. 336 num. 3 inciso 2
+        1% factura elect.     motor: art. 336 par. 4
+                          knowledge: art. 336 numeral 5
+
+    La que ve el contador en el CSV es la del motor, así que la del knowledge
+    —que es la verificada, la que tiene URL y la que revisa el test de
+    fuentes— no servía de nada. Ahora la cita viene del mismo sitio que la
+    cifra, y el literal queda solo como respaldo para cuando un año gravable
+    todavía no declare esa fuente.
+    """
+    citada = par.fuente(ruta_valor)
+    return respaldo if citada == "sin fuente citada" else citada
+
+
 def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     if ruta not in RUTAS:
         raise ValueError(f"Ruta '{ruta}' no válida. Usa 'A' o 'B'.")
@@ -236,17 +261,25 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
                "conjunto del 40%." if ruta == "B"
                else "No aplica en Ruta A: es excluyente con los costos."),
          fuente="ET art. 206 num. 10, mod. Ley 2277 de 2022 art. 2")
-    L._r("− GMF deducible (50% del 4x1000 pagado)", gmf, -1, fuente="ET art. 115")
-    L._r("− Intereses de vivienda", vivienda, -1, fuente="ET art. 119")
-    L._r("− Medicina prepagada", prepagada, -1, fuente="ET art. 387 num. 1")
-    L._r("− Aportes voluntarios AFP / AFC", voluntarios, -1, fuente="ET arts. 126-1 y 126-4")
+    L._r("− GMF deducible (50% del 4x1000 pagado)", gmf, -1,
+         fuente=_fuente(par, "topes.gmf.porcentaje_deducible", "ET art. 115"))
+    L._r("− Intereses de vivienda", vivienda, -1,
+         fuente=_fuente(par, "topes.intereses_vivienda.tope_uvt", "ET art. 119"))
+    L._r("− Medicina prepagada", prepagada, -1,
+         fuente=_fuente(par, "topes.medicina_prepagada.tope_mensual_uvt",
+                        "ET art. 387"))
+    L._r("− Aportes voluntarios AFP / AFC", voluntarios, -1,
+         fuente=_fuente(par, "topes.aportes_voluntarios.tope_uvt",
+                        "ET arts. 126-1 y 126-4"))
     L._r("− Dependientes (10% renta de trabajo)", e["dep_dentro"], -1,
          nota="Excluyente con la de 72 UVT. Consume el tope del 40%.",
-         fuente="ET art. 387")
+         fuente=_fuente(par, "topes.dependientes_10pct.tope_mensual_uvt",
+                        "ET art. 387"))
 
     L._r("  [tope conjunto 40% / 1.340 UVT]", tope, 0,
          nota="Lo que exceda este tope se pierde.",
-         fuente="ET art. 336 num. 3")
+         fuente=_fuente(par, "topes.conjunto_deducciones_exentas.tope_uvt",
+                        "ET art. 336 num. 3"))
     L._r("  [rechazado por el tope]", rechazado, 0,
          nota="Deducciones y rentas exentas solicitadas que el tope no dejó pasar.")
     L.tope_conjunto = tope
@@ -255,17 +288,20 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     L._r("− Dependientes (72 UVT c/u — FUERA del tope)", e["dep_fuera"], -1,
          nota="No consume el tope del 40% y no exige factura: solo acreditar "
               "la condición. Excluyente con la del 10%.",
-         fuente="ET art. 336 par., Ley 2277 de 2022 art. 7")
+         fuente=_fuente(par, "topes.dependientes_72uvt.uvt_por_dependiente",
+                        "ET art. 336 num. 3 inciso 2, Ley 2277 de 2022 art. 7"))
     L._r("− Deducción 1% compras con factura electrónica", fe, -1,
          nota="Exige factura electrónica a tu NIT/cédula y pago electrónico.",
-         fuente="ET art. 336 par. 4")
+         fuente=_fuente(par, "topes.deduccion_1pct_factura_electronica.tope_uvt",
+                        "ET art. 336 num. 5"))
 
     # --- 8. impuesto ---------------------------------------------------
     L.renta_liquida = renta_liquida
     L._r("= RENTA LÍQUIDA GRAVABLE", renta_liquida)
 
     L.impuesto = impuesto_241(renta_liquida, par)
-    L._r("IMPUESTO SOBRE LA RENTA", L.impuesto, +1, fuente="ET art. 241")
+    L._r("IMPUESTO SOBRE LA RENTA", L.impuesto, +1,
+         fuente=_fuente(par, "tarifa.rangos", "ET art. 241"))
 
     donado = p.get("descuentos.donaciones_certificadas_rte")
     descuento = min(
@@ -275,7 +311,8 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     L._r("− Descuento por donaciones", descuento, -1,
          nota="Solo con certificado de entidad del Régimen Tributario Especial "
               "firmado por representante legal y contador o revisor fiscal.",
-         fuente="ET art. 257")
+         fuente=_fuente(par, "topes.descuento_donaciones.porcentaje_descuento",
+                        "ET art. 257"))
 
     L.impuesto_neto = max(L.impuesto - descuento, 0)
     L._r("= Impuesto neto de renta", L.impuesto_neto)
@@ -448,7 +485,8 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
 
     # --- medicina prepagada -------------------------------------------------
     if not p.get("deducciones.medicina_prepagada"):
-        techo = par.exigir("topes.medicina_prepagada.tope_mensual_uvt") * 12 * uvt
+        techo = (par.exigir("topes.medicina_prepagada.tope_mensual_uvt")
+                 * par.get("topes.medicina_prepagada.meses", 12) * uvt)
         probar(
             f"Medicina prepagada al tope ({_cop(techo)})",
             {"deducciones__medicina_prepagada": round(techo)},

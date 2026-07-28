@@ -258,6 +258,13 @@ class Ledger:
         descripción que empiece por =, +, - o @ la ejecuta la hoja de
         cálculo al abrir el archivo, y esas descripciones vienen de un CSV
         de terceros que nadie revisó.
+
+        El costo conocido: una descripción legítima que empiece por "-" o
+        "+" —«-3000 devolución»— sale con un apóstrofo delante y se ve rota.
+        Se acepta a propósito. Los cuatro caracteres son los que lista OWASP
+        para inyección en CSV, y quitar el "-" y el "+" abre el vector real:
+        `-1+1+cmd|' /C calc'!A1` empieza por guion. Una descripción fea es
+        más barata que una fórmula ejecutándose en la máquina del contador.
         """
         texto = str(valor)
         return "'" + texto if texto[:1] in ("=", "+", "-", "@", "\t", "\r") else texto

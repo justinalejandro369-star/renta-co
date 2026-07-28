@@ -12,7 +12,8 @@ ambiguos, convenciones de separador contradictorias.
 
 Agregar un banco o plataforma nueva son ~40 líneas. Copia `generico.py`,
 ajusta el mapeo de columnas, regístralo abajo y manda el PR. Incluye siempre
-un CSV de muestra ANONIMIZADO en engine/tests/muestras/.
+un test con un CSV de muestra ANONIMIZADO inline, como los de
+engine/tests/test_importacion.py.
 """
 
 from __future__ import annotations

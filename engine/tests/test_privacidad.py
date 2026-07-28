@@ -150,11 +150,43 @@ class TestNoRuido(unittest.TestCase):
         self.assertEqual(altas(h), [])
 
 
+def ignorados_por_git(rutas: list[Path]) -> set[str]:
+    """Los que git no publicaría. Vacío si git no está disponible.
+
+    Sin esto, el test dependía de si alguien había corrido `calcular --csv`
+    antes: `expediente.ejemplo/03-analisis/escenarios.csv` es un artefacto
+    generado, está en .gitignore y nunca se publica, pero el escaneo del
+    árbol lo veía igual. Un test que falla según qué comandos corriste antes
+    enseña a ignorar los fallos, que es exactamente lo contrario de lo que
+    hace falta acá.
+    """
+    import shutil
+    import subprocess
+
+    if not shutil.which("git") or not rutas:
+        return set()
+    try:
+        r = subprocess.run(
+            ["git", "check-ignore", "--stdin"],
+            cwd=RAIZ, input="\n".join(str(x) for x in rutas),
+            capture_output=True, text=True,
+        )
+    except OSError:
+        return set()
+    return {linea for linea in r.stdout.splitlines() if linea}
+
+
 class TestRepositorio(unittest.TestCase):
     """El repositorio publicado no puede contener datos personales."""
 
     def test_repo_limpio(self):
         globs = esc.globs_ignorados(RAIZ, estricto=False)
+        candidatos = [
+            a.relative_to(RAIZ) for a in RAIZ.rglob("*")
+            if a.is_file() and a.suffix.lower() not in esc.BINARIAS
+            and not esc.IGNORAR_DIRS & set(a.parts)
+        ]
+        fuera_de_git = ignorados_por_git(candidatos)
         sucios = []
         for archivo in RAIZ.rglob("*"):
             if not archivo.is_file() or archivo.suffix.lower() in esc.BINARIAS:
@@ -162,6 +194,8 @@ class TestRepositorio(unittest.TestCase):
             if esc.IGNORAR_DIRS & set(archivo.parts):
                 continue
             relativo = archivo.relative_to(RAIZ)
+            if str(relativo) in fuera_de_git:
+                continue
             if esc.esta_ignorado(relativo, globs):
                 continue
             hallazgos = [h for h in esc.escanear(archivo, []) if h[3] == "alta"]
@@ -221,6 +255,70 @@ class TestUmbralAcumulado(unittest.TestCase):
         )
         self.assertEqual(len(quedan), 98)
         self.assertEqual(avisos, [])
+
+
+class TestColumnasConComillas(unittest.TestCase):
+    """Una coma dentro de comillas corría todas las columnas de la derecha.
+
+    Con eso la columna de montos dejaba de reconocerse y sus cifras de ocho
+    dígitos se reportaban como documento de confianza ALTA. Es un falso
+    positivo del escáner sobre la salida del propio motor, y el modo de
+    fallo que el docstring del módulo llama el más caro: la gente deja de
+    leerlo.
+    """
+
+    def test_los_rangos_respetan_las_comillas(self):
+        linea = '"= SALDO (positivo, negativo)",3656962,11599309,'
+        rangos = esc.rangos_de_celdas(linea, ",")
+        self.assertEqual(len(rangos), 4)
+        self.assertEqual(linea[rangos[1][0]:rangos[1][1]], "3656962")
+        self.assertEqual(linea[rangos[2][0]:rangos[2][1]], "11599309")
+
+    def test_una_columna_de_dinero_no_se_desplaza_por_una_coma_citada(self):
+        texto = ('concepto,ruta_A_costos,ruta_B_exenta_25\n'
+                 '"= SALDO (positivo a pagar, negativo a favor)",3656962,11599309\n')
+        self.assertEqual(altas(escanear_texto(texto, [], ".csv")), [])
+
+    def test_y_una_cedula_en_su_columna_sigue_rompiendo_el_build(self):
+        """El arreglo no puede volverse una puerta: si la celda desplazada
+        fuera de verdad un documento, tiene que seguir saliendo."""
+        texto = ('concepto,documento,ruta_A_costos\n'
+                 '"pago a tercero, con nota",1016086781,3656962\n')
+        self.assertIn("cédula o documento", tipos(escanear_texto(texto, [], ".csv")))
+
+
+class TestColumnasQueEscribeLaHerramienta(unittest.TestCase):
+    """El escáner no puede ser ciego a su propia salida.
+
+    El ledger guarda en `contraparte` lo que el banco traía en `documento`.
+    Como `contraparte` no estaba en CONTEXTO, la MISMA cédula salía de
+    confianza ALTA antes de importar y BAJA después: la herramienta
+    degradaba justamente la PII que ella escribe.
+    """
+
+    ENCABEZADO = ("fecha,descripcion,contraparte,moneda,monto_origen,trm,"
+                  "monto_cop,categoria,fuente\n")
+
+    def test_una_cedula_en_la_columna_contraparte_es_de_confianza_alta(self):
+        texto = self.ENCABEZADO + "2025-03-14,PAGO,79.483.921,COP,1500000.00,1.00,1500000,costo,b.csv\n"
+        self.assertTrue(altas(escanear_texto(texto, [], ".csv")),
+                        "el ledger degradó su propia PII a confianza baja")
+
+    def test_da_igual_como_se_llame_la_columna_de_documento(self):
+        """La clase: los tres nombres con los que puede llegar el mismo dato."""
+        for columna in ("documento", "contraparte", "beneficiario"):
+            texto = (f"fecha,descripcion,{columna},monto_cop\n"
+                     f"2025-03-14,PAGO,79.483.921,1500000\n")
+            self.assertTrue(
+                altas(escanear_texto(texto, [], ".csv")),
+                f"una cédula bajo el encabezado {columna!r} no rompe el build",
+            )
+
+    def test_la_columna_de_monto_sigue_siendo_de_monto(self):
+        """El arreglo no puede llenar el reporte de ruido: los montos del
+        ledger tienen la misma forma y no son documento de nadie."""
+        texto = self.ENCABEZADO + "2025-03-14,PAGO,,COP,1500000.00,1.00,15000000,costo,b.csv\n"
+        self.assertEqual(altas(escanear_texto(texto, [], ".csv")), [])
 
 
 class TestEnmascarar(unittest.TestCase):

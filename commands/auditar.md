@@ -7,9 +7,18 @@ Corre el motor y presenta el resultado. Argumentos: $ARGUMENTS
 
 Si el usuario pasó `--anio N`, agrégalo a AMBOS comandos como `--anio N`. Si no, no pases nada y el motor toma el año del perfil.
 
+`$RAIZ` es la raíz de renta-co: el directorio que contiene `AGENTS.md` y
+`bin/renta`. Instalado como plugin es `$CLAUDE_PLUGIN_ROOT`; clonado, es la
+raíz del repo. Resuélvelo antes de correr nada — este comando se puede
+invocar sin haber pasado por `/renta-co:setup`, así que no supongas que ya
+está definido.
+
+`--csv` es una bandera sin valor: escribe `03-analisis/escenarios.csv`. El
+año va en `--anio`, aparte.
+
 ```bash
 "$RAIZ/bin/renta" verificar --expediente "$PWD/expediente"
-"$RAIZ/bin/renta" calcular  --expediente "$PWD/expediente" --csv $ANIO
+"$RAIZ/bin/renta" calcular  --expediente "$PWD/expediente" --csv
 ```
 
 Presenta la salida en este orden, que es el orden en que le importa a la

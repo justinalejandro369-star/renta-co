@@ -11,7 +11,9 @@ Escribe el resultado en `expediente/05-riesgos/riesgos.md`. Formato en `template
 
 ## Catálogo base del perfil freelance
 
-Evalúa los ocho, siempre. Los que no apliquen se marcan como no aplicables, no se omiten — así el contador ve que se miraron.
+Evalúa los **nueve**, siempre. Los que no apliquen se marcan como no aplicables, no se omiten — así el contador ve que se miraron.
+
+R-01, R-02 y R-09 los emite el motor con los datos del perfil (`bin/renta calcular`), así que esos tres llegan ya evaluados. Los otros seis los levantas tú.
 
 ### R-01 · Pérdida de la calidad de no responsable de IVA por consignaciones
 **Severidad ALTA · La más subestimada de todas.**
@@ -74,6 +76,15 @@ Partidas que parecen deducibles y no lo son: intereses de tarjeta de crédito, c
 Art. 288 ET exige TRM de la fecha de cada operación. Un promedio anual mueve la base en millones cuando la TRM osciló 19% en el año.
 
 **Mitigación:** el ledger ya aplica TRM diaria. Si el contador usó promedio, reconciliar y documentar la diferencia.
+
+### R-09 · Costos por encima del tope indicativo del 60%
+**Severidad ALTA · Solo Ruta A**
+
+El art. 336-1 ET, adicionado por la Ley 2277 de 2022 art. 60, estima los costos y gastos deducibles de rentas de trabajo en el **60% de los ingresos brutos**. Superarlo es legítimo, pero obliga a indicarlo **EXPRESAMENTE** en la declaración marcando la casilla informativa.
+
+**Si se materializa:** no marcar la casilla acarrea la sanción del art. 651 num. 1 lit. d). Y hay un segundo requisito que suele mirarse por separado: esos costos deben estar soportados con **factura electrónica** de venta, nómina electrónica o documento equivalente ELECTRÓNICO — lo que choca de frente con la estrategia de documento soporte en físico del R-03. Quien piense superar el 60% tiene que mirar los dos juntos.
+
+**Mitigación:** el motor lo emite solo cuando `total_costos > 60% de los ingresos brutos`. Si sale, decidir con el contador ANTES de escoger la Ruta A: puede ser que la Ruta B salga mejor no por aritmética sino porque los soportes electrónicos no existen.
 
 ## Cómo escribir cada riesgo
 

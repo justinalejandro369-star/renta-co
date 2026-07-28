@@ -65,11 +65,15 @@ Es la diferencia entre donar y que valga $0, y donar exactamente lo mismo y recu
 
 16 UVT/mes, tope 192 UVT. Dentro del tope del 40% — verificar con el motor si el tope ya está saturado antes de recomendarla como palanca fiscal. Si lo está, vale cero fiscalmente y la decisión es de salud, no tributaria.
 
-## 7. Régimen Simple — evaluar con números
+## 7. Régimen Simple — mandarlo al contador, no modelarlo acá
 
 Inscripción hasta el **último día hábil de febrero** del año en que se quiere tributar bajo el régimen. No aplica retroactivamente.
 
-Para servicios profesionales las tarifas son altas y **no admiten costos ni deducciones**, así que para el perfil típico de freelance con costos reales suele no convenir. Pero se modela antes de descartarlo: hay casos con márgenes altos, pocos gastos y mucho ICA donde sí gana.
+Para servicios profesionales las tarifas son altas y **no admiten costos ni deducciones**, así que para el perfil típico de freelance con costos reales suele no convenir. Hay casos con márgenes altos, pocos gastos y mucho ICA donde sí gana.
+
+**El motor NO lo liquida** — está en «lo que NO hace» del README — y tú tampoco. La comparación Simple vs. ordinario exige las tarifas del art. 908 por grupo de actividad, el descuento del art. 912 y el ICA consolidado, y ninguno de esos está en `knowledge/`. Hacer la cuenta a mano viola la regla del proyecto: **la aritmética la hace el motor**, y un número inventado sobre un régimen al que hay que inscribirse antes de febrero es de los que cuestan un año entero.
+
+Lo que sí haces: decir que existe, decir la fecha límite, decir por qué normalmente no conviene para este perfil, y mandarlo al contador con la cifra de ingresos y de costos reales que el motor SÍ calculó. Si alguien lo implementa, va con sus tarifas en `knowledge/<año>/parametros.toml` y con fuente, como todo lo demás.
 
 ## 8. Umbral de consignaciones — vigilarlo durante el año
 

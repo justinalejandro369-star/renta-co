@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Benchmark de renta-co.
 
-Tres capas de verificación, de la más débil a la más fuerte:
+Cuatro capas de verificación, de la más débil a la más fuerte:
 
   1. INVARIANTES   — propiedades que deben cumplirse siempre, sobre 14
                      personas y sobre un barrido de miles de bases gravables.
@@ -11,6 +11,11 @@ Tres capas de verificación, de la más débil a la más fuerte:
   3. ANCLAS        — valores calculados a mano con el Estatuto en la mano.
                      Atrapan el caso en que ambas implementaciones se
                      equivocan igual.
+  4. FRONTERAS     — los bordes de cada rango del art. 241. La tabla tiene
+                     saltos por el redondeo que la propia norma ordena, y un
+                     salto anómalo delata un `adicional_uvt` mal transcrito
+                     que las tres capas anteriores no ven: cada una por
+                     separado da un número consistente.
 
     python -m benchmark.correr
     python -m benchmark.correr --verbose
@@ -392,7 +397,7 @@ def main(argv=None) -> int:
         print(f"✗ BENCHMARK FALLIDO — {total} problema(s)")
         linea("═")
         return 1
-    print("✓ BENCHMARK LIMPIO — las tres capas pasan")
+    print("✓ BENCHMARK LIMPIO — las cuatro capas pasan")
     linea("═")
     return 0
 

@@ -172,6 +172,30 @@ class TRM:
         # columna del ledger mostraba el valor viejo como si fuera del día.
         self.suplidas: dict[date, tuple[date, float]] = {}
 
+    # Días hábiles hacia atrás que `de()` acepta retroceder. `para()` tiene
+    # que usar el MISMO número: si exige más cobertura de la que `de()`
+    # necesita, rechaza cachés que sirven perfectamente.
+    DIAS_DE_RESPALDO = 7
+
+    @classmethod
+    def _sin_cobertura(cls, serie: dict[date, float], desde: date,
+                       hasta: date) -> list[date]:
+        """Días que `de()` no podría resolver ni retrocediendo.
+
+        No es lo mismo que «días que no están en la serie». La TRM del
+        viernes rige el sábado y el domingo, y la fuente oficial no publica
+        fines de semana, así que un caché COMPLETO tiene huecos por
+        definición. Medir la cobertura como presencia exacta hacía que
+        `--sin-red` fuera inutilizable sin haber estado en línea: bastaba
+        que el rango tocara un sábado.
+        """
+        return [
+            d for d in (desde + timedelta(days=i)
+                        for i in range((hasta - desde).days + 1))
+            if not any((d - timedelta(days=i)) in serie
+                       for i in range(cls.DIAS_DE_RESPALDO + 1))
+        ]
+
     @classmethod
     def para(cls, desde: date, hasta: date, cache: Path | None = None,
              permitir_red: bool = True) -> "TRM":
@@ -183,6 +207,10 @@ class TRM:
             for i in range((hasta - desde).days + 1)
             if desde + timedelta(days=i) not in serie
         ]
+        # Con red se descarga todo lo que falte, aunque el caché ya diera
+        # cobertura: tener la TRM exacta del día es mejor que la del viernes
+        # anterior. Sin red, lo que decide es la COBERTURA —ver
+        # `_sin_cobertura`— y no la presencia exacta.
         if faltan and permitir_red:
             # Se pide desde unos días antes: la TRM del viernes es la que rige
             # el sábado, y filtrar por `vigenciadesde >= desde` la dejaba
@@ -209,10 +237,14 @@ class TRM:
             if cache:
                 escribir_cache(cache, serie)
             return cls(serie)
-        if faltan:
+        sin_cobertura = cls._sin_cobertura(serie, desde, hasta)
+        if sin_cobertura:
             raise SinTRM(
-                f"Faltan {len(faltan)} día(s) en el caché de TRM y la red está "
-                f"desactivada. Primer día faltante: {min(faltan)}."
+                f"El caché de TRM no cubre {len(sin_cobertura)} día(s) ni con "
+                f"el último día hábil de los {cls.DIAS_DE_RESPALDO} anteriores, "
+                f"y la red está desactivada. Primero sin cubrir: "
+                f"{min(sin_cobertura)}. Descarga la serie de {FUENTE} y guárdala "
+                f"como CSV con columnas 'fecha,trm'."
             )
         return cls(serie, desde_cache=True)
 

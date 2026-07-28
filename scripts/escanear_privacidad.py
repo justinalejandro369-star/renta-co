@@ -95,7 +95,13 @@ def luhn(numero: str) -> bool:
 # ningún dato personal. Incluirlas volvía a llenar el reporte de ruido.
 CONTEXTO = re.compile(
     r"\b(?:c[eé]dula|c\.?c\.?|nit|identificaci[oó]n|documento|doc|pasaporte|"
-    r"cuenta|ahorros|corriente|tarjeta|titular|apellido)\b",
+    r"cuenta|ahorros|corriente|tarjeta|titular|apellido|"
+    # `contraparte`, `beneficiario` y `payee` son los nombres con los que el
+    # PROPIO ledger guarda lo que el banco traía en su columna `documento`.
+    # Sin ellos, el escáner degradaba a BAJA justamente la PII que esta
+    # herramienta escribe: la misma cédula salía ALTA bajo el encabezado
+    # `documento` y BAJA bajo `contraparte` después de importarla.
+    r"contraparte|beneficiario|payee)\b",
     re.IGNORECASE,
 )
 
@@ -216,7 +222,13 @@ def nombres_del_perfil(ruta: Path | None) -> list[str]:
 
 MONETARIA = re.compile(
     r"\b(?:monto|valor|saldo|importe|total|amount|trm|debito|credito|"
-    r"monto_cop|monto_origen|impuesto|base|uvt|cop|usd)\b",
+    r"monto_cop|monto_origen|impuesto|base|uvt|cop|usd|"
+    # Columnas de los CSV que genera el propio motor. Sin ellas,
+    # `escenarios.csv` —cuyas columnas son ruta_A_costos y ruta_B_exenta_25—
+    # reportaba cada cifra de ocho dígitos como documento de confianza ALTA.
+    # El escáner gritando sobre su propia salida es la forma más rápida de
+    # que la gente deje de leerlo.
+    r"ruta_[ab](?:_\w+)?|costos?|exenta|deduccion|deducciones)\b",
     re.IGNORECASE,
 )
 
@@ -245,6 +257,32 @@ def columnas_por_encabezado(texto: str, sep: str) -> tuple[set[int], set[int]]:
         elif CONTEXTO.search(nombre):
             ident.add(i)
     return ident, dinero
+
+
+def rangos_de_celdas(linea: str, sep: str) -> list[tuple[int, int]]:
+    """Posición (inicio, fin) de cada celda de una línea de CSV.
+
+    Partir por `linea.split(sep)` era incorrecto en cuanto una celda traía el
+    separador entre comillas —que es el caso normal: las descripciones de un
+    extracto y los conceptos del `escenarios.csv` del propio motor lo traen—.
+    Cada coma dentro de comillas corría UNA columna todas las de la derecha,
+    así que la columna de montos dejaba de reconocerse y sus cifras de ocho
+    dígitos se reportaban como documento de confianza ALTA.
+
+    El resultado era el escáner gritando sobre su propia salida, que es la
+    forma más rápida de que la gente deje de leerlo.
+    """
+    rangos: list[tuple[int, int]] = []
+    inicio = 0
+    entre_comillas = False
+    for i, c in enumerate(linea):
+        if c == '"':
+            entre_comillas = not entre_comillas
+        elif c == sep and not entre_comillas:
+            rangos.append((inicio, i))
+            inicio = i + 1
+    rangos.append((inicio, len(linea)))
+    return rangos
 
 
 def escanear(ruta: Path, nombres=None) -> list[tuple[int, str, str, str]]:
@@ -287,13 +325,11 @@ def escanear_texto(texto: str, nombres, sufijo="") -> list[tuple[int, str, str, 
         rangos_id: list[tuple[int, int]] = []
         rangos_dinero: list[tuple[int, int]] = []
         if sep and (cols_id or cols_dinero):
-            pos = 0
-            for i, celda in enumerate(linea.split(sep)):
+            for i, (desde, hasta) in enumerate(rangos_de_celdas(linea, sep)):
                 if i in cols_id:
-                    rangos_id.append((pos, pos + len(celda)))
+                    rangos_id.append((desde, hasta))
                 elif i in cols_dinero:
-                    rangos_dinero.append((pos, pos + len(celda)))
-                pos += len(celda) + 1
+                    rangos_dinero.append((desde, hasta))
 
         vistos = set()
         for etiqueta, patron, modo in PATRONES:

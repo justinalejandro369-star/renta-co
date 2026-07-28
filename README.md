@@ -120,7 +120,7 @@ Este proyecto ataca el caso más difícil y peor atendido: **el freelance con in
 
 | El problema | Lo que hace `renta-co` |
 |---|---|
-| Cobras en USD por Deel, Wise o Payoneer | Convierte cada movimiento a la **TRM de su fecha** (art. 288 ET), no a un promedio. En 2025 la TRM osciló 19%: el atajo mueve la base en millones |
+| Cobras en USD por Deel, Wise o cualquier plataforma que exporte CSV | Convierte cada movimiento a la **TRM de su fecha** (art. 288 ET), no a un promedio. En 2025 la TRM osciló 19%: el atajo mueve la base en millones |
 | El export mezcla pagos, retiros y conversiones | Clasifica los **traslados** como lo que son. Sumar todo lo positivo triplica tu ingreso, y es el error más común al importar a mano |
 | Tienes que elegir entre costos y el 25% exento | Calcula **las dos rutas** y te dice la diferencia en pesos. Son excluyentes (art. 336 num. 4 ET) |
 | Nadie te retuvo nada | Te lo dice antes de que sea sorpresa, y confirma que **no eras agente de retención** (art. 368-2 ET exige ser comerciante *y* superar 30.000 UVT) |
@@ -154,7 +154,7 @@ Y trae el calificador que casi nadie cita: el art. 437 par. 3 num. 6 habla de co
 
 ### Registra los riesgos en vez de esconderlos
 
-Ocho riesgos del perfil freelance, con fundamento normativo, probabilidad de objeción y mitigación. Cuando una posición es agresiva pero defendible, queda por escrito con su nivel, para que la decisión se tome informada.
+Nueve riesgos del perfil freelance, con fundamento normativo, probabilidad de objeción y mitigación. Cuando una posición es agresiva pero defendible, queda por escrito con su nivel, para que la decisión se tome informada.
 
 ### El criterio, explícito
 

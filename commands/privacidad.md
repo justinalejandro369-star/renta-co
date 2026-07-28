@@ -9,10 +9,24 @@ Objetivo del escaneo: $ARGUMENTS
 Si no se dio ninguno, escanea `expediente/04-entregables/` y, si existe, la
 raíz del proyecto excluyendo `expediente/`.
 
+`$RAIZ` es la raíz de renta-co: el directorio que contiene `AGENTS.md` y
+`bin/renta`. Instalado como plugin es `$CLAUDE_PLUGIN_ROOT`; clonado, es la
+raíz del repo. Resuélvelo antes de correr nada — este comando se puede
+invocar sin haber pasado por `/renta-co:setup`, así que no supongas que ya
+está definido.
+
 Ejecuta:
 
 ```bash
 "$RAIZ/bin/renta" privacidad --perfil expediente/perfil.toml <objetivo>
+```
+
+Con `--staged`, el escáner mira los blobs del índice de git **del
+directorio desde donde se invoca**, que es el repositorio del usuario. No
+le pases rutas: se las pide a git.
+
+```bash
+"$RAIZ/bin/renta" privacidad --staged
 ```
 
 Después del escaneo:

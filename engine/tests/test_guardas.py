@@ -448,6 +448,94 @@ class TestParametros(unittest.TestCase):
 # TRM y ledger: las guardas de la capa de datos
 # ---------------------------------------------------------------------
 
+class TestCitasNormativas(unittest.TestCase):
+    """La cita que ve el contador es la del MOTOR, no la de knowledge/.
+
+    Las dos podían divergir porque la cifra salía de
+    `knowledge/<año>/parametros.toml` y la cita de un literal en Python. La
+    ronda 5 encontró tres divergencias sobre el mismo número —prepagada,
+    dependientes de 72 UVT y el 1% de factura electrónica—, y en las tres la
+    del motor apuntaba a una norma distinta de la verificada.
+    """
+
+    def _citas_de_knowledge(self, anio: int) -> set[str]:
+        import tomllib
+
+        ruta = RAIZ / "knowledge" / f"ag{anio}" / "parametros.toml"
+        with open(ruta, "rb") as f:
+            datos = tomllib.load(f)
+        citas: set[str] = set()
+
+        def recorrer(nodo):
+            if isinstance(nodo, dict):
+                if isinstance(nodo.get("fuente"), str):
+                    citas.add(nodo["fuente"])
+                for v in nodo.values():
+                    recorrer(v)
+            elif isinstance(nodo, list):
+                for v in nodo:
+                    recorrer(v)
+
+        recorrer(datos)
+        return citas
+
+    # Renglones cuya norma no tiene bloque propio en parametros.toml porque
+    # no llevan una cifra parametrizable: son la estructura de la cédula.
+    SIN_BLOQUE = {
+        "ET art. 335 y art. 103", "ET art. 338", "ET art. 340",
+        "ET arts. 55 y 56", "ET art. 336 num. 4",
+        "ET art. 206 num. 10, mod. Ley 2277 de 2022 art. 2",
+        "ET art. 373", "ET art. 815",
+    }
+
+    def test_ningun_renglon_cita_una_norma_que_knowledge_no_declare(self):
+        from engine.depuracion import liquidar
+
+        citas = self._citas_de_knowledge(2025)
+        par = P.cargar(2025)
+        p = PF.cargar(RAIZ / "expediente.ejemplo")
+        divergentes = []
+        for ruta in ("A", "B"):
+            for renglon in liquidar(p, par, ruta).renglones:
+                if not renglon.fuente:
+                    continue
+                if renglon.fuente in citas or renglon.fuente in self.SIN_BLOQUE:
+                    continue
+                divergentes.append((renglon.concepto, renglon.fuente))
+        self.assertEqual(
+            divergentes, [],
+            "estos renglones citan una norma que knowledge/ no declara; si la "
+            "cifra sale de parametros.toml, la cita también tiene que salir de "
+            "ahí (ver _fuente en depuracion.py)",
+        )
+
+    def test_los_tres_renglones_que_divergian_citan_lo_mismo_que_knowledge(self):
+        from engine.depuracion import liquidar
+
+        par = P.cargar(2025)
+        p = PF.cargar(RAIZ / "expediente.ejemplo")
+        por_concepto = {r.concepto: r.fuente
+                        for r in liquidar(p, par, "A").renglones}
+        for concepto, bloque in (
+            ("− Medicina prepagada", "topes.medicina_prepagada"),
+            ("− Dependientes (72 UVT c/u — FUERA del tope)",
+             "topes.dependientes_72uvt"),
+            ("− Deducción 1% compras con factura electrónica",
+             "topes.deduccion_1pct_factura_electronica"),
+        ):
+            self.assertEqual(por_concepto[concepto], par.get(f"{bloque}.fuente"),
+                             f"{concepto} cita algo distinto de {bloque}")
+
+    def test_un_ano_sin_fuente_declarada_cae_al_respaldo_y_no_a_vacio(self):
+        """Un renglón sin cita es peor que uno con cita imperfecta: el
+        contador no tiene por dónde empezar a verificar."""
+        from engine.depuracion import _fuente
+
+        par = P.Parametros({"uvt": {"valor": 100}}, set(), 2025)
+        self.assertEqual(_fuente(par, "topes.gmf.porcentaje_deducible",
+                                 "ET art. 115"), "ET art. 115")
+
+
 class TestGuardasDeTRM(unittest.TestCase):
     def setUp(self):
         self.dia = date(2025, 3, 14)
@@ -489,6 +577,38 @@ class TestGuardasDeTRM(unittest.TestCase):
             TRM.para(date(2025, 1, 1), date(2025, 1, 5), cache=None,
                      permitir_red=False)
         self.assertIn("red está desactivada", str(ctx.exception))
+
+    def test_sin_red_acepta_un_cache_de_solo_dias_habiles(self):
+        """La fuente oficial no publica fines de semana, así que un caché
+        COMPLETO tiene huecos por definición. Exigir todos los días
+        calendario hacía que `--sin-red` fuera inutilizable sin haber estado
+        en línea: bastaba que el rango tocara un sábado."""
+        import tempfile
+
+        from engine.trm import escribir_cache
+
+        habiles = {date(2025, 3, d): 4_000.0 for d in (13, 14, 17, 18)}
+        cache = Path(tempfile.mkdtemp()) / "trm-cache.csv"
+        escribir_cache(cache, habiles)
+
+        trm = TRM.para(date(2025, 3, 14), date(2025, 3, 17), cache=cache,
+                       permitir_red=False)
+        self.assertEqual(trm.de(date(2025, 3, 15)), 4_000.0)   # sábado
+        self.assertTrue(trm.desde_cache)
+
+    def test_sin_red_sigue_fallando_con_un_hueco_de_verdad(self):
+        """El arreglo no puede volverse una puerta: un mes sin datos sigue
+        siendo un caché que no sirve."""
+        import tempfile
+
+        from engine.trm import escribir_cache
+
+        cache = Path(tempfile.mkdtemp()) / "trm-cache.csv"
+        escribir_cache(cache, {date(2025, 3, 14): 4_000.0})
+        with self.assertRaises(SinTRM) as ctx:
+            TRM.para(date(2025, 3, 14), date(2025, 4, 30), cache=cache,
+                     permitir_red=False)
+        self.assertIn("no cubre", str(ctx.exception))
 
 
 class TestEntradasPorFuente(unittest.TestCase):

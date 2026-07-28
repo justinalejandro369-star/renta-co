@@ -4,14 +4,14 @@
 python3 -m benchmark.correr
 ```
 
-Catorce contribuyentes ficticios, tres capas de verificación. Corre en CI en
+Catorce contribuyentes ficticios, cuatro capas de verificación. Corre en CI en
 cada push.
 
-## Por qué tres capas
+## Por qué cuatro capas
 
 Un test que compara la salida del motor contra una constante **que salió del
 propio motor** no prueba nada: si el motor está mal, la constante también lo
-está. Este benchmark evita esa trampa por tres caminos distintos.
+está. Este benchmark evita esa trampa por cuatro caminos distintos.
 
 ### 1. Invariantes
 

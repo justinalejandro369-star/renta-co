@@ -5,6 +5,12 @@ description: Muestra en qué va el expediente y cuál es el siguiente paso
 Revisa el estado del expediente y di, en menos de quince líneas, dónde va y
 qué sigue.
 
+`$RAIZ` es la raíz de renta-co: el directorio que contiene `AGENTS.md` y
+`bin/renta`. Instalado como plugin es `$CLAUDE_PLUGIN_ROOT`; clonado, es la
+raíz del repo. Resuélvelo antes de correr nada — este comando se puede
+invocar sin haber pasado por `/renta-co:setup`, así que no supongas que ya
+está definido.
+
 ```bash
 "$RAIZ/bin/renta" verificar --expediente "$PWD/expediente"
 ```

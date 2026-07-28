@@ -382,21 +382,49 @@ def detecta(cabeceras: list[str], nombre: str = "") -> bool:
     return "fecha" in mapa and "monto" in mapa
 
 
-def abrir_csv(ruta: Path):
+# Secuencias que delatan un utf-8 leído como latin-1 o cp1252: la "é" de
+# "descripción" en utf-8 son dos bytes que en latin-1 se ven como "Ã©".
+MOJIBAKE = re.compile(r"[ÃÂ][\x80-\xbf]|ï»¿|â€")
+
+
+def abrir_csv(ruta: Path, avisos: list[str] | None = None):
     """Abre un CSV probando codificaciones, en vez de mutilar el texto.
 
     Con `errors="replace"` un extracto en latin-1 —que es lo que exporta más
     de un banco colombiano— perdía todas las tildes y con ellas las palabras
     que usan las reglas de clasificación. Peor: la detección del adaptador
     fallaba y el archivo caía al genérico.
+
+    Ojo con la cadena de respaldo: latin-1 acepta CUALQUIER byte, así que
+    nunca lanza `UnicodeDecodeError` y el `errors="replace"` del final es
+    inalcanzable. Eso no es un problema de código muerto: significa que un
+    utf-8 corrupto se lee sin error como mojibake y entra al ledger con las
+    descripciones rotas, que son las que usan las reglas de clasificación.
+    Por eso, cuando se llega a latin-1, se MIRA el texto y se avisa.
     """
+    avisos = avisos if avisos is not None else []
     for encoding in ("utf-8-sig", "cp1252", "latin-1"):
         try:
             with open(ruta, newline="", encoding=encoding) as f:
-                f.read()
-            return open(ruta, newline="", encoding=encoding)
+                texto = f.read()
         except UnicodeDecodeError:
             continue
+        # La revisión corre en TODAS las codificaciones, no solo en el
+        # respaldo. El caso más común es el doble encoding: un utf-8 leído
+        # como latin-1 y vuelto a guardar como utf-8. El archivo resultante
+        # es utf-8 VÁLIDO —decodifica sin un solo error— y dice "RETENCIÃ³N".
+        # Mirar solo la ruta de respaldo dejaba pasar justo ese.
+        roto = MOJIBAKE.search(texto)
+        if roto:
+            avisos.append(
+                f"{ruta.name} se leyó como {encoding} y el texto quedó con "
+                f"caracteres rotos (por ejemplo {roto.group(0)!r}). Suele ser "
+                f"un archivo utf-8 guardado dos veces con la codificación "
+                f"equivocada. Las descripciones son lo que usan las reglas de "
+                f"clasificación, así que revisa las categorías del ledger "
+                f"antes de calcular."
+            )
+        return open(ruta, newline="", encoding=encoding)
     return open(ruta, newline="", encoding="utf-8", errors="replace")
 
 
@@ -420,7 +448,7 @@ def aviso_de_filas_saltadas(nombre: str, malas: list[str], leidas: int) -> str:
 def importar(ruta: Path, mapa: dict[str, str] | None = None,
              avisos: list[str] | None = None) -> list[Movimiento]:
     avisos = avisos if avisos is not None else []
-    with abrir_csv(ruta) as f:
+    with abrir_csv(ruta, avisos) as f:
         lector = csv.DictReader(f)
         cols = mapa or _mapear(lector.fieldnames or [])
         if "fecha" not in cols or "monto" not in cols:

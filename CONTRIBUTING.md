@@ -37,7 +37,8 @@ Reglas:
   clasifique a mano a que un traslado se cuente como ingreso. No clasifiques
   por el signo del monto.
 - **Los retiros y las conversiones son `traslado`**, no ingreso ni gasto.
-- Incluye un CSV de muestra **anonimizado** en `engine/tests/muestras/` y un
+- Incluye un CSV de muestra **anonimizado** dentro del test, como los de
+  `engine/tests/test_importacion.py` —se escriben a un directorio temporal—, y un
   test que verifique la clasificación.
 
 ---
