@@ -53,12 +53,102 @@ def impuesto_241(base_cop: float, par: Parametros) -> float:
 
 
 def tarifa_marginal(base_cop: float, par: Parametros) -> float:
+    """Tarifa que paga el PRÓXIMO peso de base.
+
+    El corte va con `<` y no con `<=`, al revés que `impuesto_241`. No es un
+    descuido simétrico: son dos preguntas distintas.
+
+      · `impuesto_241` pregunta en qué tramo cae ESTA base. Una base de
+        exactamente 1.090 UVT está dentro del tramo del 0%, así que `<=`.
+      · `tarifa_marginal` pregunta qué le cuesta el peso SIGUIENTE. Parado
+        exactamente en 1.090 UVT, el siguiente peso ya paga 19%.
+
+    Con `<=` devolvía la tarifa del tramo ANTERIOR justo en la frontera, y
+    esta cifra sale impresa como insumo de planeación: quien está en el
+    borde leía 0% y decidía con eso.
+    """
     base_uvt = base_cop / par.uvt if par.uvt else 0
     for rango in par.exigir("tarifa.rangos"):
         hasta = rango["hasta_uvt"]
-        if hasta == 0 or base_uvt <= hasta:
+        if hasta == 0 or base_uvt < hasta:
             return rango["tarifa"]
     return 0.0
+
+
+def aproximar_577(valor: float) -> int:
+    """Al múltiplo de mil más cercano, como manda el art. 577 ET.
+
+    «Los valores diligenciados en los formularios de las declaraciones
+    tributarias deberán aproximarse al múltiplo de mil (1.000) más cercano.»
+
+    El motor calcula al peso, que es lo correcto para comparar rutas y para
+    auditar la cuenta. Pero lo que el usuario TRANSCRIBE al formulario 210 va
+    aproximado, y la diferencia entre lo que el motor imprimía y lo que él
+    escribía en la casilla la estaba resolviendo él de cabeza — contra la
+    regla del proyecto de que la aritmética la hace el motor.
+
+    Se usa `round`, que en Python redondea al par en el empate exacto (500).
+    Da igual: el art. 577 no dice qué hacer con el empate y la DIAN acepta
+    cualquiera de los dos, con una diferencia máxima de mil pesos.
+    """
+    return int(round(valor / 1000) * 1000)
+
+
+def zonas_de_castigo_241(par: Parametros) -> list[tuple[float, float, float]]:
+    """Tramos donde ganar un peso más de base BAJA el impuesto.
+
+    La tabla del art. 241 no es continua: en cada frontera, el `adicional_uvt`
+    del tramo siguiente viene redondeado a UVT enteras y no coincide con lo
+    que acumuló el tramo anterior. En 8.670 UVT un peso más de base son
+    $4.980 MENOS de impuesto.
+
+    Esto es FIEL A LA NORMA —sale del propio texto de la tabla— y no hay nada
+    que arreglar en el motor. Pero nada en la salida se lo advertía a quien
+    queda parado justo ahí, que es exactamente a quien le sirve saberlo: le
+    conviene renunciar a una deducción.
+
+    Devuelve (desde_cop, hasta_cop, ahorro) por cada zona: quien tenga la
+    renta líquida dentro de ese rango paga MÁS que si tuviera `hasta_cop + 1`.
+    """
+    zonas = []
+    for rango in par.exigir("tarifa.rangos"):
+        hasta = rango["hasta_uvt"]
+        if not hasta:
+            continue
+        frontera = hasta * par.uvt
+        arriba = impuesto_241(frontera + 1, par)
+        if impuesto_241(frontera, par) <= arriba:
+            continue
+        # El punto donde el impuesto de este tramo alcanza al del siguiente.
+        # Bisección en vez de despejar: no depende de la forma de la fórmula,
+        # así que sigue valiendo si la tabla cambia de estructura.
+        bajo, alto = rango["desde_uvt"] * par.uvt, frontera
+        for _ in range(60):
+            medio = (bajo + alto) / 2
+            if impuesto_241(medio, par) > arriba:
+                alto = medio
+            else:
+                bajo = medio
+        zonas.append((alto, frontera, impuesto_241(frontera, par) - arriba))
+    return zonas
+
+
+def aviso_de_discontinuidad(base_cop: float, par: Parametros) -> str:
+    """Aviso para quien cae dentro de una zona de castigo. Vacío si no."""
+    for desde, hasta, ahorro in zonas_de_castigo_241(par):
+        if desde <= base_cop <= hasta:
+            return (
+                f"Tu renta líquida gravable ({_cop(base_cop)}) cae en el "
+                f"escalón del art. 241 que termina en {_cop(hasta)}. Con "
+                f"{_cop(hasta + 1)} de base pagarías {_cop(ahorro)} MENOS de "
+                f"impuesto, porque la tabla salta hacia abajo en esa "
+                f"frontera. No es un error del cálculo: sale del redondeo a "
+                f"UVT enteras del propio texto de la norma. Si estás sobre "
+                f"ese borde, renunciar a una deducción pequeña te puede "
+                f"salir más barato — revísalo con tu contador antes de "
+                f"hacerlo, porque una deducción no solicitada no se recupera."
+            )
+    return ""
 
 
 # ---------------------------------------------------------------------
@@ -281,14 +371,39 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
             * uvt,
         )
 
-    # La de 72 UVT queda FUERA del tope conjunto; la del 10% queda DENTRO.
-    ded_fijas = gmf + vivienda + prepagada + voluntarios
-
-    # 1% de compras con factura electrónica — fuera del tope
+    # 1% de compras con factura electrónica
     fe = min(
         p.get("deducciones.compras_con_factura_electronica")
         * par.exigir("topes.deduccion_1pct_factura_electronica.porcentaje_compras"),
         par.exigir("topes.deduccion_1pct_factura_electronica.tope_uvt") * uvt,
+    )
+
+    # Qué deducción entra al tope conjunto y cuál no lo decide
+    # `dentro_del_tope_conjunto` de parametros.toml, no una suma escrita a
+    # mano acá.
+    #
+    # Los flags existían en knowledge/ desde el principio y NO LOS LEÍA
+    # NADIE: la partición estaba cableada en esta función. Hoy coinciden, y
+    # ese es el problema — es la misma clase de divergencia knowledge↔motor
+    # que `_fuente()` cerró para las citas, esperando a que alguien corrija
+    # un flag creyendo que cambia el cálculo y no pase nada.
+    #
+    # Las de dependientes NO van acá: se resuelven por escenario, más abajo,
+    # porque la vía elegida decide cuál de las dos aplica.
+    partidas = (
+        ("topes.gmf", gmf),
+        ("topes.intereses_vivienda", vivienda),
+        ("topes.medicina_prepagada", prepagada),
+        ("topes.aportes_voluntarios", voluntarios),
+        ("topes.deduccion_1pct_factura_electronica", fe),
+    )
+    ded_fijas = sum(
+        v for bloque, v in partidas
+        if par.get(f"{bloque}.dentro_del_tope_conjunto", True)
+    )
+    fuera_fijas = sum(
+        v for bloque, v in partidas
+        if not par.get(f"{bloque}.dentro_del_tope_conjunto", True)
     )
 
     tope = max(
@@ -313,7 +428,7 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
             # Art. 206 num. 10 inciso 2: la base de la exención se calcula
             # UNA VEZ SE DETRAIGAN los INCRNGO, las deducciones y las rentas
             # exentas distintas de esta. No es el 25% del ingreso bruto.
-            base = trabajo - incrngo - ded_limitadas - dep_fuera - fe
+            base = trabajo - incrngo - ded_limitadas - dep_fuera - fuera_fijas
             exenta = min(
                 max(base, 0) * par.exigir("topes.renta_exenta_25.porcentaje"),
                 par.exigir("topes.renta_exenta_25.tope_anual_uvt") * uvt,
@@ -322,7 +437,7 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
         solicitado = ded_limitadas + exenta
         aplicado = min(solicitado, tope)
         rechazado = solicitado - aplicado
-        rl = max(netos - costos - aplicado - dep_fuera - fe, 0)
+        rl = max(netos - costos - aplicado - dep_fuera - fuera_fijas, 0)
         return {
             "impuesto": impuesto_241(rl, par),
             "renta_liquida": rl,
@@ -333,7 +448,17 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
             "rechazado": rechazado,
         }
 
-    opciones = [("72 UVT por dependiente (fuera del tope)", evaluar(0.0, dep_72))]
+    # Las dos vías de dependientes también salen de su flag, no de una
+    # constante de esta función.
+    dep10_dentro = par.get("topes.dependientes_10pct.dentro_del_tope_conjunto", True)
+    dep72_dentro = par.get("topes.dependientes_72uvt.dentro_del_tope_conjunto", False)
+
+    def escenario(v10: float, v72: float):
+        dentro = (v10 if dep10_dentro else 0.0) + (v72 if dep72_dentro else 0.0)
+        fuera = (0.0 if dep10_dentro else v10) + (0.0 if dep72_dentro else v72)
+        return evaluar(dentro, fuera)
+
+    opciones = [("72 UVT por dependiente (fuera del tope)", escenario(0.0, dep_72))]
     if n_dep > 0:
         resto = min(n_dep - 1, max_dep)
         etiqueta = (
@@ -341,7 +466,7 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
             f"10% de la renta de trabajo por uno (dentro del tope) + 72 UVT "
             f"por los otros {resto} (fuera)"
         )
-        opciones.append((etiqueta, evaluar(dep_10, dep_72_resto)))
+        opciones.append((etiqueta, escenario(dep_10, dep_72_resto)))
 
     via, e = min(opciones, key=lambda o: o[1]["impuesto"])
     L.dependientes_via = via if n_dep else "sin dependientes"
@@ -983,6 +1108,21 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
 # Comparación completa
 # ---------------------------------------------------------------------
 
+def renglones_al_210(L: Liquidacion) -> list[tuple[str, int]]:
+    """Las cifras que se transcriben al formulario, aproximadas al art. 577.
+
+    Solo las que van a una casilla. El resto de la depuración es la
+    trazabilidad de cómo se llegó a estas, y va al peso.
+    """
+    return [
+        ("Renta líquida gravable", aproximar_577(L.renta_liquida)),
+        ("Impuesto sobre la renta líquida", aproximar_577(L.impuesto)),
+        ("Impuesto neto de renta", aproximar_577(L.impuesto_neto)),
+        ("Saldo a pagar" if L.saldo >= 0 else "Saldo a favor",
+         aproximar_577(abs(L.saldo))),
+    ]
+
+
 def comparar(p: Perfil, par: Parametros) -> dict:
     a = liquidar(p, par, "A")
     b = liquidar(p, par, "B")
@@ -1000,6 +1140,13 @@ def comparar(p: Perfil, par: Parametros) -> dict:
         "pasivos": p.pasivos,
         "patrimonio_liquido": p.patrimonio_bruto - p.pasivos,
         "tarifa_marginal": tarifa_marginal(
+            (a if mejor == "A" else b).renta_liquida, par
+        ),
+        # Lo que el usuario TRANSCRIBE al 210, ya aproximado al múltiplo de
+        # mil del art. 577. Lo hacía él de cabeza, contra la regla de que la
+        # aritmética la hace el motor.
+        "al_formulario_210": renglones_al_210(a if mejor == "A" else b),
+        "aviso_discontinuidad": aviso_de_discontinuidad(
             (a if mejor == "A" else b).renta_liquida, par
         ),
         "supuestos": p.supuestos,

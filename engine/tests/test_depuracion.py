@@ -1064,3 +1064,144 @@ class TestTopeDeCostosPorTipoDeRenta(unittest.TestCase):
             for ruta in ("A", "B")
         }
         self.assertEqual(conceptos["A"], conceptos["B"])
+
+
+class TestMenoresDelMotorRonda7(unittest.TestCase):
+    """Los cinco menores que la ronda 6 dejó abiertos. Ninguno producía un
+    número equivocado en silencio; todos se reprodujeron antes."""
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+
+    # --- parse_monto: tres decimales CON separador de miles --------------
+
+    def test_tres_decimales_con_separador_de_miles(self):
+        """"1,234.500" y "1.234,500" caían en «mezcla puntos y comas». Todos
+        los grupos miden tres, así que la LONGITUD no desambigua; lo hace el
+        TIPO: los separadores de miles de un número son todos iguales, así
+        que un último separador distinto solo puede ser el decimal."""
+        self.assertEqual(parse_monto("1,234.500"), 1234.5)
+        self.assertEqual(parse_monto("1.234,500"), 1234.5)
+        self.assertEqual(parse_monto("12.345,678"), 12345.678)
+
+    def test_la_señal_del_tipo_no_rompe_lo_que_ya_funcionaba(self):
+        self.assertEqual(parse_monto("1.234.567"), 1234567)
+        self.assertEqual(parse_monto("1,234,567.89"), 1234567.89)
+        self.assertEqual(parse_monto("1.234.567,89"), 1234567.89)
+        for malo in ("1.2.3", "12,34,567", "1,2.345"):
+            with self.assertRaises(ValueError, msg=malo):
+                parse_monto(malo)
+
+    # --- tarifa marginal en la frontera ----------------------------------
+
+    def test_la_marginal_en_la_frontera_es_la_del_proximo_peso(self):
+        """Parado exactamente en 1.090 UVT —el techo del tramo del 0%— el
+        siguiente peso ya paga 19%. Devolvía 0%, y es una cifra de
+        planeación que sale impresa."""
+        from engine.depuracion import tarifa_marginal
+
+        self.assertEqual(tarifa_marginal(1090 * UVT_2025, self.par), 0.19)
+        self.assertEqual(tarifa_marginal(1700 * UVT_2025, self.par), 0.28)
+        self.assertEqual(tarifa_marginal((1090 - 1) * UVT_2025, self.par), 0.0)
+
+    def test_el_impuesto_en_la_frontera_sigue_usando_el_tramo_de_abajo(self):
+        """La otra mitad, y por qué no es una asimetría descuidada: son dos
+        preguntas distintas. Una base de 1.090 UVT EXACTAS está dentro del
+        tramo del 0% y paga cero."""
+        self.assertEqual(impuesto_241(1090 * UVT_2025, self.par), 0)
+
+    # --- los flags de dentro_del_tope_conjunto ---------------------------
+
+    def test_los_flags_del_knowledge_deciden_de_verdad(self):
+        """Los flags existían y no los leía nadie: la partición estaba
+        cableada en depuracion.py. Hoy coinciden, y ESE es el problema —
+        esperando a que alguien corrija un flag y no pase nada."""
+        # El tope tiene que estar SATURADO o mover una deducción de un lado a
+        # otro no cambia nada y el test no probaría el flag. Se satura con
+        # aportes voluntarios: 1.340 UVT son $66.730.660.
+        p = self._perfil(deducciones={"gmf_pagado": 4_000_000,
+                                      "aportes_voluntarios": 66_000_000,
+                                      "medicina_prepagada": 9_561_408})
+        antes = liquidar(p, self.par, "A")
+        self.assertGreater(antes.rechazado_por_tope, 0, "el tope debe saturarse")
+
+        par2 = P.cargar(2025)
+        par2._d["topes"]["gmf"]["dentro_del_tope_conjunto"] = False
+        despues = liquidar(p, par2, "A")
+
+        self.assertNotEqual(
+            antes.impuesto, despues.impuesto,
+            "cambiar el flag no cambió nada: el motor no lo está leyendo",
+        )
+
+    def test_sacar_del_tope_una_deduccion_no_puede_subir_el_impuesto(self):
+        """Invariante de la partición: lo que queda FUERA del tope siempre
+        resta entero, así que sacarla nunca puede empeorar."""
+        p = self._perfil(deducciones={"gmf_pagado": 4_000_000,
+                                      "aportes_voluntarios": 60_000_000,
+                                      "medicina_prepagada": 9_561_408})
+        par2 = P.cargar(2025)
+        par2._d["topes"]["gmf"]["dentro_del_tope_conjunto"] = False
+        self.assertLessEqual(
+            liquidar(p, par2, "A").impuesto, liquidar(p, self.par, "A").impuesto
+        )
+
+    # --- art. 577 --------------------------------------------------------
+
+    def test_aproximar_577_al_multiplo_de_mil_mas_cercano(self):
+        from engine.depuracion import aproximar_577
+
+        self.assertEqual(aproximar_577(3_656_500 + 400), 3_657_000)
+        self.assertEqual(aproximar_577(3_656_400), 3_656_000)
+        self.assertEqual(aproximar_577(0), 0)
+        self.assertEqual(aproximar_577(999), 1_000)
+        self.assertEqual(aproximar_577(499), 0)
+
+    def test_el_comparativo_emite_las_casillas_del_210_aproximadas(self):
+        """La regla del proyecto es que la aritmética la hace el motor. Estas
+        cuatro cifras las estaba aproximando el usuario de cabeza."""
+        r = comparar(self._perfil(), self.par)
+        casillas = dict(r["al_formulario_210"])
+        self.assertEqual(len(casillas), 4)
+        for valor in casillas.values():
+            self.assertEqual(valor % 1000, 0, casillas)
+
+    # --- discontinuidad del art. 241 -------------------------------------
+
+    def test_las_zonas_de_castigo_existen_y_estan_donde_dice_la_norma(self):
+        from engine.depuracion import zonas_de_castigo_241
+
+        zonas = zonas_de_castigo_241(self.par)
+        fronteras = {round(h / UVT_2025) for _, h, _ in zonas}
+        self.assertEqual(fronteras, {8670, 31000})
+        for _, _, ahorro in zonas:
+            self.assertGreater(ahorro, 0)
+
+    def test_quien_cae_en_la_zona_recibe_el_aviso(self):
+        from engine.depuracion import aviso_de_discontinuidad, zonas_de_castigo_241
+
+        desde, hasta, _ = zonas_de_castigo_241(self.par)[0]
+        self.assertIn("art. 241", aviso_de_discontinuidad(hasta, self.par))
+        self.assertIn("art. 241", aviso_de_discontinuidad((desde + hasta) / 2,
+                                                          self.par))
+        self.assertEqual(aviso_de_discontinuidad(hasta + 1, self.par), "")
+        self.assertEqual(aviso_de_discontinuidad(desde - 1_000_000, self.par), "")
+
+    def test_el_aviso_dice_una_verdad_comprobable(self):
+        """No basta con que avise: la cifra que promete tiene que salir del
+        motor. Se recalcula con impuesto_241, no se copia del aviso."""
+        from engine.depuracion import zonas_de_castigo_241
+
+        for _, hasta, ahorro in zonas_de_castigo_241(self.par):
+            real = impuesto_241(hasta, self.par) - impuesto_241(hasta + 1, self.par)
+            self.assertEqual(real, ahorro)
+
+    def _perfil(self, **secciones):
+        datos = {
+            "contribuyente": {"anio_gravable": 2025, "residente_fiscal": True},
+            "ingresos": {"rentas_trabajo_honorarios": 200_000_000},
+        }
+        for seccion, campos in secciones.items():
+            datos.setdefault(seccion, {}).update(campos)
+        completos, supuestos = PF._completar(datos)
+        return PF.Perfil(completos, None, supuestos)

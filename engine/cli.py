@@ -155,6 +155,20 @@ def cmd_calcular(args) -> int:
         if otra.dependientes_via != ganadora.dependientes_via:
             print(f"    (la otra ruta usaría: {otra.dependientes_via})")
 
+    # Lo que va a las casillas, aproximado al múltiplo de mil del art. 577.
+    # El motor calcula al peso —así se audita la cuenta— pero lo que se
+    # ESCRIBE en el formulario va aproximado, y esa cuenta la estaba haciendo
+    # el usuario de cabeza.
+    print()
+    print("  AL FORMULARIO 210 — ya aproximado al múltiplo de mil (art. 577 ET)")
+    for etiqueta, valor in r["al_formulario_210"]:
+        print(f"    {etiqueta:<38}{cop(valor):>15}")
+
+    if r["aviso_discontinuidad"]:
+        print()
+        for tramo in _envolver("⚠ " + r["aviso_discontinuidad"], ANCHO - 4):
+            print(f"  {tramo}")
+
     print()
     print(f"  Patrimonio bruto        : {cop(r['patrimonio_bruto'])}")
     print(f"  Pasivos                 : {cop(r['pasivos'])}")

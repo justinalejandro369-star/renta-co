@@ -331,6 +331,21 @@ def parse_monto(texto: str, sep_decimal: str | None = None,
     if not decimales and len(seps) == 1:
         decimales = _resolver_ambiguo(grupos[0], seps[0], sep_decimal, moneda)
 
+    # Tres decimales CON separador de miles: "1,234.500" y "1.234,500".
+    # Todos los grupos miden tres, así que la LONGITUD no dice nada y el
+    # número caía en "mezcla puntos y comas como separadores de miles".
+    # Falla ruidosamente —la fila se salta y se cuenta, no produce un número
+    # malo— pero es un formato legítimo que quedaba sin leer.
+    #
+    # Lo desambigua el TIPO: los separadores de miles de un número son todos
+    # iguales, así que un último separador distinto de los anteriores solo
+    # puede ser el decimal. La señal es de la misma clase que las otras tres
+    # de `_resolver_ambiguo`: sale de la estructura del propio número y no de
+    # una convención supuesta.
+    if (not decimales and len(seps) > 1
+            and seps[-1] != seps[0] and len(set(seps[:-1])) == 1):
+        decimales = [len(seps) - 1]
+
     if len(decimales) > 1:
         raise malo("hay más de un separador decimal")
     if decimales and decimales[0] != len(seps) - 1:

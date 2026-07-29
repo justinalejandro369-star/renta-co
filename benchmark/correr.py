@@ -176,11 +176,15 @@ def invariantes(par) -> list[str]:
             if not v.get("estado") or not v.get("detalle"):
                 fallos.append(f"{pid}/{v['id']}: verificación sin estado o detalle")
 
+        # Tarifa del PRÓXIMO peso, así que el corte va con `<` y no con
+        # `<=`: parado exactamente en 1.090 UVT —el techo del tramo del
+        # 0%— el siguiente peso ya paga 19%. `impuesto_241` sí usa `<=`,
+        # porque responde otra pregunta: en qué tramo cae ESTA base.
         marginal = r["tarifa_marginal"]
         esperada = next(
             (x["tarifa"] for x in par.exigir("tarifa.rangos")
              if x["hasta_uvt"] == 0
-             or r["rutas"][r["mejor_ruta"]].renta_liquida / par.uvt <= x["hasta_uvt"]),
+             or r["rutas"][r["mejor_ruta"]].renta_liquida / par.uvt < x["hasta_uvt"]),
             None,
         )
         if marginal != esperada:
