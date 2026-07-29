@@ -79,6 +79,22 @@ inventada le cuesta media hora encontrarla.
 | ___ | **Total saldo a pagar** | **{{$X}}** |
 | ___ | **o Total saldo a favor** | **{{$X}}** |
 
+> **Copia estas seis cifras del bloque «Al formulario 210» de `renta calcular`,
+> tal como salen. No las recalcules ni las redondees.**
+>
+> El motor ya las aproximó al múltiplo de mil del art. 577 **encadenadas**:
+> el impuesto sale de aplicar el art. 241 a la base YA APROXIMADA, que es lo
+> que hace el formulario y lo que comprueba el validador del Muisca. Si
+> tomas la cifra al peso de la depuración y la redondeas tú, en algunos
+> casos te da mil pesos de diferencia y la declaración queda descuadrada
+> consigo misma.
+>
+> Comprueba las tres ecuaciones antes de presentar:
+>
+> - impuesto = art. 241 aplicado a la **renta líquida gravable de esta tabla**
+> - impuesto neto = impuesto − descuentos
+> - saldo = impuesto neto − (retenciones + saldo a favor del año anterior)
+
 ---
 
 ## Casillas informativas que se olvidan

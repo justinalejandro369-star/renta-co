@@ -35,6 +35,7 @@ benchmark/golden.json · cédula o documento · 1XXXXX540
 benchmark/golden.json · cédula o documento · 1XXXXX562
 benchmark/golden.json · cédula o documento · 1XXXXX750
 benchmark/golden.json · cédula o documento · 1XXXXX888
+benchmark/golden.json · cédula o documento · 1XXXXXX000
 benchmark/golden.json · cédula o documento · 1XXXXXX284
 benchmark/golden.json · cédula o documento · 2XXXX000
 benchmark/golden.json · cédula o documento · 2XXXX120
@@ -63,6 +64,7 @@ benchmark/golden.json · cédula o documento · 4XXXXX000
 benchmark/golden.json · cédula o documento · 4XXXXX063
 benchmark/golden.json · cédula o documento · 5XXXX000
 benchmark/golden.json · cédula o documento · 5XXXX910
+benchmark/golden.json · cédula o documento · 5XXXXX000
 benchmark/golden.json · cédula o documento · 5XXXXX669
 benchmark/golden.json · cédula o documento · 6XXXX000
 benchmark/golden.json · cédula o documento · 6XXXX408
@@ -70,6 +72,7 @@ benchmark/golden.json · cédula o documento · 6XXXX660
 benchmark/golden.json · cédula o documento · 7XXXX000
 benchmark/golden.json · cédula o documento · 7XXXX565
 benchmark/golden.json · cédula o documento · 7XXXX966
+benchmark/golden.json · cédula o documento · 7XXXXX000
 benchmark/golden.json · cédula o documento · 7XXXXX340
 benchmark/golden.json · cédula o documento · 8XXXX000
 benchmark/golden.json · cédula o documento · 8XXXX701

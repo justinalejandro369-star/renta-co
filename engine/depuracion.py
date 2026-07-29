@@ -1147,18 +1147,55 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
 # Comparación completa
 # ---------------------------------------------------------------------
 
-def renglones_al_210(L: Liquidacion) -> list[tuple[str, int]]:
+def renglones_al_210(L: Liquidacion, par: Parametros) -> list[tuple[str, int]]:
     """Las cifras que se transcriben al formulario, aproximadas al art. 577.
 
     Solo las que van a una casilla. El resto de la depuración es la
     trazabilidad de cómo se llegó a estas, y va al peso.
+
+    EL REDONDEO SE ENCADENA, y ése es el arreglo
+    ────────────────────────────────────────────
+    La versión anterior aproximaba cada casilla POR SEPARADO desde la cifra
+    al peso del motor. El resultado era que las cuatro casillas no cuadraban
+    ENTRE SÍ: quien transcribiera la base al 210 y liquidara sobre ella —que
+    es lo que hace el formulario, y lo que hace el validador de la DIAN—
+    obtenía un impuesto distinto del que el motor le imprimía al lado.
+
+    Medido sobre las 20 personas del benchmark: 3 de 40 liquidaciones
+    discrepaban en $1.000. Poco dinero y mucho problema, porque es
+    exactamente la clase de descuadre que un validador rechaza y que el
+    contribuyente no sabe explicar.
+
+    Acá el cálculo va HACIA ADELANTE desde la base ya aproximada, en el
+    mismo orden en que el formulario lo hace:
+
+        base_210      = aproximar(renta líquida)
+        impuesto_210  = aproximar(art. 241 sobre base_210)      ← sobre la
+                                                                  base YA
+                                                                  aproximada
+        neto_210      = impuesto_210 − descuentos_210
+        saldo_210     = neto_210 − anticipos_210
+
+    Así las casillas se reproducen unas de otras con la aritmética impresa
+    en el propio formulario, que es la única especificación de este cálculo
+    publicada por la autoridad. `benchmark/formulario210.py` la comprueba.
     """
+    base = aproximar_577(L.renta_liquida)
+    impuesto = aproximar_577(impuesto_241(base, par))
+    # Descuentos y anticipos se derivan de la liquidación al peso y se
+    # aproximan una sola vez; de ahí en adelante todo es aritmética entera
+    # entre casillas, que es lo que el formulario permite verificar.
+    descuentos = aproximar_577(L.impuesto - L.impuesto_neto)
+    anticipos = aproximar_577(L.impuesto_neto - L.saldo)
+    neto = max(impuesto - descuentos, 0)
+    saldo = neto - anticipos
     return [
-        ("Renta líquida gravable", aproximar_577(L.renta_liquida)),
-        ("Impuesto sobre la renta líquida", aproximar_577(L.impuesto)),
-        ("Impuesto neto de renta", aproximar_577(L.impuesto_neto)),
-        ("Saldo a pagar" if L.saldo >= 0 else "Saldo a favor",
-         aproximar_577(abs(L.saldo))),
+        ("Renta líquida gravable", base),
+        ("Impuesto sobre la renta líquida", impuesto),
+        ("Descuentos tributarios", descuentos),
+        ("Impuesto neto de renta", neto),
+        ("Anticipos y retenciones", anticipos),
+        ("Saldo a pagar" if saldo >= 0 else "Saldo a favor", abs(saldo)),
     ]
 
 
@@ -1184,7 +1221,7 @@ def comparar(p: Perfil, par: Parametros) -> dict:
         # Lo que el usuario TRANSCRIBE al 210, ya aproximado al múltiplo de
         # mil del art. 577. Lo hacía él de cabeza, contra la regla de que la
         # aritmética la hace el motor.
-        "al_formulario_210": renglones_al_210(a if mejor == "A" else b),
+        "al_formulario_210": renglones_al_210(a if mejor == "A" else b, par),
         "aviso_discontinuidad": aviso_de_discontinuidad(
             (a if mejor == "A" else b).renta_liquida, par
         ),

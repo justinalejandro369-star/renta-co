@@ -1205,12 +1205,45 @@ class TestMenoresDelMotorRonda7(unittest.TestCase):
 
     def test_el_comparativo_emite_las_casillas_del_210_aproximadas(self):
         """La regla del proyecto es que la aritmética la hace el motor. Estas
-        cuatro cifras las estaba aproximando el usuario de cabeza."""
+        cifras las estaba aproximando el usuario de cabeza."""
         r = comparar(self._perfil(), self.par)
         casillas = dict(r["al_formulario_210"])
-        self.assertEqual(len(casillas), 4)
+        self.assertGreaterEqual(len(casillas), 4)
         for valor in casillas.values():
             self.assertEqual(valor % 1000, 0, casillas)
+
+    def test_las_casillas_del_210_cuadran_ENTRE_SI(self):
+        """Que cada casilla esté aproximada no basta: tienen que reproducirse
+        unas de otras con la aritmética impresa en el formulario.
+
+        Antes se aproximaba cada una POR SEPARADO desde la cifra al peso, y
+        el resultado era que quien transcribiera la base y liquidara sobre
+        ella —que es lo que hace el 210, y lo que hace el validador de la
+        DIAN— obtenía otro impuesto. Medido: 3 de 40 liquidaciones del
+        benchmark discrepaban en $1.000 con el número impreso al lado.
+
+        La compuerta completa sobre las 20 personas está en
+        `benchmark/formulario210.py`; acá va el caso mínimo para que la
+        suite de unidad también lo cubra.
+        """
+        from engine.depuracion import aproximar_577, impuesto_241
+
+        c = dict(comparar(self._perfil(), self.par)["al_formulario_210"])
+        base = c["Renta líquida gravable"]
+        self.assertEqual(
+            c["Impuesto sobre la renta líquida"],
+            aproximar_577(impuesto_241(base, self.par)),
+            "el impuesto de la casilla no es el que sale de liquidar la BASE "
+            "DE LA CASILLA con el art. 241",
+        )
+        self.assertEqual(
+            c["Impuesto neto de renta"],
+            max(c["Impuesto sobre la renta líquida"] - c["Descuentos tributarios"], 0),
+        )
+        saldo = c.get("Saldo a pagar", -c.get("Saldo a favor", 0))
+        self.assertEqual(
+            saldo, c["Impuesto neto de renta"] - c["Anticipos y retenciones"]
+        )
 
     # --- discontinuidad del art. 241 -------------------------------------
 

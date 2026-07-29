@@ -50,7 +50,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from engine.depuracion import liquidar
+from engine.depuracion import liquidar, renglones_al_210
 
 ARCHIVO = Path(__file__).resolve().parent / "golden.json"
 
@@ -82,6 +82,13 @@ def _instantanea(par, personas, construir) -> dict:
             fila["renglones"] = {r.concepto: round(r.valor)
                                  for r in L.renglones
                                  if isinstance(r.valor, (int, float))}
+            # Las casillas del 210 van aparte y a propósito: son la ÚNICA
+            # superficie que el contribuyente copia a mano a un documento
+            # con consecuencias legales. Un cambio ahí no puede pasar sin
+            # que alguien lo apruebe, aunque la liquidación al peso no se
+            # haya movido — que es exactamente lo que acaba de pasar al
+            # encadenar el redondeo del art. 577.
+            fila["al_210"] = dict(renglones_al_210(L, par))
             salida[clave] = fila
     return salida
 
@@ -122,13 +129,15 @@ def correr(par, personas, construir) -> list[str]:
                 fallos.append(
                     f"{clave}.{campo}: {a.get(campo)!r} → {b.get(campo)!r}"
                 )
-        ra, rb = a.get("renglones", {}), b.get("renglones", {})
-        for concepto in sorted(set(ra) | set(rb)):
-            if ra.get(concepto) != rb.get(concepto):
-                fallos.append(
-                    f"{clave} renglón «{concepto}»: "
-                    f"{ra.get(concepto, '—')!r} → {rb.get(concepto, '—')!r}"
-                )
+        for grupo, etiqueta in (("renglones", "renglón"),
+                                ("al_210", "casilla del 210")):
+            ra, rb = a.get(grupo, {}), b.get(grupo, {})
+            for concepto in sorted(set(ra) | set(rb)):
+                if ra.get(concepto) != rb.get(concepto):
+                    fallos.append(
+                        f"{clave} {etiqueta} «{concepto}»: "
+                        f"{ra.get(concepto, '—')!r} → {rb.get(concepto, '—')!r}"
+                    )
     if fallos:
         fallos.append(
             "── Toda diferencia es un fallo hasta que la apruebes. Si el "

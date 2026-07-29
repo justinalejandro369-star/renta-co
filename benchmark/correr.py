@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Benchmark de renta-co.
 
-Siete capas de verificación, de la más débil a la más fuerte. El conteo del
+Ocho capas de verificación, de la más débil a la más fuerte. El conteo del
 cierre se DERIVA de la tupla `CAPAS`, no está escrito a mano: este mismo
 docstring decía «cuatro capas» con cinco corriendo, que es la clase de
 desfase que ya le costó al catálogo de riesgos tres conteos distintos en
@@ -38,6 +38,11 @@ tres archivos.
                      introdujo la sesión que estaba arreglando el repo y
                      pasaron todas las capas de entonces, porque ninguna
                      comparaba contra el motor de ayer.
+  8. FORMULARIO 210 — las ecuaciones entre casillas impresas en el propio
+                     formulario. Es el único ORÁCULO EXTERNO disponible sin
+                     credenciales: aritmética publicada por la autoridad, no
+                     una interpretación de nadie. `renglones_al_210()` emitía
+                     cuatro casillas y no verificaba ninguna.
 
     python -m benchmark.correr
     python -m benchmark.correr --verbose
@@ -54,7 +59,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from benchmark import cobertura, golden, metamorficas, referencia
+from benchmark import cobertura, formulario210, golden, metamorficas, referencia
 from benchmark.personas import ANCLAS, PERSONAS
 from engine import parametros as P
 from engine import perfil as PF
@@ -419,6 +424,11 @@ def main(argv=None) -> int:
         # de entonces porque ninguna comparaba contra el motor de ayer.
         ("GOLDEN MASTER (el motor de hoy contra el de ayer)",
          lambda: golden.correr(par, PERSONAS, construir_perfil)),
+        # El único oráculo externo disponible sin credenciales: las ecuaciones
+        # entre casillas impresas en el 210 son aritmética publicada por la
+        # autoridad, no una interpretación de nadie.
+        ("FORMULARIO 210 (ecuaciones entre casillas, publicadas por la DIAN)",
+         lambda: formulario210.correr(par, PERSONAS, construir_perfil)),
     )
     for etiqueta, fn in CAPAS:
         fallos = fn()
@@ -430,6 +440,19 @@ def main(argv=None) -> int:
                 print(f"    · {f}")
         else:
             print(f"✓ {etiqueta}")
+
+    # El tamaño del hueco, impreso. Sin esto, «8 capas verdes» se lee como
+    # «el formulario 210 está verificado», y lo verificado son 6 casillas de
+    # unas 19. Un límite de cobertura que no se imprime es una promesa que
+    # nadie hizo y todos entienden.
+    emitidas, total = formulario210.casillas_no_emitidas()
+    print()
+    print(f"  ⓘ El oráculo del 210 cubre {emitidas} de ~{total} casillas de la "
+          f"liquidación privada.")
+    print(f"    Las otras {total - emitidas} el motor no las emite por "
+          f"separado, así que su aritmética")
+    print("    no se puede comprobar. Están listadas en "
+          "benchmark/formulario210.py.")
 
     # El benchmark solo corría AG2025, así que la herencia de parámetros —y
     # sus validaciones— no se ejercitaban nunca.

@@ -1,5 +1,13 @@
 {
  "P01/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 7272000,
+   "Impuesto sobre la renta líquida": 7272000,
+   "Renta líquida gravable": 90000000,
+   "Saldo a pagar": 7272000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -40,6 +48,14 @@
   "tope_conjunto": 36000000
  },
  "P01/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 2512000,
+   "Impuesto sobre la renta líquida": 2512000,
+   "Renta líquida gravable": 67500000,
+   "Saldo a pagar": 2512000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -80,6 +96,14 @@
   "tope_conjunto": 36000000
  },
  "P02/A": {
+  "al_210": {
+   "Anticipos y retenciones": 120000,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 7826000,
+   "Impuesto sobre la renta líquida": 7826000,
+   "Renta líquida gravable": 91977000,
+   "Saldo a pagar": 7706000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 66000000,
   "dependientes_via": "10% de la renta de trabajo (dentro del tope)",
@@ -120,6 +144,14 @@
   "tope_conjunto": 66730660
  },
  "P02/B": {
+  "al_210": {
+   "Anticipos y retenciones": 120000,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 15353000,
+   "Impuesto sobre la renta líquida": 15353000,
+   "Renta líquida gravable": 118858000,
+   "Saldo a pagar": 15233000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "10% de la renta de trabajo (dentro del tope)",
@@ -160,6 +192,14 @@
   "tope_conjunto": 66730660
  },
  "P03/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 100213000,
+   "Impuesto sobre la renta líquida": 100213000,
+   "Renta líquida gravable": 388939000,
+   "Saldo a pagar": 100213000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -200,6 +240,14 @@
   "tope_conjunto": 66730660
  },
  "P03/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 87231000,
+   "Impuesto sobre la renta líquida": 87231000,
+   "Renta líquida gravable": 349597000,
+   "Saldo a pagar": 87231000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -240,6 +288,14 @@
   "tope_conjunto": 66730660
  },
  "P04/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 1087000,
+   "Impuesto sobre la renta líquida": 1087000,
+   "Renta líquida gravable": 60000000,
+   "Saldo a pagar": 1087000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -280,6 +336,14 @@
   "tope_conjunto": 24000000
  },
  "P04/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 0,
+   "Impuesto sobre la renta líquida": 0,
+   "Renta líquida gravable": 45000000,
+   "Saldo a pagar": 0
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -320,6 +384,14 @@
   "tope_conjunto": 24000000
  },
  "P05/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 0,
+   "Impuesto sobre la renta líquida": 0,
+   "Renta líquida gravable": 50000000,
+   "Saldo a pagar": 0
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 70000000,
   "dependientes_via": "sin dependientes",
@@ -360,6 +432,14 @@
   "tope_conjunto": 48000000
  },
  "P05/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 7272000,
+   "Impuesto sobre la renta líquida": 7272000,
+   "Renta líquida gravable": 90000000,
+   "Saldo a pagar": 7272000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -400,6 +480,14 @@
   "tope_conjunto": 48000000
  },
  "P06/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 24420000,
+   "Impuesto sobre la renta líquida": 24420000,
+   "Renta líquida gravable": 151243000,
+   "Saldo a pagar": 24420000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "10% de la renta de trabajo por uno (dentro del tope) + 72 UVT por los otros 3 (fuera)",
@@ -440,6 +528,14 @@
   "tope_conjunto": 66730660
  },
  "P06/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 13834000,
+   "Impuesto sobre la renta líquida": 13834000,
+   "Renta líquida gravable": 113433000,
+   "Saldo a pagar": 13834000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "10% de la renta de trabajo por uno (dentro del tope) + 72 UVT por los otros 3 (fuera)",
@@ -480,6 +576,14 @@
   "tope_conjunto": 66730660
  },
  "P07/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 10659000,
+   "Impuesto sobre la renta líquida": 10659000,
+   "Renta líquida gravable": 102096000,
+   "Saldo a pagar": 10659000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "72 UVT por dependiente (fuera del tope)",
@@ -520,6 +624,14 @@
   "tope_conjunto": 66730660
  },
  "P07/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 9772000,
+   "Impuesto sobre la renta líquida": 9772000,
+   "Renta líquida gravable": 98927000,
+   "Saldo a pagar": 9772000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "72 UVT por dependiente (fuera del tope)",
@@ -560,6 +672,14 @@
   "tope_conjunto": 66730660
  },
  "P08/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 19032000,
+   "Impuesto sobre la renta líquida": 19032000,
+   "Renta líquida gravable": 132000000,
+   "Saldo a pagar": 19032000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 218000000,
   "dependientes_via": "sin dependientes",
@@ -600,6 +720,14 @@
   "tope_conjunto": 66730660
  },
  "P08/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 74381000,
+   "Impuesto sobre la renta líquida": 74381000,
+   "Renta líquida gravable": 310659000,
+   "Saldo a pagar": 74381000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -640,6 +768,14 @@
   "tope_conjunto": 66730660
  },
  "P09/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 6018000,
+   "Impuesto neto de renta": 18054000,
+   "Impuesto sobre la renta líquida": 24072000,
+   "Renta líquida gravable": 150000000,
+   "Saldo a pagar": 18054000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -680,6 +816,14 @@
   "tope_conjunto": 60000000
  },
  "P09/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 3393000,
+   "Impuesto neto de renta": 10179000,
+   "Impuesto sobre la renta líquida": 13572000,
+   "Renta líquida gravable": 112500000,
+   "Saldo a pagar": 10179000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -720,6 +864,14 @@
   "tope_conjunto": 60000000
  },
  "P10/A": {
+  "al_210": {
+   "Anticipos y retenciones": 8000000,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 3937000,
+   "Impuesto sobre la renta líquida": 3937000,
+   "Renta líquida gravable": 75000000,
+   "Saldo a favor": 4063000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -760,6 +912,14 @@
   "tope_conjunto": 30000000
  },
  "P10/B": {
+  "al_210": {
+   "Anticipos y retenciones": 8000000,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 374000,
+   "Impuesto sobre la renta líquida": 374000,
+   "Renta líquida gravable": 56250000,
+   "Saldo a favor": 7626000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -800,6 +960,14 @@
   "tope_conjunto": 30000000
  },
  "P11/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 0,
+   "Impuesto sobre la renta líquida": 0,
+   "Renta líquida gravable": 54281000,
+   "Saldo a pagar": 0
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -840,6 +1008,14 @@
   "tope_conjunto": 21712364
  },
  "P11/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 0,
+   "Impuesto sobre la renta líquida": 0,
+   "Renta líquida gravable": 40711000,
+   "Saldo a pagar": 0
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -880,6 +1056,14 @@
   "tope_conjunto": 21712364
  },
  "P12/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 0,
+   "Impuesto sobre la renta líquida": 0,
+   "Renta líquida gravable": 0,
+   "Saldo a pagar": 0
+  },
   "costos_rechazados_por_tipo": 150000000,
   "costos_solicitados": 200000000,
   "dependientes_via": "72 UVT por dependiente (fuera del tope)",
@@ -920,6 +1104,14 @@
   "tope_conjunto": 20000000
  },
  "P12/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 0,
+   "Impuesto sobre la renta líquida": 0,
+   "Renta líquida gravable": 19243000,
+   "Saldo a pagar": 0
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "10% de la renta de trabajo por uno (dentro del tope) + 72 UVT por los otros 3 (fuera)",
@@ -960,6 +1152,14 @@
   "tope_conjunto": 20000000
  },
  "P13/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 0,
+   "Impuesto sobre la renta líquida": 0,
+   "Renta líquida gravable": 2000000,
+   "Saldo a pagar": 0
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -1000,6 +1200,14 @@
   "tope_conjunto": 800000
  },
  "P13/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 0,
+   "Impuesto sobre la renta líquida": 0,
+   "Renta líquida gravable": 2000000,
+   "Saldo a pagar": 0
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -1040,6 +1248,14 @@
   "tope_conjunto": 800000
  },
  "P14/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 233868000,
+   "Impuesto sobre la renta líquida": 233868000,
+   "Renta líquida gravable": 773269000,
+   "Saldo a pagar": 233868000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -1080,6 +1296,14 @@
   "tope_conjunto": 66730660
  },
  "P14/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 233868000,
+   "Impuesto sobre la renta líquida": 233868000,
+   "Renta líquida gravable": 773269000,
+   "Saldo a pagar": 233868000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -1120,6 +1344,14 @@
   "tope_conjunto": 66730660
  },
  "P15/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 70864000,
+   "Impuesto sobre la renta líquida": 70864000,
+   "Renta líquida gravable": 300000000,
+   "Saldo a pagar": 70864000
+  },
   "costos_rechazados_por_tipo": 190000000,
   "costos_solicitados": 200000000,
   "dependientes_via": "sin dependientes",
@@ -1160,6 +1392,14 @@
   "tope_conjunto": 66730660
  },
  "P15/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 73339000,
+   "Impuesto sobre la renta líquida": 73339000,
+   "Renta líquida gravable": 307500000,
+   "Saldo a pagar": 73339000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -1200,6 +1440,14 @@
   "tope_conjunto": 66730660
  },
  "P16/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 327000,
+   "Impuesto sobre la renta líquida": 327000,
+   "Renta líquida gravable": 56000000,
+   "Saldo a pagar": 327000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 54000000,
   "dependientes_via": "sin dependientes",
@@ -1240,6 +1488,14 @@
   "tope_conjunto": 44000000
  },
  "P16/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 7272000,
+   "Impuesto sobre la renta líquida": 7272000,
+   "Renta líquida gravable": 90000000,
+   "Saldo a pagar": 7272000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -1280,6 +1536,14 @@
   "tope_conjunto": 44000000
  },
  "P17/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 4127000,
+   "Impuesto sobre la renta líquida": 4127000,
+   "Renta líquida gravable": 76000000,
+   "Saldo a pagar": 4127000
+  },
   "costos_rechazados_por_tipo": 20000000,
   "costos_solicitados": 54000000,
   "dependientes_via": "sin dependientes",
@@ -1320,6 +1584,14 @@
   "tope_conjunto": 44000000
  },
  "P17/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 7272000,
+   "Impuesto sobre la renta líquida": 7272000,
+   "Renta líquida gravable": 90000000,
+   "Saldo a pagar": 7272000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -1360,6 +1632,14 @@
   "tope_conjunto": 44000000
  },
  "P18/A": {
+  "al_210": {
+   "Anticipos y retenciones": 260000000,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 491226000,
+   "Impuesto sobre la renta líquida": 491226000,
+   "Renta líquida gravable": 1478098000,
+   "Saldo a pagar": 231226000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 800000000,
   "dependientes_via": "72 UVT por dependiente (fuera del tope)",
@@ -1400,6 +1680,14 @@
   "tope_conjunto": 66730660
  },
  "P18/B": {
+  "al_210": {
+   "Anticipos y retenciones": 260000000,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 801908000,
+   "Impuesto sobre la renta líquida": 801908000,
+   "Renta líquida gravable": 2278098000,
+   "Saldo a pagar": 541908000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "72 UVT por dependiente (fuera del tope)",
@@ -1440,6 +1728,14 @@
   "tope_conjunto": 66730660
  },
  "P19/A": {
+  "al_210": {
+   "Anticipos y retenciones": 18000000,
+   "Descuentos tributarios": 1778000,
+   "Impuesto neto de renta": 5334000,
+   "Impuesto sobre la renta líquida": 7112000,
+   "Renta líquida gravable": 89429000,
+   "Saldo a favor": 12666000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 47000000,
   "dependientes_via": "10% de la renta de trabajo por uno (dentro del tope) + 72 UVT por los otros 2 (fuera)",
@@ -1480,6 +1776,14 @@
   "tope_conjunto": 66730660
  },
  "P19/B": {
+  "al_210": {
+   "Anticipos y retenciones": 18000000,
+   "Descuentos tributarios": 3267000,
+   "Impuesto neto de renta": 9801000,
+   "Impuesto sobre la renta líquida": 13068000,
+   "Renta líquida gravable": 110698000,
+   "Saldo a favor": 8199000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "10% de la renta de trabajo por uno (dentro del tope) + 72 UVT por los otros 2 (fuera)",
@@ -1520,6 +1824,14 @@
   "tope_conjunto": 66730660
  },
  "P20/A": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 114341000,
+   "Impuesto sobre la renta líquida": 114341000,
+   "Renta líquida gravable": 431750000,
+   "Saldo a pagar": 114341000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
@@ -1560,6 +1872,14 @@
   "tope_conjunto": 66730660
  },
  "P20/B": {
+  "al_210": {
+   "Anticipos y retenciones": 0,
+   "Descuentos tributarios": 0,
+   "Impuesto neto de renta": 101359000,
+   "Impuesto sobre la renta líquida": 101359000,
+   "Renta líquida gravable": 392409000,
+   "Saldo a pagar": 101359000
+  },
   "costos_rechazados_por_tipo": 0,
   "costos_solicitados": 0,
   "dependientes_via": "sin dependientes",
