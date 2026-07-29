@@ -115,7 +115,11 @@ aportes_voluntarios = 0
 # a TU NIT o cédula, pagadas por medio electrónico. Tope de deducción 240 UVT.
 compras_con_factura_electronica = 0
 
-# Cantidad de dependientes, máximo 4. 72 UVT cada uno, FUERA del tope del 40%.
+# Cantidad de dependientes, máximo 5. Las 72 UVT topan en 4 (art. 336 num. 3
+# inciso 2), y la otra vía —el 10% de la renta de trabajo del art. 387— consume
+# un dependiente DISTINTO, porque la exclusividad es por dependiente y no por
+# contribuyente (Decreto 1625 art. 1.2.1.20.3). Por eso el quinto todavía vale.
+# Las 72 UVT quedan FUERA del tope del 40%.
 # Cuentan (definición actualizada por la Ley 2411 de 2024, desde AG2025):
 #   · hijos hasta 18 años
 #   · hijos de 18 a 25 estudiando, si tú financias su educación superior

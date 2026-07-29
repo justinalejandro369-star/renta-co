@@ -56,6 +56,26 @@ def titulo(t):
     linea("═")
 
 
+def via_dependientes(L) -> str:
+    """La vía de dependientes que eligió el motor, en el vocabulario de la
+    referencia.
+
+    Vive en UN solo sitio a propósito: estaba copiada en `diferencial` y en
+    `anclas`, y al aparecer la vía mixta se actualizó una y no la otra. El
+    diferencial quedó verde y las anclas rojas por la misma liquidación.
+
+    El orden importa: la vía mixta trae las DOS cadenas, así que hay que
+    preguntar por ella primero o se confunde con la de 72.
+    """
+    tiene_10 = "10%" in L.dependientes_via
+    tiene_72 = "72 UVT" in L.dependientes_via
+    if tiene_10 and tiene_72:
+        return "mixto"
+    if tiene_72:
+        return "72"
+    return "10" if tiene_10 else "sin"
+
+
 def construir_perfil(persona: dict) -> PF.Perfil:
     """Convierte las llaves con punto en el diccionario anidado del perfil."""
     datos: dict = {"contribuyente": {"anio_gravable": 2025, "residente_fiscal": True}}
@@ -250,9 +270,7 @@ def diferencial(par, verbose=False) -> list[str]:
                         f"motor {cop(mio)} vs referencia {cop(suyo)} "
                         f"(dif {cop(mio - suyo)})"
                     )
-            via_motor = ("72" if "72 UVT" in L.dependientes_via
-                         else "10" if "10%" in L.dependientes_via
-                         else "sin")
+            via_motor = via_dependientes(L)
             if via_motor != R["via_dependientes"]:
                 fallos.append(
                     f"{persona['id']}/{ruta} · vía de dependientes: "
@@ -278,8 +296,7 @@ def anclas(par) -> list[str]:
         persona = por_id[ancla["id"]]
         L = liquidar(construir_perfil(persona), par, ancla["ruta"])
         if ancla["campo"] == "via_dependientes":
-            obtenido = ("72" if "72 UVT" in L.dependientes_via
-                        else "10" if "10%" in L.dependientes_via else "sin")
+            obtenido = via_dependientes(L)
         else:
             obtenido = round(getattr(L, ancla["campo"]))
         esperado = ancla["esperado"]

@@ -70,7 +70,7 @@ capa 2 no ve: que ambas implementaciones se equivoquen igual.
 | P03 | Alto ingreso | El tope de 1.340 UVT muerde antes que el 40% |
 | P04 | Bajo el umbral | Detección de no obligado a declarar |
 | P05 | Consignaciones altas | R-01 con ingreso propio muy por debajo |
-| P06 | 4 dependientes, tope libre | Gana la vía del 10% (art. 387) |
+| P06 | 4 dependientes, tope libre | Gana la MEZCLA: 10% por uno (art. 387) + 72 UVT por los otros 3 |
 | P07 | 4 dependientes, tope saturado | Se invierte: gana la de 72 UVT |
 | P08 | Costos enormes | Ruta A dominante + R-02 abierto |
 | P09 | Donaciones grandes | El descuento se topa al 25% **del impuesto** |

@@ -35,7 +35,7 @@ Soporte según el caso:
 | Cónyuge, padres o hermanos con ingresos < 260 UVT | **Certificado de contador público** (art. 387 par. 2 nums. 4 y 5). Es un requisito formal que se olvida y que la DIAN sí exige |
 | Dependencia física o psicológica de cónyuge, padres o hermanos | Certificado de **Medicina Legal** (art. 387 par. 2 nums. 4 y 5). La Ley 2411 de 2024 cambió la entidad **solo para los hijos** (nums. 2 y 3): acá sigue siendo Medicina Legal, y un certificado de Minsalud no cumple el requisito |
 
-> Hay una segunda vía por dependientes (10% de la renta de trabajo, tope 384 UVT, art. 387) que es **excluyente** con esta. El motor calcula las dos y toma la mejor. La diferencia clave: la del 10% **sí** consume el tope del 40%, así que solo gana cuando el tope está libre.
+> Hay una segunda vía por dependientes (10% de la renta de trabajo, tope 384 UVT, art. 387) que es **excluyente con esta para el mismo dependiente** (Decreto 1625 art. 1.2.1.20.3), no para el contribuyente. Como el 10% no depende de cuántos sean, se puede tomar por UNO y 72 UVT por cada uno de los demás — y esa mezcla es la que suele ganar. El motor evalúa las tres opciones y toma la mejor. La diferencia clave: la del 10% **sí** consume el tope del 40%, así que cuando el tope está saturado no agrega nada.
 
 ### 2. Aportes obligatorios de salud y pensión — INCRNGO, no deducción
 

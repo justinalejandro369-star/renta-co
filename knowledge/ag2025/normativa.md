@@ -163,7 +163,7 @@ Cuentan como dependientes (art. 387 par. 2 ET):
 
 ### La otra deducción por dependientes — art. 387, 10%
 
-Existe una segunda vía: 10% de la renta de trabajo, tope 32 UVT/mes (384 UVT/año = $19.122.816). **Es excluyente con la de 72 UVT.** El motor calcula ambas y toma la mejor, pero fíjate en la diferencia real: la del 10% **sí consume** el tope conjunto del 40%, así que su valor efectivo suele ser mucho menor de lo que parece.
+Existe una segunda vía: 10% de la renta de trabajo, tope 32 UVT/mes (384 UVT/año = $19.122.816). **Es excluyente con la de 72 UVT para el MISMO dependiente** —Decreto 1625 art. 1.2.1.20.3: «un mismo dependiente solo dará lugar a una de estas dos deducciones»—, no para el contribuyente. Como el 10% no depende de cuántos sean, la combinación que suele ganar es tomarlo por UNO y 72 UVT por cada uno de los demás. El motor evalúa las tres opciones y toma la mejor. Fíjate igual en la diferencia real: la del 10% **sí consume** el tope conjunto del 40%, así que cuando el tope está saturado no agrega nada y conviene dejar los cuatro en las 72 UVT.
 
 Fuentes: [Ley 2277 de 2022 art. 7](https://normograma.dian.gov.co/dian/compilacion/docs/ley_2277_2022.htm) · [ET art. 387](https://estatuto.co/387)
 

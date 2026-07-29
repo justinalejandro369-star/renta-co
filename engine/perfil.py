@@ -465,10 +465,18 @@ def validar(perfil: Perfil, anios_disponibles: list[int] | None = None) -> list[
         errores.append(
             f"deducciones.dependientes = {dep} debe ser un número entero."
         )
-    elif dep > 4:
+    elif dep > 5:
+        # Cinco, no cuatro. El art. 336 num. 3 inciso 2 topa en 4 la
+        # deducción de 72 UVT, y el Decreto 1625 art. 1.2.1.20.3 prohíbe que
+        # UN MISMO dependiente dé lugar a las dos deducciones — no que el
+        # contribuyente tome una sola. Así que el quinto dependiente todavía
+        # sirve: cuatro por 72 UVT y uno por el 10% del art. 387. Cortar en 4
+        # le quitaba 72 UVT a quien tiene cinco.
         errores.append(
-            f"deducciones.dependientes = {dep}. El art. 336 num. 3 inciso 2 ET "
-            f"permite máximo 4. Corrígelo o el cálculo quedará mal."
+            f"deducciones.dependientes = {dep}. Más de 5 no cambia el "
+            f"cálculo: el art. 336 num. 3 inciso 2 ET topa en 4 la deducción "
+            f"de 72 UVT, y el 10% del art. 387 consume un dependiente más. "
+            f"Pon máximo 5."
         )
 
     # `[costos.atribucion]` decide contra qué techo se compara cada costo

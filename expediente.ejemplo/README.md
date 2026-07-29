@@ -22,7 +22,9 @@ dos palancas más grandes de este caso cuestan más de lo que ahorran.
 
 **2. La vía de dependientes que escoge el motor.**
 Con un dependiente y el tope del 40% sin saturar, gana la deducción del 10%
-(art. 387) por encima de las 72 UVT. El motor calcula ambas y toma la mejor.
+(art. 387) por encima de las 72 UVT — o la mezcla de las dos, que es lo que
+suele ganar: el 10% por un dependiente y 72 UVT por cada uno de los demás. El
+motor evalúa las tres y toma la mejor.
 Si el tope estuviera saturado, la respuesta se invierte — hay un test que
 verifica exactamente eso.
 

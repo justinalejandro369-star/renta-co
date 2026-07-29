@@ -173,7 +173,19 @@ tope_mensual_uvt = 32
 meses = 12
 dentro_del_tope_conjunto = true
 excluyente_con = "dependientes_72uvt"
-nota = "Excluyente con la deducción de 72 UVT. El motor calcula ambas y toma la mejor."
+nota = """
+Excluyente con la deducción de 72 UVT PARA EL MISMO DEPENDIENTE, no para el
+contribuyente: el Decreto 1625 art. 1.2.1.20.3 dice «un mismo dependiente solo
+dará lugar a una de estas dos deducciones».
+
+Como esta deducción NO depende de cuántos dependientes haya, gastar más de uno
+en ella es tirarlos. La combinación que casi siempre gana con el tope conjunto
+libre es: el 10% por UNO y 72 UVT por cada uno de los demás. El motor evalúa
+las tres —72 UVT puras, 10% puro y la mezcla— y toma la mejor.
+
+Por lo mismo el quinto dependiente todavía vale: cuatro por 72 UVT (que es
+donde topa el art. 336 num. 3 inciso 2) y uno por el 10%.
+"""
 fuente = "Estatuto Tributario art. 387"
 url = "https://estatuto.co/387"
 

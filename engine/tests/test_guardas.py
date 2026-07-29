@@ -161,9 +161,13 @@ class TestAlcanceDelMotor(unittest.TestCase):
                                 deducciones={"dependientes": 99})
         self.assertTrue(all("debe ser un número" in e for e in errores), errores)
 
-    def test_mas_de_cuatro_dependientes_se_detiene(self):
-        errores = self._errores(deducciones={"dependientes": 5})
-        self.assertTrue(any("máximo 4" in e for e in errores), errores)
+    def test_mas_de_cinco_dependientes_se_detiene(self):
+        """Cinco, no cuatro: el art. 336 num. 3 inciso 2 topa en 4 la
+        deducción de 72 UVT, y el 10% del art. 387 consume un dependiente
+        DISTINTO (Decreto 1625 art. 1.2.1.20.3). El quinto todavía vale."""
+        self.assertEqual(self._errores(deducciones={"dependientes": 5}), [])
+        errores = self._errores(deducciones={"dependientes": 6})
+        self.assertTrue(any("máximo 5" in e for e in errores), errores)
 
     def test_un_anio_sin_parametros_se_detiene(self):
         errores = self._errores(contribuyente={"anio_gravable": 1999})

@@ -138,22 +138,61 @@ class TestTopes(unittest.TestCase):
 
     def test_con_tope_libre_gana_la_via_del_10pct(self):
         """La otra cara: si el tope NO está saturado, la vía del 10% (art. 387)
-        puede valer más que las 72 UVT, y el motor debe tomar esa.
+        vale más que las 72 UVT, y el motor debe tomar esa — pero solo para
+        UN dependiente.
 
-        Con 200 M de renta de trabajo: 10% = 20 M, capado a 384 UVT =
-        19.122.816, contra 4 × 72 UVT = 14.342.112. Gana el 10%.
+        El Decreto 1625 art. 1.2.1.20.3 dice «un mismo dependiente solo dará
+        lugar a una de estas dos deducciones». Es exclusividad POR
+        DEPENDIENTE, no por contribuyente: con 200 M de renta de trabajo y 4
+        dependientes, el 10% (capado en 384 UVT = 19.122.816) por el primero
+        MÁS 3 × 72 UVT = 10.756.584 por los otros, o sea 600 UVT en total.
+
+        El motor evaluaba dos escenarios todo-o-nada y se quedaba con los
+        384 UVT del 10% solo. Error conservador, pero el repo promete en tres
+        sitios que «calcula ambas y toma la mejor».
         """
         L = liquidar(self._perfil(deducciones={"dependientes": 4}), self.par, "A")
         sin = liquidar(self._perfil(), self.par, "A")
         self.assertEqual(sin.rechazado_por_tope, 0, "el tope debe estar libre")
         self.assertIn("10%", L.dependientes_via)
+        self.assertIn("72 UVT", L.dependientes_via)
+        self.assertAlmostEqual(
+            sin.renta_liquida - L.renta_liquida, (384 + 3 * 72) * UVT_2025, delta=2
+        )
+
+    def test_con_un_solo_dependiente_no_hay_mezcla_que_valga(self):
+        """El escenario mixto tiene que degradar limpiamente: con UN
+        dependiente, tomarlo por el 10% no deja ninguno para las 72 UVT."""
+        L = liquidar(self._perfil(deducciones={"dependientes": 1}), self.par, "A")
+        sin = liquidar(self._perfil(), self.par, "A")
+        self.assertIn("10%", L.dependientes_via)
+        self.assertNotIn("72 UVT", L.dependientes_via)
         self.assertAlmostEqual(
             sin.renta_liquida - L.renta_liquida, 384 * UVT_2025, delta=2
         )
 
-    def test_maximo_4_dependientes(self):
+    def test_maximo_5_dependientes(self):
         p = self._perfil(deducciones={"dependientes": 10})
-        self.assertTrue(any("máximo 4" in e for e in PF.validar(p)))
+        self.assertTrue(any("máximo 5" in e for e in PF.validar(p)))
+
+    def test_cinco_dependientes_valen_mas_que_cuatro(self):
+        """Las 72 UVT topan en 4 dependientes y el 10% gasta uno distinto, así
+        que el quinto SÍ agrega. Con el límite del perfil en 4, el
+        contribuyente con cinco perdía 72 UVT que la norma le da."""
+        cuatro = liquidar(self._perfil(deducciones={"dependientes": 4}),
+                          self.par, "A")
+        cinco = liquidar(self._perfil(deducciones={"dependientes": 5}),
+                         self.par, "A")
+        self.assertAlmostEqual(
+            cuatro.renta_liquida - cinco.renta_liquida, 72 * UVT_2025, delta=2
+        )
+
+    def test_el_sexto_dependiente_ya_no_agrega_nada(self):
+        cinco = liquidar(self._perfil(deducciones={"dependientes": 5}),
+                         self.par, "A")
+        seis = liquidar(self._perfil(deducciones={"dependientes": 6}),
+                        self.par, "A")
+        self.assertEqual(cinco.renta_liquida, seis.renta_liquida)
 
     def test_renta_exenta_25_solo_en_ruta_b(self):
         p = self._perfil()

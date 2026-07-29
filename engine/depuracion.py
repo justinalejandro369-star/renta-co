@@ -252,10 +252,25 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     # así que un perfil con $300.000.000 de otras rentas no laborales, CERO
     # honorarios y 4 dependientes recibía $14.342.112 de deducción a la que
     # no tiene derecho. La asimetría era un descuido, no una decisión.
+    uvt_por_dep = par.exigir("topes.dependientes_72uvt.uvt_por_dependiente")
     dep_72 = 0.0
     if trabajo > 0:
-        dep_72 = (min(n_dep, max_dep)
-                  * par.exigir("topes.dependientes_72uvt.uvt_por_dependiente") * uvt)
+        dep_72 = min(n_dep, max_dep) * uvt_por_dep * uvt
+
+    # La exclusividad es POR DEPENDIENTE, no por contribuyente. El Decreto
+    # 1625 art. 1.2.1.20.3 dice «un mismo dependiente solo dará lugar a una
+    # de estas dos deducciones», no «el contribuyente solo podrá tomar una
+    # de las dos». El motor evaluaba dos escenarios todo-o-nada y se perdía
+    # el que casi siempre gana: tomar el 10% por UN dependiente —la del art.
+    # 387 no depende de cuántos sean— y 72 UVT por CADA UNO de los demás.
+    #
+    # Con $180.000.000 de renta de trabajo y 4 dependientes, el motor
+    # deducía $18.000.000 y la norma permite $28.756.584. Era un error
+    # conservador, pero el repo promete en tres sitios que «calcula ambas y
+    # toma la mejor», y no era la mejor.
+    dep_72_resto = 0.0
+    if trabajo > 0 and n_dep > 1:
+        dep_72_resto = min(n_dep - 1, max_dep) * uvt_por_dep * uvt
 
     dep_10 = 0.0
     if n_dep > 0:
@@ -320,9 +335,13 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
 
     opciones = [("72 UVT por dependiente (fuera del tope)", evaluar(0.0, dep_72))]
     if n_dep > 0:
-        opciones.append(
-            ("10% de la renta de trabajo (dentro del tope)", evaluar(dep_10, 0.0))
+        resto = min(n_dep - 1, max_dep)
+        etiqueta = (
+            "10% de la renta de trabajo (dentro del tope)" if resto == 0 else
+            f"10% de la renta de trabajo por uno (dentro del tope) + 72 UVT "
+            f"por los otros {resto} (fuera)"
         )
+        opciones.append((etiqueta, evaluar(dep_10, dep_72_resto)))
 
     via, e = min(opciones, key=lambda o: o[1]["impuesto"])
     L.dependientes_via = via if n_dep else "sin dependientes"
@@ -352,7 +371,11 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
          fuente=_fuente(par, "topes.aportes_voluntarios.tope_uvt",
                         "ET arts. 126-1 y 126-4"))
     L._r("− Dependientes (10% renta de trabajo)", e["dep_dentro"], -1,
-         nota="Excluyente con la de 72 UVT. Consume el tope del 40%.",
+         nota="Consume el tope del 40%. Excluyente con la de 72 UVT PARA EL "
+              "MISMO DEPENDIENTE (Decreto 1625 art. 1.2.1.20.3): esta vía "
+              "gasta uno, y los demás siguen valiendo 72 UVT cada uno. No "
+              "depende de cuántos sean, así que solo tiene sentido gastar "
+              "en ella al primero.",
          fuente=_fuente(par, "topes.dependientes_10pct.tope_mensual_uvt",
                         "ET art. 387"))
 
@@ -367,7 +390,9 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
 
     L._r("− Dependientes (72 UVT c/u — FUERA del tope)", e["dep_fuera"], -1,
          nota="No consume el tope del 40% y no exige factura: solo acreditar "
-              "la condición. Excluyente con la del 10%.",
+              "la condición. Hasta 4 dependientes. Excluyente con la del 10% "
+              "PARA EL MISMO DEPENDIENTE, no para el contribuyente: se puede "
+              "tomar el 10% por uno y 72 UVT por los otros.",
          fuente=_fuente(par, "topes.dependientes_72uvt.uvt_por_dependiente",
                         "ET art. 336 num. 3 inciso 2, Ley 2277 de 2022 art. 7"))
     L._r("− Deducción 1% compras con factura electrónica", fe, -1,
@@ -510,16 +535,19 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         )
 
     # --- dependientes ---------------------------------------------------
-    # Una sola fila, no una por cada cantidad. Como el motor elige entre la
-    # vía de 72 UVT y la del 10% —y la del 10% no depende del número—, con
-    # frecuencia el 2º, 3º y 4º dependiente valen exactamente lo mismo que el
-    # primero. Cuatro filas con la misma cifra en una tabla titulada "cuánto
-    # vale cada palanca" invitan a sumarlas, y el valor marginal es cero.
+    # Una sola fila, no una por cada cantidad. Con frecuencia el 2º, 3º y 4º
+    # dependiente valen exactamente lo mismo que el primero, y cuatro filas
+    # con la misma cifra en una tabla titulada "cuánto vale cada palanca"
+    # invitan a sumarlas cuando el valor marginal es cero.
     actuales = int(p.get("deducciones.dependientes"))
     max_dep = par.exigir("topes.dependientes_72uvt.maximo_dependientes")
-    if actuales < max_dep:
+    # Uno más que el tope de la deducción de 72 UVT: la del 10% consume un
+    # dependiente DISTINTO (Decreto 1625 art. 1.2.1.20.3), así que el quinto
+    # todavía sirve. Explorar solo hasta 4 escondía esa fila entera.
+    max_util = max_dep + 1
+    if actuales < max_util:
         por_cantidad = {}
-        for n in range(actuales + 1, max_dep + 1):
+        for n in range(actuales + 1, max_util + 1):
             alt = p.copia_con(deducciones__dependientes=n)
             sa, sb = _saldo(alt, par, "A"), _saldo(alt, par, "B")
             por_cantidad[n] = min(base_a, base_b) - min(sa, sb)
@@ -537,13 +565,18 @@ def sensibilidad(p: Perfil, par: Parametros) -> list[Palanca]:
         # cifra cuando ganaba la B.
         ahorro_a = base_a - _saldo(alt, par, "A")
         ruta_del_ahorro = "A" if ahorro_a >= base_b - _saldo(alt, par, "B") else "B"
-        via = liquidar(alt, par, ruta_del_ahorro).dependientes_via
-        if suficientes < max_dep:
-            motivo = ("la vía que gana en tu caso es la del 10% de la renta de "
-                      "trabajo (art. 387), que no depende de cuántos sean"
-                      if "10%" in via
-                      else "tu base gravable ya llegó al tramo de tarifa 0%, así "
-                           "que restar más no cambia el impuesto")
+        L_alt = liquidar(alt, par, ruta_del_ahorro)
+        via = L_alt.dependientes_via
+        if suficientes < max_util:
+            # El motivo se lee del RESULTADO, no de la etiqueta de la vía.
+            # Antes se deducía de si la cadena traía "10%", y ahora la vía
+            # que gana casi siempre trae las dos cosas a la vez: la
+            # explicación habría quedado fija en una de las dos ramas.
+            motivo = ("tu base gravable ya llegó al tramo de tarifa 0%, así "
+                      "que restar más no cambia el impuesto"
+                      if L_alt.impuesto == 0
+                      else "lo que agregarían no baja tu impuesto en la ruta "
+                           "que te conviene")
             extra = f" Acreditar más de {suficientes} no agrega nada: {motivo}."
         else:
             # Con la vía de 72 UVT cada dependiente vale por separado. Quien

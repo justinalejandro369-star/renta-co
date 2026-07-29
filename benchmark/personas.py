@@ -308,10 +308,16 @@ ANCLAS = [
         "id": "P06",
         "ruta": "A",
         "campo": "via_dependientes",
-        "esperado": "10",
-        "razon": "Con 180 M de renta de trabajo y el tope libre: la vía del 10% "
-                 "da min(18.000.000; 384 UVT = 19.122.816) = 18.000.000, contra "
-                 "4 × 72 UVT = 14.342.112 de la otra. Gana el 10%.",
+        "esperado": "mixto",
+        "razon": "Con 180 M de renta de trabajo y el tope libre gana la "
+                 "COMBINACIÓN, no una de las dos vías puras. El Decreto 1625 "
+                 "art. 1.2.1.20.3 prohíbe que un MISMO dependiente dé lugar a "
+                 "las dos deducciones, no que el contribuyente tome una sola. "
+                 "El 10% del art. 387 no depende de cuántos sean, así que "
+                 "gasta uno: min(18.000.000; 384 UVT = 19.122.816) = "
+                 "18.000.000. Los otros 3 valen 72 UVT cada uno = 10.756.584. "
+                 "Total 28.756.584, contra 18.000.000 del 10% solo y "
+                 "14.342.112 de 4 × 72 UVT.",
     },
     {
         "id": "P15",

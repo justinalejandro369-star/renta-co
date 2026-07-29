@@ -244,10 +244,21 @@ def _liquidar_escenario(c: dict, ruta: str, escenario: dict) -> dict:
 def _escenarios(c: dict) -> list[dict]:
     """Las combinaciones de dependientes que la norma permite.
 
-    Son excluyentes: o se toman las 72 UVT por dependiente (art. 336 num. 3
-    inciso 2, fuera del tope conjunto) o el 10% de la renta de trabajo
-    (art. 387, dentro del tope). Se enumeran las dos como escenarios
-    completos y después se elige; el motor lo resuelve con otra estructura.
+    La exclusividad es POR DEPENDIENTE: el Decreto 1625 art. 1.2.1.20.3 dice
+    «un mismo dependiente solo dará lugar a una de estas dos deducciones».
+    No dice que el contribuyente tenga que escoger una sola.
+
+    Así que hay tres combinaciones, no dos:
+
+      · 72 UVT (art. 336 num. 3 inciso 2, fuera del tope) por hasta 4;
+      · el 10% de la renta de trabajo (art. 387, dentro del tope) por uno —
+        esa deducción no depende de cuántos sean, así que gastar más de un
+        dependiente en ella es tirarlos;
+      · el 10% por uno Y 72 UVT por cada uno de los demás, que es la que
+        casi siempre gana cuando el tope conjunto no está saturado.
+
+    Se enumeran como escenarios completos y después se elige; el motor lo
+    resuelve con otra estructura.
     """
     n = int(c.get("deducciones.dependientes", 0))
     if n <= 0:
@@ -256,11 +267,28 @@ def _escenarios(c: dict) -> list[dict]:
     trabajo = c.get("ingresos.rentas_trabajo_honorarios", 0)
     por_72 = min(n, DEP_MAX) * DEP_UVT * UVT
     por_10 = _topar(trabajo * DEP_10_PCT, DEP_10_TOPE_UVT * UVT)
+    # Las 72 UVT que quedan cuando uno de los dependientes se gasta en el 10%.
+    resto_72 = min(n - 1, DEP_MAX) * DEP_UVT * UVT
 
-    return [
+    # Las dos vías aplican ÚNICAMENTE sobre rentas de trabajo: el art. 336
+    # num. 3 inciso 2 dice «el TRABAJADOR podrá deducir» y el Decreto 1625
+    # art. 1.2.1.20.3 es explícito.
+    if trabajo <= 0:
+        por_72 = resto_72 = 0.0
+
+    escenarios = [
         {"via": "72", "dependientes_dentro": 0.0, "dependientes_fuera": por_72},
-        {"via": "10", "dependientes_dentro": por_10, "dependientes_fuera": 0.0},
     ]
+    if resto_72 > 0:
+        escenarios.append(
+            {"via": "mixto", "dependientes_dentro": por_10,
+             "dependientes_fuera": resto_72}
+        )
+    else:
+        escenarios.append(
+            {"via": "10", "dependientes_dentro": por_10, "dependientes_fuera": 0.0}
+        )
+    return escenarios
 
 
 def liquidar(caso: dict, ruta: str) -> dict:
