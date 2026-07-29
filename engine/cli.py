@@ -221,6 +221,8 @@ def cmd_calcular(args) -> int:
             print(f"   {tramo}")
         if v.get("fuente"):
             print(f"   Fuente: {v['fuente']}")
+            if getattr(v["fuente"], "url", ""):
+                print(f"           {v['fuente'].url}")
         print()
 
     # --- supuestos que deciden si este motor aplica --------------------
@@ -274,7 +276,12 @@ def _escribir_csv(destino: Path, a, b) -> None:
     destino.parent.mkdir(parents=True, exist_ok=True)
     with open(destino, "w", newline="", encoding="utf-8") as f:
         w = _csv.writer(f)
-        w.writerow(["concepto", "ruta_A_costos", "ruta_B_exenta_25", "fuente"])
+        # La URL va en su propia columna: la cita sin ella obliga al
+        # contador a buscar la norma a mano, y es la que
+        # `scripts/verificar_citas.py` comprueba cada semana contra la
+        # fuente primaria.
+        w.writerow(["concepto", "ruta_A_costos", "ruta_B_exenta_25",
+                    "fuente", "url"])
         for i, ren in enumerate(a.renglones):
             rb = b.renglones[i]
             if i == len(a.renglones) - 1:
@@ -285,9 +292,11 @@ def _escribir_csv(destino: Path, a, b) -> None:
                 # perfil: quien lo leyera con un script sumaba un saldo a
                 # favor como si fuera a pagar.
                 w.writerow(["= SALDO (positivo a pagar, negativo a favor)",
-                            round(a.saldo), round(b.saldo), ren.fuente])
+                            round(a.saldo), round(b.saldo),
+                            ren.fuente, ren.url])
             else:
-                w.writerow([ren.concepto, ren.valor, rb.valor, ren.fuente])
+                w.writerow([ren.concepto, ren.valor, rb.valor,
+                            ren.fuente, ren.url])
 
 
 def _recortar(texto: str, ancho: int) -> str:

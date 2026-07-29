@@ -1091,6 +1091,101 @@ class TestCitasNormativas(unittest.TestCase):
                           f"motor no lo advierte al calcular")
 
 
+class TestLaCitaLlevaSuURL(unittest.TestCase):
+    """La cita del renglón tiene que traer la URL de knowledge/.
+
+    Es la única guarda que puede matar la mutación M55 —reemplazar
+    `par.fuente(ruta)` por el literal de respaldo de Python—, que escapaba a
+    las ocho capas del benchmark y a los 375 tests.
+
+    Escapaba por una razón buena: la ronda 5 reconcilió los literales de
+    Python con las citas de `knowledge/`, así que hoy dicen exactamente lo
+    mismo y NINGUNA comparación de cadenas los distingue. Lo que sí los
+    distingue es la URL: el literal de Python no tiene ninguna, y la de
+    knowledge es la que `scripts/verificar_citas.py` comprueba cada semana
+    contra la fuente primaria.
+
+    Y el valor de usuario es el mismo que el de verificación: sin la URL, el
+    contador lee «ET art. 336 num. 3» en el CSV y tiene que buscar la norma
+    él. Con ella, la abre de un clic y objeta o acepta.
+    """
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+        self.p = PF.cargar(RAIZ / "expediente.ejemplo")
+
+    def _renglones(self):
+        from engine.depuracion import liquidar
+
+        for ruta in ("A", "B"):
+            yield from liquidar(self.p, self.par, ruta).renglones
+
+    def test_las_citas_que_vienen_de_knowledge_traen_su_url(self):
+        from engine.depuracion import liquidar
+
+        con_url = [r for r in self._renglones() if r.url]
+        self.assertGreaterEqual(
+            len(con_url), 8,
+            "casi ningún renglón trae URL. La cita sin URL obliga al contador "
+            "a buscar la norma a mano, y hace indistinguible el literal de "
+            "Python de la cita verificada de knowledge/",
+        )
+        for r in con_url:
+            self.assertTrue(r.url.startswith("http"), f"{r.concepto}: {r.url!r}")
+
+    def test_cada_url_del_renglon_es_la_de_su_bloque_en_knowledge(self):
+        """No basta con que traiga UNA url: tiene que ser la del bloque que
+        declara la cifra. Es la misma clase de divergencia que la ronda 5
+        encontró entre la cita del motor y la de knowledge."""
+        urls_de_knowledge = set()
+
+        def recorrer(nodo):
+            if isinstance(nodo, dict):
+                if isinstance(nodo.get("url"), str):
+                    urls_de_knowledge.add(nodo["url"])
+                for v in nodo.values():
+                    recorrer(v)
+
+        recorrer(self.par._d)
+        for r in self._renglones():
+            if r.url:
+                self.assertIn(r.url, urls_de_knowledge,
+                              f"{r.concepto} cita una URL que knowledge/ no "
+                              f"declara: {r.url}")
+
+    def test_la_url_llega_al_csv_que_lee_el_contador(self):
+        """Una URL que se queda en la memoria del proceso no le sirve a
+        nadie. Es la lección que ya costó una ronda: `ledger.validar()`
+        producía buenos avisos que nadie miraba."""
+        import csv
+        import tempfile
+        from engine import cli
+
+        exp = Path(tempfile.mkdtemp())
+        (exp / "03-analisis").mkdir(parents=True)
+        (exp / "perfil.toml").write_text(
+            (RAIZ / "expediente.ejemplo" / "perfil.toml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        cli.main(["calcular", "--expediente", str(exp), "--csv"])
+        with open(exp / "03-analisis" / "escenarios.csv", encoding="utf-8") as f:
+            filas = list(csv.DictReader(f))
+        self.assertIn("url", filas[0], "el CSV no tiene columna de URL")
+        self.assertTrue([f for f in filas if f["url"].startswith("http")],
+                        "ninguna fila del CSV trae URL")
+
+    def test_una_cita_sin_bloque_en_knowledge_no_inventa_una_url(self):
+        """El respaldo es un literal de Python y no tiene fuente verificable.
+        Fingirle una URL sería peor que no tenerla."""
+        from engine.depuracion import Cita, _fuente
+
+        c = _fuente(self.par, "no.existe.este.bloque", "ET art. inventado")
+        self.assertIsInstance(c, Cita)
+        self.assertEqual(str(c), "ET art. inventado")
+        self.assertEqual(c.url, "")
+        self.assertFalse(c.verificada)
+
+
 class TestEstadoDelReadme(unittest.TestCase):
     """El README no puede prometer lo que el motor confiesa que no hace.
 

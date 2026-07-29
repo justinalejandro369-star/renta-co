@@ -356,9 +356,18 @@ MUTACIONES = [
     ('M90-no-avisa-la-discontinuidad-del-241', 'engine/depuracion.py',
      '        if desde <= base_cop <= hasta:',
      '        if False:'),
+    # La regla vive en `_decimal_por_tipo`, que usan LOS DOS lados —el parser
+    # y el votante que decide la convención del archivo—. Apagarla acá los
+    # apaga a los dos, que es lo que hay que poder detectar.
+    #
+    # ⚠ Esta mutación quedó OBSOLETA en la ronda 7 y nadie lo notó: apuntaba
+    # al texto inline de `parse_monto`, y el arreglo de esa ronda extrajo la
+    # regla a esta función sin actualizarla acá. Salía como «no se pudo
+    # aplicar» y el script devolvía 0 igual. Un guardia que no se puede
+    # aplicar es un guardia apagado — ahora eso también rompe el build.
     ('M91-monto-sin-la-senal-del-tipo', 'engine/adapters/generico.py',
-     '    if (not decimales and len(seps) > 1\n            and seps[-1] != seps[0] and len(set(seps[:-1])) == 1):',
-     '    if (False and len(seps) > 1\n            and seps[-1] != seps[0] and len(set(seps[:-1])) == 1):'),
+     '    if len(seps) > 1 and seps[-1] != seps[0] and len(set(seps[:-1])) == 1:\n        return [len(seps) - 1]',
+     '    if False:\n        return [len(seps) - 1]'),
     ('M92-perfil-cosecha-cualquier-seccion', 'scripts/escanear_privacidad.py',
      '        if normalizar(seccion) in SECCIONES_DE_PERSONAS:',
      '        if True:'),
@@ -434,10 +443,24 @@ def main():
         for e in escapadas:
             print(f"  · {e}")
     if no_aplicadas:
-        print("\nNo se pudieron aplicar (el texto cambió):")
+        # Una mutación que no se puede aplicar es un guardia APAGADO, y
+        # apagado en silencio: el código que vigilaba se refactorizó y nadie
+        # actualizó el patrón. M91 pasó exactamente eso —quedó obsoleta en la
+        # ronda 7 cuando la regla del separador decimal se extrajo a
+        # `_decimal_por_tipo`— y el script devolvía 0 igual durante toda una
+        # ronda.
+        #
+        # Es la misma clase que ya costó dos rondas en este proyecto: el hook
+        # de privacidad que nadie corría, el paso de CI que estaba tras una
+        # condición que nunca se cumplía, el test de la ruta HOME que se
+        # saltaba justo en CI. Una defensa que no corre no es una defensa.
+        print("\n✗ NO SE PUDIERON APLICAR (el código que vigilaban cambió):")
         for n in no_aplicadas:
             print(f"  · {n}")
-    return 1 if escapadas else 0
+        print("\n  Actualiza el patrón contra el código de hoy. NO las "
+              "borres: lo que no se puede mutar es lo que nadie está "
+              "probando.")
+    return 1 if (escapadas or no_aplicadas) else 0
 
 
 if __name__ == "__main__":

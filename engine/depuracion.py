@@ -161,7 +161,12 @@ class Renglon:
     valor: float
     signo: int = 0        # -1 resta, +1 suma, 0 subtotal
     nota: str = ""
-    fuente: str = ""
+    fuente: str = ""      # normalmente una `Cita`: str con `.url`
+
+    @property
+    def url(self) -> str:
+        """URL de la norma, vacía si la cita no vino de knowledge/."""
+        return getattr(self.fuente, "url", "")
 
 
 @dataclass
@@ -189,7 +194,38 @@ class Liquidacion:
 # Depuración de una ruta
 # ---------------------------------------------------------------------
 
-def _fuente(par: Parametros, ruta_valor: str, respaldo: str) -> str:
+class Cita(str):
+    """El texto de una cita normativa, con su URL y su estado de verificación.
+
+    Es una SUBCLASE DE `str` a propósito. Los ~40 sitios que ya la imprimen,
+    la comparan y la escriben al CSV siguen funcionando sin tocarlos; lo que
+    gana es `.url`, que es lo único que le permite al contador ir a leer la
+    norma en vez de creerle al renglón.
+
+    Por qué hacía falta: `_fuente()` devolvía una cadena, así que la URL
+    verificada de `knowledge/` —la que `scripts/verificar_citas.py` comprueba
+    contra la fuente primaria cada semana— moría dentro del TOML y nunca
+    llegaba ni a `escenarios.csv` ni al memo. El contador veía «ET art. 336
+    num. 3» y tenía que buscarlo él.
+
+    Y tenía una consecuencia de verificación: la mutación M55 —reemplazar
+    `par.fuente(ruta)` por el literal de respaldo— ESCAPABA a todas las
+    capas, porque después de la ronda 5 el literal y la cita de knowledge
+    dicen exactamente lo mismo. Ninguna comparación de cadenas las distingue.
+    La URL sí: el literal de Python no tiene ninguna.
+    """
+
+    url: str
+    verificada: bool
+
+    def __new__(cls, texto: str, url: str = "", verificada: bool = False):
+        obj = super().__new__(cls, texto)
+        obj.url = url or ""
+        obj.verificada = bool(verificada)
+        return obj
+
+
+def _fuente(par: Parametros, ruta_valor: str, respaldo: str) -> Cita:
     """Cita normativa de un renglón, tomada de knowledge/.
 
     La cifra sale de `knowledge/<año>/parametros.toml` y la cita salía de un
@@ -211,7 +247,15 @@ def _fuente(par: Parametros, ruta_valor: str, respaldo: str) -> str:
     todavía no declare esa fuente.
     """
     citada = par.fuente(ruta_valor)
-    return respaldo if citada == "sin fuente citada" else citada
+    if citada == "sin fuente citada":
+        # El respaldo es un literal de Python: no tiene URL ni verificación,
+        # y que se note es el punto. Un renglón sin URL es un renglón cuya
+        # cita nadie puede comprobar de un clic.
+        return Cita(respaldo)
+    bloque = ".".join(ruta_valor.split(".")[:-1])
+    return Cita(citada,
+                par.get(f"{bloque}.url", ""),
+                bool(par.get(f"{bloque}.url_verificada", False)))
 
 
 def _costos_aceptados(p: Perfil, ruta: str) -> tuple[float, float, float, list]:
