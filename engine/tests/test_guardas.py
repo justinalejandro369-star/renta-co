@@ -1023,8 +1023,15 @@ class TestCitasNormativas(unittest.TestCase):
         norma». Quien la escriba tiene que haber abierto la fuente."""
         sin_verificar = []
         for ruta, bloque in self._bloques().items():
-            nota = bloque.get("nota", "")
-            if "«" not in str(nota):
+            nota = str(bloque.get("nota", ""))
+            # Las TRES formas de comilla, no solo la angular.
+            #
+            # La primera versión de esta guarda solo miraba «». Con eso dejó
+            # viva una cita de la Ley 2277 escrita entre comillas simples que
+            # NO era literal: le faltaban «recibidos por el trabajador,» y
+            # «demás». Una guarda que depende del carácter de comilla que le
+            # dé la gana usar al autor no es una guarda.
+            if not any(c in nota for c in ("«", "'", '"')):
                 continue
             if not bloque.get("url_verificada"):
                 sin_verificar.append(ruta)

@@ -87,15 +87,29 @@ mensuales es el de la Ley 1607 de 2012 y sigue circulando en blogs y en
 material de contadores: es la fuente de error más común de esta cédula, y
 sobreestima la exención en 3,6 veces.
 
-La base NO es el ingreso bruto. El inciso 2 del numeral 10 exige calcularla
-'una vez se detraiga del valor total de los pagos laborales los ingresos no
-constitutivos de renta, las deducciones y las rentas exentas diferentes a la
-establecida en el presente numeral'.
+La base NO es el ingreso bruto. Texto literal del numeral 10, verificado el
+2026-07-29 contra el normograma de la DIAN (la URL de abajo):
+
+  «El veinticinco por ciento (25%) del valor total de los pagos laborales,
+  limitada anualmente a setecientos noventa (790) UVT. El cálculo de esta
+  renta exenta se efectuará una vez se detraiga del valor total de los pagos
+  laborales recibidos por el trabajador, los ingresos no constitutivos de
+  renta, las deducciones y las demás rentas exentas diferentes a la
+  establecida en el presente numeral.»
+
+⚠ La versión anterior de esta nota citaba esa frase entre comillas simples y
+NO era literal: le faltaban «recibidos por el trabajador,» y «demás». No
+cambia ningún resultado, pero es la tercera cita inexacta que aparece en este
+archivo, y sobrevivió a la guarda `test_toda_cita_literal_declara_su_url_
+verificada` porque esa guarda solo miraba las comillas angulares. Una guarda
+que depende del carácter de comilla que le dé la gana usar al autor no es una
+guarda. Ya mira las tres.
 
 El resultado además compite dentro del tope conjunto de 40% / 1.340 UVT.
 """
 fuente = "Estatuto Tributario art. 206 num. 10, modificado por Ley 2277 de 2022 art. 2"
 url = "https://normograma.dian.gov.co/dian/compilacion/docs/ley_2277_2022.htm"
+url_verificada = true
 
 [topes.dependientes_72uvt]
 uvt_por_dependiente = 72
