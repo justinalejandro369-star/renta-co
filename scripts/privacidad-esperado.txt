@@ -8,9 +8,16 @@
 #   python3 scripts/escanear_privacidad.py --inventario > \
 #       scripts/privacidad-esperado.txt
 engine/tests/test_privacidad.py · IBAN · ES9XXXXXXXXXXXXXXXXXX332
+engine/tests/test_privacidad.py · correo deletreado · c******* at b***** d** c**
+engine/tests/test_privacidad.py · correo deletreado · p****** a***** e****** p**** c**
 engine/tests/test_privacidad.py · correo · e********@b******************.co
 engine/tests/test_privacidad.py · correo · j*********@b***************.co
 engine/tests/test_privacidad.py · correo · p******@e******.com
+engine/tests/test_privacidad.py · dirección (rural) · Km X vía La C*****
+engine/tests/test_privacidad.py · dirección (rural) · V***** El S*****
+engine/tests/test_privacidad.py · dirección (unidad) · Apto XXX Barrio C********
+engine/tests/test_privacidad.py · dirección (unidad) · Apto XXX Torre X
+engine/tests/test_privacidad.py · dirección (unidad) · Bloque X Apartamento XXX
 engine/tests/test_privacidad.py · dirección · Calle 1XX #XX-XX Apto 301 Barrio C
 engine/tests/test_privacidad.py · dirección · Calle 4X #X2-34
 engine/tests/test_privacidad.py · ruta de usuario · /Users/f*******
@@ -20,6 +27,16 @@ engine/tests/test_privacidad.py · teléfono fijo · (6XX) XXX X566
 engine/tests/test_privacidad.py · teléfono fijo · +5X XXX XXXX455
 engine/tests/test_privacidad.py · teléfono fijo · 6XX XXX X900
 engine/tests/test_privacidad.py · teléfono · +5X XXX XXXX567
+scripts/escanear_privacidad.py · dirección (rural) · Km X vía La C*****
+scripts/escanear_privacidad.py · dirección (rural) · V***** El S*****
+scripts/escanear_privacidad.py · dirección (unidad) · Apto XXX Barrio C****
+scripts/escanear_privacidad.py · dirección (unidad) · Apto XXX Torre X
 scripts/escanear_privacidad.py · dirección · Calle 1XX #XX-XX Apto 301 Barrio C
 scripts/escanear_privacidad.py · dirección · Calle XXX #XX-XX Apto XXX Barrio
 scripts/escanear_privacidad.py · ruta de usuario · /Users/f*******
+skills/renta-privacidad/SKILL.md · correo deletreado · p****** a***** d****** p**** c**
+skills/renta-privacidad/SKILL.md · dirección (rural) · Km X vía La C*****
+skills/renta-privacidad/SKILL.md · dirección (rural) · V***** El S*****
+skills/renta-privacidad/SKILL.md · dirección (unidad) · Apto XXX Torre X
+skills/renta-privacidad/SKILL.md · dirección (unidad) · Bloque X
+skills/renta-privacidad/SKILL.md · dirección · Manzana X L*** XX

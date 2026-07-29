@@ -36,11 +36,16 @@ Solo se leen esas dos secciones. El `nombre` de un activo de `[patrimonio]` no e
 | NIT con dígito de verificación | `900.123.456-7` |
 | Números de cuenta bancaria | secuencias de 9–20 dígitos |
 | Tarjetas | 13–19 dígitos, validado con Luhn |
-| Correos | cualquiera |
-| Teléfonos colombianos | `+57 3XX XXXXXXX`, celulares |
+| Correos | cualquiera, incluido `persona arroba dominio punto com` |
+| Teléfonos colombianos | `+57 3XX XXXXXXX` celulares, y `60X` fijos |
 | Direcciones | `Calle`, `Carrera`, `Cra`, `Kr`, `Av`, `Diagonal` + números |
+| Direcciones sin vía | `Apto 502 Torre 3`, `Bloque 4`, `Manzana 7 Lote 12` |
+| Direcciones rurales | `Km 5 vía La Calera`, `Vereda El Salado` |
 | Nombres del perfil | solo con `--perfil` |
 | Rutas de usuario | `/Users/<nombre>`, `/home/<nombre>` |
+| Identificadores rotos por un salto de línea | lo que produce copiar de un PDF a dos columnas |
+
+Lo último importa más de lo que parece: `1.016.086.` en una línea y `781` en la siguiente no es nada para un patrón que mire línea por línea. Solo cruzan líneas las formas fuertes —cuatro grupos de tres, ocho a once dígitos corridos, NIT— porque hacerlo con las ambiguas multiplicaba por cinco el ruido de confianza baja, y un contador de ruido que se dispara deja de significar algo.
 
 ## Cómo reportar
 

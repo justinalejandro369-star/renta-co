@@ -120,7 +120,16 @@ CONTEXTO = re.compile(
 
 # Separadores de miles aceptados, incluidos los unicode que aparecen al
 # copiar de un PDF o de una página web.
-SEP = r"[.\s  ·•,-]"
+# La barra va aquí porque es como quedan los dígitos al copiarlos de
+# algunos sistemas: `1/016/086/781` escapaba entero.
+#
+# El guion bajo se probó y se SACÓ. Es el separador de miles de Python y de
+# TOML, y este proyecto escribe así todos sus montos —incluidos los de la
+# plantilla que el usuario copia—, así que agregarlo convertía cada cifra
+# del repo en candidata: `300_000_000` en una línea que dice «Ahorros»
+# salía como cédula de confianza ALTA. Un separador solo sirve como señal
+# si no es además la forma normal de escribir un número.
+SEP = r"[.\s  ·•,\-/]"
 
 PATRONES = [
     ("NIT", re.compile(rf"\d{{3}}{SEP}?\d{{3}}{SEP}?\d{{3}}\s?-\s?\d(?!\d)"), "alta"),
@@ -154,11 +163,34 @@ PATRONES = [
     ("correo", re.compile(
         r"[\w.%+-]+\s*(?:@|\[at\]|\(at\)|\(arroba\))\s*[\w.-]+\s*"
         r"(?:\.|\(punto\))\s*[A-Za-z]{2,}"), "alta"),
+    # Correo DELETREADO, que es como lo escribe quien sabe que hay un
+    # escáner o quien lo dicta por teléfono: «persona arroba ejemplo punto
+    # com». Exige las DOS palabras —la del @ y la del punto— porque cada una
+    # por separado es vocabulario corriente y llenaría el reporte de ruido.
+    ("correo deletreado", re.compile(
+        r"\b[\w.%+-]+\s+(?:arroba|at)\s+[\w.-]+\s+(?:punto|dot)\s+[A-Za-z]{2,}\b",
+        re.IGNORECASE), "alta"),
     ("teléfono", re.compile(
         r"(?:\+?57[\s.-]?)?\(?3\d{2}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"), "alta"),
     ("dirección", re.compile(
         r"\b(?:calle|cll?|carrera|cra|kra|kr|avenida|av|autopista|diagonal|dg|"
         r"transversal|tv|manzana|mz)\.?\s*\d+[\w\s#\-]{0,25}", re.IGNORECASE), "alta"),
+    # Dirección SIN verbo de vía. Media Colombia urbana vive en un
+    # `Apto 502 Torre 3` y el patrón de arriba, que ancla en «calle» o
+    # «carrera», no veía ninguno. El complemento de la vía identifica una
+    # vivienda igual de bien que la vía.
+    # `conjunto` y `urbanización` se probaron y se sacaron: no llevan número
+    # de casa —«Conjunto Los Robles»— y en cambio «tope conjunto 40%»
+    # aparece en cada documento de este repo.
+    ("dirección (unidad)", re.compile(
+        r"\b(?:apto|apartamento|torre|bloque|manzana|mz|lote)\.?\s*\d+"
+        r"[\w\s#\-]{0,25}", re.IGNORECASE), "alta"),
+    # Rural: `Km 5 vía La Calera`, `Vereda El Salado`. Es la dirección de
+    # una finca, y no lleva número de casa.
+    ("dirección (rural)", re.compile(
+        r"\b(?:km|kil[oó]metro)\.?\s*\d+\s*(?:v[ií]a|vereda|carretera)\b[\w\s]{0,30}"
+        r"|\bvereda\s+[A-ZÁÉÍÓÚÑ][\w]*(?:\s+[A-ZÁÉÍÓÚÑ]?[\w]*){0,3}",
+        re.IGNORECASE), "alta"),
     ("ruta de usuario", re.compile(
         r"(?:/(?:Users|home)/|[A-Za-z]:\\Users\\)[A-Za-z0-9._-]+"), "alta"),
 ]
@@ -527,6 +559,79 @@ def escanear_texto(texto: str, nombres, sufijo="") -> list[tuple[int, str, str, 
                 hallazgos.append(
                     (n, "nombre del perfil", nombre[0] + "*" * (len(nombre) - 1), "alta")
                 )
+
+    hallazgos += hallazgos_partidos(texto)
+    return hallazgos
+
+
+# Un número roto en dos por un salto de línea. Es lo que produce copiar de
+# un PDF a dos columnas o de un extracto con el ancho justo, y el escáner
+# leía las dos mitades por separado: `1.016.086.` no es nada y `781` tampoco.
+CORTE = re.compile(rf"(\d(?:{SEP}|\d)*)$")
+PEGA = re.compile(rf"^((?:{SEP}|\d)*\d)")
+
+# Solo las formas FUERTES cruzan líneas. Correr las ambiguas —tres grupos,
+# seis o siete dígitos— sobre cada par de líneas llevó los hallazgos de
+# confianza baja de 187 a 869 sobre este mismo repo: en un documento
+# tributario, una fila que termina en dígito seguida de otra que empieza en
+# dígito es el contenido NORMAL. Un contador de ruido que se multiplica por
+# cinco deja de significar algo, y esa es la forma conocida de apagar esta
+# herramienta. Un monto partido en dos casi nunca es una cédula; una corrida
+# de ocho a once dígitos o cuatro grupos de tres, sí.
+FORMAS_FUERTES = {
+    "cédula", "cédula o documento", "cuenta o identificador largo", "NIT",
+}
+
+
+def hallazgos_partidos(texto: str) -> list[tuple[int, str, str, str]]:
+    """Identificadores que quedan a caballo entre dos líneas.
+
+    Se unen las dos líneas y se busca solo lo que CRUCE la unión: lo que cabe
+    entero en una de las dos ya lo encontró el paso normal, y reportarlo otra
+    vez sería duplicar.
+
+    La confianza es ALTA únicamente con palabra de contexto en alguna de las
+    dos líneas. Sin ella queda BAJA, porque una tabla de montos donde una
+    fila termina en dígito y la siguiente empieza en dígito produce esta
+    misma forma, y ese es el contenido normal de un expediente tributario:
+    subirlo todo a ALTA volvería a llenar el reporte de ruido, que es como se
+    apagó `--perfil`.
+    """
+    lineas = texto.splitlines()
+    hallazgos = []
+    for i in range(len(lineas) - 1):
+        izq, der = lineas[i].rstrip(), lineas[i + 1].lstrip()
+        if not izq or not der:
+            continue
+        cola = CORTE.search(izq)
+        cabeza = PEGA.match(der)
+        if not cola or not cabeza:
+            continue
+        unido = cola.group(1) + cabeza.group(1)
+        # Sin el corte no hay nada nuevo que reportar.
+        if len(cola.group(1)) < 2 or len(cabeza.group(1)) < 2:
+            continue
+        # También la línea de ARRIBA: en un extracto copiado de un PDF el
+        # encabezado («Documento:») queda en su propia línea y el número
+        # roto empieza en la siguiente. Mirando solo el par, el caso que
+        # motivó todo esto salía de confianza baja.
+        previa = lineas[i - 1] if i else ""
+        contexto = bool(CONTEXTO.search(izq) or CONTEXTO.search(der)
+                        or CONTEXTO.search(previa))
+        for etiqueta, patron, modo in PATRONES:
+            if etiqueta not in FORMAS_FUERTES:
+                continue
+            for m in patron.finditer(unido):
+                bruto = m.group(0).strip()
+                # Tiene que CRUZAR la unión, y no caber en ninguna mitad.
+                cruza = m.start() < len(cola.group(1)) < m.end()
+                if not cruza or bruto in izq or bruto in der:
+                    continue
+                hallazgos.append((
+                    i + 1, f"{etiqueta} (roto en dos líneas)",
+                    enmascarar(bruto), "alta" if contexto else "baja",
+                ))
+                break
     return hallazgos
 
 

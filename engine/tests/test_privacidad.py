@@ -780,3 +780,102 @@ class TestNombresDelPerfil(unittest.TestCase):
     def test_el_nombre_sale_enmascarado_en_el_reporte(self):
         hallazgos = escanear_texto("Firma: Yamile", nombres=["yamile"])
         self.assertEqual(hallazgos[0][2], "y*****")
+
+
+class TestPatronesDeLaRonda7(unittest.TestCase):
+    """Lo que seguía escapando después de la ronda 6.
+
+    Todos se reprodujeron antes de escribir el patrón: los siete salían con
+    cero hallazgos.
+    """
+
+    def test_una_cedula_rota_por_un_salto_de_linea(self):
+        """Lo que produce copiar de un PDF a dos columnas. Cada mitad por
+        separado no es nada: `1.016.086.` y `781`."""
+        h = escanear_texto("Documento:\n1.016.086.\n781\n")
+        rotos = [x for x in h if "roto en dos líneas" in x[1]]
+        self.assertTrue(rotos, h)
+        self.assertEqual(rotos[0][3], "alta")
+        # Enmascarado con la misma regla que el resto: primer dígito y los
+        # tres últimos, para poder reconocerlo sin publicarlo.
+        self.assertNotIn("016", rotos[0][2], "salió sin enmascarar")
+        self.assertIn("X", rotos[0][2])
+
+    def test_un_monto_partido_no_cruza_lineas(self):
+        """La otra cara, y el ajuste que costó medirlo.
+
+        Correr TODOS los patrones sobre cada par de líneas llevó los
+        hallazgos de confianza baja de 187 a 869 sobre este mismo repo: en
+        un documento tributario, una fila que termina en dígito seguida de
+        otra que empieza en dígito es el contenido normal. Un contador de
+        ruido que se multiplica por cinco deja de significar algo, y esa es
+        la forma conocida de apagar esta herramienta.
+
+        Solo cruzan líneas las formas FUERTES: cuatro grupos de tres, ocho a
+        once dígitos corridos, NIT. Un monto de tres grupos partido en dos
+        casi nunca es una cédula.
+        """
+        h = escanear_texto("Total\n90.000.\n000 pesos\n")
+        self.assertEqual([x for x in h if "roto en dos líneas" in x[1]], [], h)
+
+    def test_una_forma_fuerte_partida_sin_contexto_queda_en_baja(self):
+        """Pero sin palabra de contexto no rompe el build: cuatro grupos de
+        tres también puede ser un monto de mil millones."""
+        h = escanear_texto("Total\n1.016.086.\n781\n")
+        rotos = [x for x in h if "roto en dos líneas" in x[1]]
+        self.assertTrue(rotos, h)
+        self.assertEqual(rotos[0][3], "baja")
+
+    def test_lo_que_cabe_en_una_linea_no_se_reporta_dos_veces(self):
+        h = escanear_texto("cédula 1.016.086.781\nsigue el texto\n")
+        self.assertEqual([x for x in h if "roto en dos líneas" in x[1]], [])
+
+    def test_una_direccion_sin_verbo_de_via(self):
+        """Media Colombia urbana vive en un `Apto 502 Torre 3`, y el patrón
+        anclaba en «calle» o «carrera»."""
+        self.assertIn("dirección (unidad)",
+                      tipos(escanear_texto("Vive en Apto 502 Torre 3.")))
+        self.assertIn("dirección (unidad)",
+                      tipos(escanear_texto("Entrega en Bloque 4 Apartamento 201")))
+
+    def test_una_direccion_rural(self):
+        self.assertIn("dirección (rural)",
+                      tipos(escanear_texto("La finca queda en Km 5 vía La Calera.")))
+        self.assertIn("dirección (rural)",
+                      tipos(escanear_texto("Predio en Vereda El Salado, Rionegro.")))
+
+    def test_el_tope_conjunto_no_es_una_direccion(self):
+        """`conjunto` y `urbanización` se probaron en el patrón de unidad y
+        se sacaron: no llevan número de casa, y «tope conjunto 40%» aparece
+        en cada documento de este repo."""
+        h = escanear_texto("dentro del tope conjunto 40% / 1.340 UVT")
+        self.assertEqual(altas(h), [], h)
+
+    def test_un_correo_deletreado(self):
+        """Como lo escribe quien sabe que hay un escáner, o quien lo dicta
+        por teléfono."""
+        self.assertIn("correo deletreado",
+                      tipos(escanear_texto("persona arroba ejemplo punto com")))
+        self.assertIn("correo deletreado",
+                      tipos(escanear_texto("contacto at bufete dot com")))
+
+    def test_arroba_o_punto_por_separado_no_alcanzan(self):
+        """Exige las DOS palabras: cada una por su lado es vocabulario
+        corriente y llenaría el reporte de ruido."""
+        for texto in ("el punto de equilibrio de la actividad",
+                      "arroba de panela, medida antigua",
+                      "el at de la arquitectura no aplica acá"):
+            self.assertNotIn("correo deletreado", tipos(escanear_texto(texto)), texto)
+
+    def test_digitos_separados_por_barras(self):
+        h = escanear_texto("documento 1/016/086/781")
+        self.assertIn("cédula", tipos(h))
+
+    def test_el_guion_bajo_NO_es_separador(self):
+        """Se probó y se sacó. Es el separador de miles de Python y de TOML,
+        y este proyecto escribe así todos sus montos: agregarlo convertía
+        `300_000_000` en una línea que dice «Ahorros» en una cédula de
+        confianza ALTA. Un separador solo sirve como señal si no es además
+        la forma normal de escribir un número."""
+        h = escanear_texto('"patrimonio": [("Ahorros", 300_000_000)],')
+        self.assertEqual(altas(h), [], h)
