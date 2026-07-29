@@ -244,6 +244,94 @@ PERSONAS: list[dict] = [
             },
         },
     },
+
+    # ──────────────────────────────────────────────────────────────────
+    #  P18–P20: escritas contra los huecos que midió `benchmark/cobertura.py`,
+    #  no contra una intuición de qué falta.
+    #
+    #  Estado antes: 9 regiones del espacio de entrada sin visitar por
+    #  ninguna de las 17 personas ni en ninguna de las dos rutas. Entre
+    #  ellas los dos tramos superiores del art. 241, las dos zonas de
+    #  castigo que el motor CALCULA Y ANUNCIA, y seis campos del ESQUEMA
+    #  que valían 0 en todo el corpus — incluido
+    #  `compras_con_factura_electronica`, que es por donde escapó la
+    #  mutación M87 teniendo test dedicado escrito veinte minutos antes.
+    #
+    #  Una región declarada y vacía es una promesa de cobertura que nadie
+    #  cumple. La compuerta se pone roja hasta que alguien escriba la
+    #  persona, que es la única forma de que se escriba.
+    # ──────────────────────────────────────────────────────────────────
+
+    {
+        "id": "P18",
+        "nombre": "Agencia unipersonal, los dos tramos de arriba del 241",
+        "descripcion": "Ingresos por 2.400 millones con 800 de costos. Es la "
+                       "única persona del corpus que llega a los dos tramos "
+                       "superiores del art. 241 — y llega a los DOS a la vez, "
+                       "uno por ruta, que es lo que la hace útil.",
+        "espera": "Ruta A cae en el tramo 5 (37%) y Ruta B en el 6 (39%), "
+                  "porque la Ruta B renuncia a los 800 millones de costos a "
+                  "cambio de una exención topada en 790 UVT. La brecha entre "
+                  "las dos rutas es la más grande del corpus.",
+        "datos": {
+            "ingresos.rentas_trabajo_honorarios": 2_400_000_000,
+            "incrngo.aportes_obligatorios_salud_pension": 48_000_000,
+            "costos.pagos_a_contratistas": 600_000_000,
+            "costos.arriendo_oficina": 120_000_000,
+            "costos.equipo_tecnologico": 80_000_000,
+            "deducciones.intereses_vivienda": 55_000_000,
+            "deducciones.aportes_voluntarios": 180_000_000,
+            "deducciones.dependientes": 2,
+            "anticipos.retenciones_practicadas": 260_000_000,
+            "anticipos.anticipo_anio_anterior": 40_000_000,
+        },
+    },
+
+    {
+        "id": "P19",
+        "nombre": "Comerciante con factura electrónica y donación",
+        "descripcion": "Ejercita los campos que valían 0 en todo el corpus: "
+                       "el 1% de compras con factura electrónica, el INCRNGO "
+                       "sin tipo evidente y el descuento por donación.",
+        "espera": "La deducción del 1% del art. 336 num. 5 compite DENTRO del "
+                  "tope conjunto, y el descuento del art. 257 va contra el "
+                  "impuesto y no contra la base.",
+        "datos": {
+            "contribuyente.es_comerciante": True,
+            "ingresos.rentas_trabajo_honorarios": 190_000_000,
+            "ingresos.rentas_capital": 24_000_000,
+            "incrngo.aportes_obligatorios_salud_pension": 21_000_000,
+            "incrngo.otros": 6_000_000,
+            "costos.equipo_tecnologico": 18_000_000,
+            "costos.internet_software": 5_000_000,
+            "costos.arriendo_oficina": 24_000_000,
+            "deducciones.compras_con_factura_electronica": 240_000_000,
+            "deducciones.intereses_vivienda": 14_000_000,
+            "deducciones.medicina_prepagada": 8_000_000,
+            "deducciones.dependientes": 3,
+            "descuentos.donaciones_certificadas_rte": 20_000_000,
+            "anticipos.retenciones_practicadas": 18_000_000,
+            "anticipos.anticipo_anio_anterior": 3_000_000,
+        },
+    },
+
+    {
+        "id": "P20",
+        "nombre": "Justo dentro de la primera zona de castigo del 241",
+        "descripcion": "Base alrededor de los 431,7 millones, donde la tabla "
+                       "del art. 241 tiene un salto real: un peso más de base "
+                       "puede costar hasta 4.980 pesos más de impuesto.",
+        "espera": "El motor detecta y anuncia esta zona. Ninguna persona caía "
+                  "dentro, así que el aviso nunca se vio funcionar sobre un "
+                  "caso del corpus — se anunciaba una defensa no ejercitada.",
+        "datos": {
+            # Sin costos ni deducciones a propósito: en Ruta A la base es el
+            # ingreso, así que cae dentro de la zona por construcción y el
+            # caso no se desplaza si mañana cambia el orden de las deducciones.
+            "ingresos.rentas_trabajo_honorarios": 431_750_000,
+            "deducciones.dependientes": 0,
+        },
+    },
 ]
 
 

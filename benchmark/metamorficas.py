@@ -314,6 +314,116 @@ def _mr_los_subtotales_particionan(p, par, rng):
                    f"${sum(v[c] for c in sueltos):,.0f}")
 
 
+def _par_escalado(par, k: int):
+    """Los mismos parámetros con la UVT multiplicada por k."""
+    import copy
+
+    from engine.parametros import Parametros
+
+    datos = copy.deepcopy(par._d)
+    datos["uvt"]["valor"] = par.uvt * k
+    return Parametros(datos, set(par.heredados), par.anio_gravable,
+                      par.padre_incompleto)
+
+
+def _perfil_escalado(p, k: int):
+    """El mismo perfil con TODOS los pesos multiplicados por k.
+
+    Qué es peso y qué no lo decide `perfil.NO_SON_PESOS`, que es el mismo
+    conjunto que usa la validación. Escrito a mano acá, se desincronizaría
+    del ESQUEMA en cuanto alguien agregue un campo — y un contador de
+    dependientes multiplicado por 7 haría fallar la relación por una razón
+    que no tiene nada que ver con la norma.
+    """
+    cambios = {}
+    for seccion, campos in p.datos.items():
+        if not isinstance(campos, dict):
+            continue
+        for campo, valor in campos.items():
+            if not isinstance(valor, (int, float)) or isinstance(valor, bool):
+                continue
+            if f"{seccion}.{campo}" in PF.NO_SON_PESOS:
+                continue
+            cambios[f"{seccion}__{campo}"] = int(valor) * k
+    return p.copia_con(**cambios)
+
+
+def _mr_homogeneidad_en_uvt(p, par, rng):
+    """El Estatuto está escrito en UVT. Multiplicar TODO por k —los pesos del
+    contribuyente Y el valor de la UVT— tiene que multiplicar el impuesto
+    por k exactamente.
+
+    Qué atrapa, y qué NO — medido, no supuesto
+    ──────────────────────────────────────────
+    Es la única relación de esta capa que no es de monotonía. La monotonía es
+    un oráculo débil (arXiv 2509.13471) y las otras cinco lo son.
+
+    Lo que ésta atrapa es una clase concreta: **cualquier cifra escrita en
+    pesos donde el Estatuto la pone en UVT**. Los siete rangos del art. 241,
+    las 1.340 UVT del tope conjunto, las 790 del art. 206 num. 10, las 72 por
+    dependiente, las 32 mensuales del art. 387 — todas son umbrales en UVT, y
+    una constante en pesos no se mueve cuando la UVT sí. Es además el error
+    INVISIBLE por excelencia: no cambia ningún resultado mientras la UVT no
+    cambie, o sea, se descubre en enero cuando ya está en producción.
+
+    Medido con dos mutaciones que las otras cinco relaciones dejan pasar:
+
+        UVT cableada en `impuesto_241`   →  atrapada, diferencia de $346 M
+        piso de no-declarante en pesos   →  atrapada, impuesto donde va $0
+
+    Lo que NO atrapa, y decirlo importa tanto como lo anterior: una tarifa
+    PLANA del 12% sobre la base es perfectamente homogénea, y se midió que
+    pasa esta relación sin una sola violación. Homogéneo no quiere decir
+    correcto. Contra eso están las anclas, que son las únicas que comprueban
+    NIVELES contra una liquidación hecha a mano.
+
+    Y ataca el punto ciego que diagnosticó la ronda 7 desde otro lado: no
+    compara el motor contra otra implementación de la misma lectura, sino
+    contra sí mismo bajo un cambio de unidad. `referencia.py` puede compartir
+    el malentendido; la aritmética de escala no.
+
+    ⚠ ACOTADA por el redondeo al peso, y la cota está DERIVADA, no ajustada
+    hasta que la relación se calle.
+
+    La primera corrida disparó: diferencias de $3 sobre $1.700 millones. Eso
+    no es ruido de coma flotante —un `double` sobre 1e9 yerra en el orden de
+    1e-7 pesos, no de 3— y la causa es concreta y está en una línea:
+
+        impuesto_241 → return round(max(uvt, 0) * par.uvt)
+
+    Redondear al peso es una granularidad FIJA, y ninguna granularidad fija
+    es homogénea: `round(x·k) ≠ k·round(x)`. El error está acotado por medio
+    peso en cada corrida, así que |y − k·x| ≤ k/2 + 1/2, y esa es la
+    tolerancia que se usa. Con k = 10 son $5,5 sobre cifras de miles de
+    millones: cualquier constante escrita en pesos donde la norma la pone en
+    UVT produce una diferencia proporcional al monto y la relación la ve
+    igual.
+
+    `renta_liquida` va SIN esa holgura, a propósito: no pasa por ningún
+    redondeo, así que ahí la igualdad tiene que ser exacta salvo coma
+    flotante. Si algún día `aproximar_577` —que redondea a MILES— entra al
+    núcleo en vez de usarse solo al emitir casillas, esta relación lo va a
+    reportar sobre `renta_liquida`, y será correcto: hay que decidir ese
+    cambio a la vista en vez de aflojar el umbral hasta que calle.
+    """
+    k = rng.choice([2, 3, 5, 7, 10])
+    par_k = _par_escalado(par, k)
+    p_k = _perfil_escalado(p, k)
+    # Medio peso por corrida, por el `round()` al peso de impuesto_241. La
+    # base no lo lleva porque no pasa por ningún redondeo.
+    holgura = {"impuesto": k * 0.5 + 0.5, "renta líquida": 0.0}
+    for ruta in ("A", "B"):
+        a, b = liquidar(p, par, ruta), liquidar(p_k, par_k, ruta)
+        for nombre, x, y in (("renta líquida", a.renta_liquida, b.renta_liquida),
+                             ("impuesto", a.impuesto, b.impuesto)):
+            esperado = x * k
+            if abs(y - esperado) > holgura[nombre] + max(1.0, abs(esperado) * 1e-9):
+                yield (f"ruta {ruta}: con la UVT y todos los pesos ×{k}, la "
+                       f"{nombre} debería ser ${esperado:,.0f} y da ${y:,.0f} "
+                       f"(diferencia ${y - esperado:,.0f}). Busca una cifra "
+                       f"escrita en pesos donde la norma la pone en UVT.")
+
+
 def _mr_impuesto_nunca_supera_la_base(p, par, rng):
     """La tarifa marginal máxima del art. 241 es 39%. El impuesto no puede
     superar la renta líquida gravable, ni ser negativo."""
@@ -332,6 +442,9 @@ RELACIONES = [
     ("el INCRNGO domina a la deducción", _mr_incrngo_domina_a_la_deduccion),
     ("partir un costo no cambia el resultado", _mr_partir_un_costo_no_cambia_nada),
     ("los subtotales particionan el tope", _mr_los_subtotales_particionan),
+    # La única que no es de monotonía, y por eso la que más discrimina: una
+    # tarifa plana del 12% pasa todas las de arriba y falla ésta.
+    ("homogeneidad en UVT", _mr_homogeneidad_en_uvt),
     ("el impuesto no supera la base", _mr_impuesto_nunca_supera_la_base),
 ]
 
