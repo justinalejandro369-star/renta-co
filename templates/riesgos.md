@@ -80,6 +80,87 @@ El ledger aplica TRM diaria (art. 288 ET). Diferencia frente a promedio:
 
 ---
 
+## R-09 · Costos por encima del tope indicativo del 60%
+**Severidad: ALTA · Solo Ruta A · Lo emite el motor**
+
+Art. 336-1 ET. Costos {{$X}} = {{X}}% de los ingresos brutos. Superar el 60%
+es legítimo pero obliga a marcar la casilla informativa; no marcarla acarrea
+la sanción del art. 651 num. 1 lit. d). Y exige soporte con factura
+electrónica, nómina electrónica o documento equivalente ELECTRÓNICO, lo que
+choca con la estrategia de documento soporte físico del R-03.
+
+**Mitigación:** {{}}
+
+---
+
+## R-10 · Costos por encima del techo de su tipo de renta
+**Severidad: ALTA · Solo Ruta A · Lo emite el motor**
+
+Decreto 1625 art. 1.2.1.20.5. {{$X}} rechazados: {{detalle por tipo}}.
+
+**Mitigación:** declarar `[costos.atribucion]` en el `perfil.toml` en vez de
+dejarlo al criterio por defecto, y guardar con qué actividad se relaciona
+cada factura.
+
+---
+
+## R-11 · Costos sin tipo de renta: el techo no se pudo aplicar
+**Severidad: MEDIA · Solo Ruta A · Lo emite el motor**
+
+Hay ingresos de más de un tipo y el perfil no dice a cuál pertenece cada
+costo, así que el motor NO les aplicó el techo. **El borrador puede estar
+restando de más**, que es el error que la DIAN cobra con sanción por
+inexactitud.
+
+**Mitigación:** no entregues el borrador sin resolverlo. Escribe
+`[costos.atribucion]` y vuelve a calcular: puede cambiar la ruta ganadora,
+no solo el saldo.
+
+---
+
+## R-12 · Dependientes sin acreditación verificable
+**Severidad: ALTA**
+
+La DIAN denunció esto públicamente. **Comunicado de Prensa No. 058 del 2 de
+septiembre de 2024**: de 2,25 millones de declaraciones de personas
+naturales encontró inconsistencia en al menos 90.000, y nombró de primera
+que «se están incluyendo como dependientes a personas con identificaciones
+inusuales, tales como "cero" o con números secuenciales "1234...", "2222",
+"5678", entre otros».
+
+Es el riesgo que acompaña a la palanca más grande de esta herramienta. No
+está acá para desanimarla: la deducción es legal y vale. Está para que se
+tome con el soporte que exige.
+
+Dependientes declarados: {{N}}. Deducción tomada: **{{$X}}**.
+
+**Mitigación:** documento de identidad REAL de cada dependiente, y el soporte
+que corresponde a su causal — registro civil, certificado de estudio de la
+institución, certificación del Ministerio de Salud para dependencia física o
+psicológica, o **certificación de contador público** para padres, hermanos o
+cónyuge con ingresos anuales inferiores a 260 UVT (art. 387 par. 2 nums. 4 y
+5 ET). Esta última es la que más se olvida y es la que sostiene la causal más
+usada.
+
+---
+
+## R-13 · Deducción del 1% por factura electrónica improcedente
+**Severidad: MEDIA-ALTA**
+
+La segunda inconsistencia que nombra el mismo Comunicado 058 de 2024: «la
+inclusión improcedente del beneficio de deducción del 1% sobre las compras
+soportadas con factura electrónica».
+
+Deducción tomada: **{{$X}}**.
+
+**Mitigación:** exige las DOS condiciones a la vez, y casi nadie verifica la
+segunda — factura electrónica de venta con el NIT o cédula del contribuyente
+como ADQUIRIENTE, **y** pago por medio electrónico. Una factura a nombre de
+otro, o una compra en efectivo, no cuentan. Guarda el soporte del medio de
+pago junto con la factura.
+
+---
+
 ## Resumen
 
 | ID | Riesgo | Severidad | Se resuelve con |
@@ -90,5 +171,15 @@ El ledger aplica TRM diaria (art. 288 ET). Diferencia frente a promedio:
 | R-05 | Patrimonio subdeclarado | MEDIA-ALTA | {{}} |
 | R-06 | UGPP | MEDIA-ALTA | {{}} |
 | R-03 | Documento soporte extemporáneo | MEDIA | {{}} |
+| R-09 | Costos > 60% indicativo | ALTA | {{}} |
+| R-10 | Costos > techo de su tipo de renta | ALTA | {{}} |
+| R-12 | Dependientes sin acreditación | ALTA | {{}} |
+| R-13 | Deducción 1% factura electrónica | MEDIA-ALTA | {{}} |
+| R-11 | Costos sin tipo de renta | MEDIA | {{}} |
 | R-07 | Deducciones improcedentes | BAJA-MEDIA | {{}} |
 | R-08 | TRM promedio | BAJA | {{}} |
+
+> Los cinco que el motor emite —R-01, R-02, R-09, R-10, R-11— se copian de la
+> salida de `bin/renta calcular`, no se redactan de nuevo. Si el motor imprime
+> un `R-xx` que no está en esta plantilla, agrégalo igual: un riesgo detectado
+> que no llega al expediente es el error invisible de este proyecto.

@@ -294,7 +294,14 @@ def _escenarios(c: dict) -> list[dict]:
 def liquidar(caso: dict, ruta: str) -> dict:
     """Liquida todos los escenarios y devuelve el de menor impuesto."""
     resultados = [_liquidar_escenario(caso, ruta, e) for e in _escenarios(caso)]
-    return min(resultados, key=lambda r: r["impuesto"])
+    # Lexicográfico: menor impuesto y, empatando, menor base declarada. Con
+    # la clave sobre el impuesto a secas el empate lo resolvía el orden de la
+    # lista, y esta referencia tenía los escenarios EN EL MISMO ORDEN que el
+    # motor. Por eso el diferencial daba cero divergencias sobre 80.000
+    # perfiles con las dos implementaciones equivocadas: la independencia era
+    # aritmética, no de criterio. Es el resultado que midieron Knight y
+    # Leveson en 1986 y que este archivo ya reprodujo dos veces.
+    return min(resultados, key=lambda r: (r["impuesto"], r["renta_liquida"]))
 
 
 def comparar(caso: dict) -> dict:

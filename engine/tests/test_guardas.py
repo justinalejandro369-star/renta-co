@@ -1082,3 +1082,98 @@ class TestCitasNormativas(unittest.TestCase):
             self.assertIn(ruta, avisos,
                           f"{ruta} está marcado como no implementado y el "
                           f"motor no lo advierte al calcular")
+
+
+class TestCatalogoDeRiesgos(unittest.TestCase):
+    """El catálogo de riesgos vive en cuatro sitios y se desfasó en los cuatro.
+
+    Estado que encontró la ronda 7:
+
+        README.md                    «Nueve riesgos»
+        skills/renta-riesgos/SKILL.md  «Evalúa los once»
+        templates/riesgos.md           R-01 … R-08
+        engine/depuracion.py           emite R-01, R-02, R-09, R-10, R-11
+
+    O sea: el motor detectaba R-09, R-10 y R-11 y la plantilla que la persona
+    llena y le manda al contador no tenía dónde ponerlos. Un riesgo detectado
+    que no llega al expediente queda dicho en la conversación y no queda
+    escrito — que es lo que este proyecto llama su error invisible.
+
+    Y lo peor: la sesión que arregló el conteo de la skill de «nueve» a
+    «once» NO tocó la plantilla ni el README, así que dejó el desfase en tres
+    sitios en vez de dos. Contar a mano no funciona. Esto lo cuenta solo.
+    """
+
+    def _emitidos_por_el_motor(self) -> set[str]:
+        """Los R-xx que `verificar_obligaciones` puede emitir, leídos del
+        código y no de una lista escrita a mano en el test."""
+        import re
+
+        fuente = (RAIZ / "engine" / "depuracion.py").read_text(encoding="utf-8")
+        return set(re.findall(r'"id":\s*"(R-\d+)"', fuente))
+
+    def _mencionados_en(self, ruta: str) -> set[str]:
+        import re
+
+        return set(re.findall(
+            r"\bR-\d{2}\b", (RAIZ / ruta).read_text(encoding="utf-8")))
+
+    def test_todo_riesgo_que_emite_el_motor_tiene_donde_escribirse(self):
+        """El que importa: si el motor lo detecta, el entregable tiene que
+        poder recogerlo."""
+        del_motor = self._emitidos_por_el_motor()
+        self.assertTrue(del_motor, "no se leyó ningún R-xx de depuracion.py")
+        for archivo in ("templates/riesgos.md", "skills/renta-riesgos/SKILL.md"):
+            faltan = sorted(del_motor - self._mencionados_en(archivo))
+            self.assertEqual(
+                faltan, [],
+                f"{archivo} no menciona {faltan}, que el motor SÍ emite. Un "
+                f"riesgo detectado que no llega al expediente es el error "
+                f"invisible de este proyecto",
+            )
+
+    def test_la_skill_y_la_plantilla_cubren_el_mismo_catalogo(self):
+        skill = self._mencionados_en("skills/renta-riesgos/SKILL.md")
+        plantilla = self._mencionados_en("templates/riesgos.md")
+        self.assertEqual(
+            sorted(skill - plantilla), [],
+            "la skill manda evaluar riesgos que la plantilla no tiene",
+        )
+        self.assertEqual(
+            sorted(plantilla - skill), [],
+            "la plantilla tiene riesgos que la skill no manda evaluar",
+        )
+
+    def test_el_conteo_del_readme_es_el_de_verdad(self):
+        """`README.md` decía «Nueve» con once en el catálogo. El número se
+        lee del catálogo, no se escribe a mano."""
+        import re
+
+        cuantos = len(self._mencionados_en("skills/renta-riesgos/SKILL.md"))
+        palabras = {
+            8: "ocho", 9: "nueve", 10: "diez", 11: "once", 12: "doce",
+            13: "trece", 14: "catorce", 15: "quince",
+        }
+        esperada = palabras.get(cuantos)
+        self.assertIsNotNone(
+            esperada, f"agrega {cuantos} al mapa de palabras de este test")
+        readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+        m = re.search(r"\b(\w+) riesgos del perfil freelance", readme)
+        self.assertIsNotNone(m, "no encontré la frase del conteo en README.md")
+        self.assertEqual(
+            m.group(1).lower(), esperada,
+            f"README dice «{m.group(1)}» y el catálogo tiene {cuantos}",
+        )
+
+    def test_los_riesgos_que_denuncio_la_dian_estan_en_el_catalogo(self):
+        """La palanca que esta herramienta más promociona —dependientes— es
+        textualmente la inconsistencia número uno del Comunicado de Prensa
+        058 del 2 de septiembre de 2024 de la DIAN, y no tenía ningún riesgo
+        asociado. Empujar una deducción sin su riesgo, en el mismo expediente
+        que se enorgullece de registrar riesgos, es un punto ciego."""
+        for archivo in ("templates/riesgos.md", "skills/renta-riesgos/SKILL.md"):
+            texto = (RAIZ / archivo).read_text(encoding="utf-8")
+            self.assertIn("058", texto,
+                          f"{archivo} no cita el comunicado de la DIAN")
+            self.assertIn("R-12", texto)
+            self.assertIn("R-13", texto)

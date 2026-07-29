@@ -7,15 +7,24 @@ description: Determina el patrimonio bruto y los pasivos a 31 de diciembre del a
 
 No cambia el impuesto de renta, pero **es la parte que más problemas causa después**. Un activo omitido que la DIAN detecte se grava como renta líquida gravable, sin derecho a costo (art. 239-1 ET), **más sanción por inexactitud del 200%** — no del 100%: el art. 648 num. 1 la duplica justamente cuando se omiten activos o se incluyen pasivos inexistentes.
 
-## La ecuación patrimonial
+## Renta por comparación patrimonial (arts. 236 y 237 ET)
 
-La DIAN corre este chequeo automático:
+⚠ Esta sección traía una fórmula INVENTADA —`patrimonio inicial + renta líquida − gastos de vida`— presentada como «el chequeo automático de la DIAN». «Gastos de vida» no aparece en la norma, y la fórmula real incluye tres términos que esa omitía. Un contador detecta eso en diez segundos y a partir de ahí desconfía de todo lo demás.
+
+Lo que dice el art. 236: si el aumento del **patrimonio líquido** de un año al otro supera las rentas declaradas, la diferencia es **renta gravable**, salvo que el contribuyente demuestre la causa. En términos operativos, la comparación es:
 
 ```
-patrimonio inicial + renta líquida − gastos de vida ≈ patrimonio final
+PL_final − PL_inicial   contra
+    renta gravable + rentas exentas + ganancia ocasional neta − impuestos pagados en el año
 ```
 
-Si no cuadra, **presume ingresos omitidos**. Por eso un patrimonio subdeclarado no solo es un riesgo por sí mismo: hace sospechosa toda la declaración.
+El exceso no justificado se grava. El art. 237 admite justificarlo con rentas exentas, ganancias ocasionales, donaciones o herencias recibidas, premios, condonación de deudas, y el aumento de avalúo catastral.
+
+Por eso hace falta la declaración del año anterior: de ahí sale el **patrimonio líquido inicial**, no solo el bruto.
+
+> **Pendiente de verificación literal.** El texto de los arts. 236 y 237 no se ha contrastado contra el ET en fuente primaria (`estatuto.co` devolvió 403). Por eso arriba va descrito y no entre comillas. Antes de escribir una cita literal de estos artículos en `knowledge/`, ábrelos en el normograma de la DIAN — la guarda `test_toda_cita_literal_declara_su_url_verificada` te lo va a exigir.
+
+> **El motor todavía NO corre esta comparación.** `perfil.toml` no tiene `patrimonio.liquido_anio_anterior` ni el impuesto pagado del año anterior, así que el chequeo no existe. Está en el HANDOFF como R-15.
 
 Y por eso hace falta la declaración del año anterior — de ahí sale el patrimonio inicial.
 

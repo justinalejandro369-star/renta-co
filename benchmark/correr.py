@@ -32,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from benchmark import referencia
+from benchmark import metamorficas, referencia
 from benchmark.personas import ANCLAS, PERSONAS
 from engine import parametros as P
 from engine import perfil as PF
@@ -372,13 +372,21 @@ def main(argv=None) -> int:
     tabla(par)
 
     resultados = []
-    for etiqueta, fn in (
+    # Las capas van en una lista con nombre para que el conteo del cierre se
+    # DERIVE de ella. Estaba escrito «las cuatro capas pasan» a mano, y al
+    # agregar la quinta el mensaje habría seguido diciendo cuatro — la misma
+    # clase de desfase que el catálogo de riesgos, que llegó a tener tres
+    # conteos distintos en tres archivos.
+    CAPAS = (
         ("INVARIANTES", lambda: invariantes(par)),
         ("DIFERENCIAL (motor vs. referencia independiente)", lambda: diferencial(par, args.verbose)),
         ("ANCLAS (calculadas a mano con la norma)", lambda: anclas(par)),
         ("FRONTERAS DEL ART. 241 (saltos por redondeo de la norma)",
          lambda: discontinuidades_del_241(par)),
-    ):
+        ("RELACIONES METAMÓRFICAS (derivadas de la norma, no del código)",
+         lambda: metamorficas.correr(par)),
+    )
+    for etiqueta, fn in CAPAS:
         fallos = fn()
         resultados.append((etiqueta, fallos))
         print()
@@ -418,7 +426,7 @@ def main(argv=None) -> int:
         print(f"✗ BENCHMARK FALLIDO — {total} problema(s)")
         linea("═")
         return 1
-    print("✓ BENCHMARK LIMPIO — las cuatro capas pasan")
+    print(f"✓ BENCHMARK LIMPIO — las {len(CAPAS)} capas pasan")
     linea("═")
     return 0
 

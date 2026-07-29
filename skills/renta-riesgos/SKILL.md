@@ -11,7 +11,7 @@ Escribe el resultado en `expediente/05-riesgos/riesgos.md`. Formato en `template
 
 ## Catálogo base del perfil freelance
 
-Evalúa los **once**, siempre. Los que no apliquen se marcan como no aplicables, no se omiten — así el contador ve que se miraron.
+Evalúa los **trece**, siempre. Los que no apliquen se marcan como no aplicables, no se omiten — así el contador ve que se miraron.
 
 **R-01, R-02, R-09, R-10 y R-11 los emite el motor** con los datos del perfil (`bin/renta calcular`), así que esos cinco llegan ya evaluados: cópialos de la salida, no los redactes de nuevo. Los otros seis los levantas tú.
 
@@ -111,6 +111,22 @@ Sale cuando el contribuyente tiene ingresos de **más de un tipo** y el `perfil.
 **Mitigación, y es acción tuya, no del motor:** si sale R-11, **no entregues el borrador sin resolverlo**. Escribe el bloque `[costos.atribucion]` en `perfil.toml` —una línea por campo de `[costos]`, con `rentas_trabajo_honorarios`, `rentas_capital` u `otras_rentas_no_laborales`— y vuelve a calcular. La cifra puede cambiar la ruta ganadora, no solo el saldo.
 
 Si un mismo campo de `[costos]` mezcla gastos de dos actividades, sepáralos primero: usa los campos que ya existen (`comisiones_plataforma`, `equipo_tecnologico`, `arriendo_oficina`) en vez de amontonarlo todo en `otros`. La atribución es por CAMPO, no por peso.
+
+### R-12 · Dependientes sin acreditación verificable
+**Severidad ALTA**
+
+La DIAN lo denunció por escrito. **Comunicado de Prensa No. 058 del 2 de septiembre de 2024**: de 2,25 millones de declaraciones de personas naturales encontró inconsistencia en al menos 90.000, y lo primero que nombró fue que «se están incluyendo como dependientes a personas con identificaciones inusuales, tales como "cero" o con números secuenciales "1234...", "2222", "5678", entre otros».
+
+Míralo de frente, porque es incómodo: **la palanca que esta herramienta promociona con más energía es exactamente la inconsistencia número uno que la administración está persiguiendo.** La deducción es legal y vale mucho — pero empujarla sin su riesgo, en el mismo expediente que se enorgullece de registrar riesgos, es un punto ciego. Este riesgo va SIEMPRE que haya dependientes declarados, aunque estén bien soportados.
+
+**Mitigación:** documento de identidad real de cada uno, más el soporte de su causal. La que más se olvida es la **certificación de contador público** para padres, hermanos o cónyuge con ingresos anuales inferiores a 260 UVT (art. 387 par. 2 nums. 4 y 5), que además es la causal más usada.
+
+### R-13 · Deducción del 1% por factura electrónica improcedente
+**Severidad MEDIA-ALTA**
+
+La segunda inconsistencia del mismo Comunicado 058: «la inclusión improcedente del beneficio de deducción del 1% sobre las compras soportadas con factura electrónica».
+
+**Mitigación:** son DOS condiciones concurrentes y casi nadie verifica la segunda — factura electrónica de venta con el NIT o cédula del contribuyente como ADQUIRIENTE, **y** pago por medio electrónico. Guarda el soporte del medio de pago junto con la factura.
 
 ## Cómo escribir cada riesgo
 

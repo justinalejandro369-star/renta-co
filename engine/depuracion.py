@@ -468,7 +468,32 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
         )
         opciones.append((etiqueta, escenario(dep_10, dep_72_resto)))
 
-    via, e = min(opciones, key=lambda o: o[1]["impuesto"])
+    # El desempate va en la clave, y no es cosmético.
+    #
+    # Con `key=o["impuesto"]` a secas, dos escenarios que empatan en impuesto
+    # los resuelve el ORDEN DE LA LISTA. Y empatan siempre que el impuesto da
+    # cero, o sea con la base bajo 1.090 UVT ($54.280.910), que es media
+    # población objetivo de esta herramienta. Ganaba la vía de 72 UVT pura
+    # por estar escrita primero, aunque dejara una base MAYOR.
+    #
+    # No cambia la plata —los dos pagan cero— pero sí cambia lo que el
+    # contribuyente ESCRIBE: `renglones_al_210()` manda transcribir esa base
+    # a la casilla «Renta líquida gravable». Reproducido con 90.000.000 de
+    # honorarios y 2 dependientes: subir los aportes voluntarios en
+    # $1.000.000 subía la base declarada de $49.064.472 a $53.478.944.
+    # Deducir más y declarar más. Y la vía que imprime el CLI pedía soportes
+    # de dos dependientes por 72 UVT cuando convenía el 10% por uno.
+    #
+    # El objetivo correcto es lexicográfico: primero el menor impuesto,
+    # después la menor base. Una base más baja nunca perjudica —art. 236: es
+    # la que se compara contra el patrimonio— y ante dos formas de pagar lo
+    # mismo, se declara la que la norma permite.
+    #
+    # Lo encontró la capa de relaciones metamórficas el día que se escribió,
+    # con la relación «más deducción nunca sube la base». Ninguna de las
+    # cuatro capas anteriores podía verlo: `referencia.py` tenía los
+    # escenarios en el MISMO orden.
+    via, e = min(opciones, key=lambda o: (o[1]["impuesto"], o[1]["renta_liquida"]))
     L.dependientes_via = via if n_dep else "sin dependientes"
     renta_liquida = e["renta_liquida"]
     tope_aplicado, rechazado = e["aplicado"], e["rechazado"]
