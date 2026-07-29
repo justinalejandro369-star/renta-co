@@ -11,9 +11,11 @@ Escribe el resultado en `expediente/05-riesgos/riesgos.md`. Formato en `template
 
 ## Catálogo base del perfil freelance
 
-Evalúa los **nueve**, siempre. Los que no apliquen se marcan como no aplicables, no se omiten — así el contador ve que se miraron.
+Evalúa los **once**, siempre. Los que no apliquen se marcan como no aplicables, no se omiten — así el contador ve que se miraron.
 
-R-01, R-02 y R-09 los emite el motor con los datos del perfil (`bin/renta calcular`), así que esos tres llegan ya evaluados. Los otros seis los levantas tú.
+**R-01, R-02, R-09, R-10 y R-11 los emite el motor** con los datos del perfil (`bin/renta calcular`), así que esos cinco llegan ya evaluados: cópialos de la salida, no los redactes de nuevo. Los otros seis los levantas tú.
+
+> Si `calcular` imprime un `R-xx` que no está en esta lista, **no lo omitas del entregable**: agrégalo con lo que diga el motor y repórtalo como catálogo desactualizado. Un riesgo que el motor detecta y el `riesgos.md` no menciona es el error invisible de este proyecto — queda dicho en la conversación y no queda escrito en el expediente.
 
 ### R-01 · Pérdida de la calidad de no responsable de IVA por consignaciones
 **Severidad ALTA · La más subestimada de todas.**
@@ -87,6 +89,28 @@ El art. 336-1 ET, adicionado por la Ley 2277 de 2022 art. 60, estima los costos 
 **Si se materializa:** no marcar la casilla acarrea la sanción del art. 651 num. 1 lit. d). Y hay un segundo requisito que suele mirarse por separado: esos costos deben estar soportados con **factura electrónica** de venta, nómina electrónica o documento equivalente ELECTRÓNICO — lo que choca de frente con la estrategia de documento soporte en físico del R-03. Quien piense superar el 60% tiene que mirar los dos juntos.
 
 **Mitigación:** el motor lo emite solo cuando `total_costos > 60% de los ingresos brutos`. Si sale, decidir con el contador ANTES de escoger la Ruta A: puede ser que la Ruta B salga mejor no por aritmética sino porque los soportes electrónicos no existen.
+
+### R-10 · Costos por encima del techo de su tipo de renta
+**Severidad ALTA · Solo Ruta A**
+
+El Decreto 1625 art. 1.2.1.20.5 inciso final (sustituido por el Decreto 2231 de 2023) no topa los costos contra la cédula: los topa contra los ingresos menos los INCRNGO de **cada tipo de renta**. El exceso de un tipo NO genera pérdida que se pueda restar de otro.
+
+Importa cuando hubo un mal año en la actividad y a la vez rentas de capital: no se puede cruzar lo uno contra lo otro.
+
+**Si se materializa:** la DIAN rechaza el exceso, sube la renta líquida y con ella el impuesto, más sanción por inexactitud del art. 648.
+
+**Mitigación:** el motor lo emite con el detalle por tipo. Si crees que esos costos pertenecen a otro tipo de renta, decláralo en `[costos.atribucion]` del `perfil.toml` en vez de dejarlo al criterio por defecto — y guarda con qué actividad se relaciona cada factura.
+
+### R-11 · Costos sin tipo de renta: el techo no se pudo aplicar
+**Severidad MEDIA · Solo Ruta A**
+
+Sale cuando el contribuyente tiene ingresos de **más de un tipo** y el `perfil.toml` no dice a cuál pertenece cada costo. El motor NO los reparte a ojo —atribuirlos al tipo equivocado sube el impuesto de alguien que no lo debe— así que los deja **sin topar**, y esa es una posición favorable al contribuyente: el borrador puede estar restando de más.
+
+**Si se materializa:** el borrador subdeclara, que es el error que la DIAN cobra con sanción por inexactitud del art. 648.
+
+**Mitigación, y es acción tuya, no del motor:** si sale R-11, **no entregues el borrador sin resolverlo**. Escribe el bloque `[costos.atribucion]` en `perfil.toml` —una línea por campo de `[costos]`, con `rentas_trabajo_honorarios`, `rentas_capital` u `otras_rentas_no_laborales`— y vuelve a calcular. La cifra puede cambiar la ruta ganadora, no solo el saldo.
+
+Si un mismo campo de `[costos]` mezcla gastos de dos actividades, sepáralos primero: usa los campos que ya existen (`comisiones_plataforma`, `equipo_tecnologico`, `arriendo_oficina`) en vez de amontonarlo todo en `otros`. La atribución es por CAMPO, no por peso.
 
 ## Cómo escribir cada riesgo
 

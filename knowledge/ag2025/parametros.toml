@@ -144,28 +144,77 @@ url = "https://estatuto.co/336-1"
 [topes.costos_por_tipo_de_renta]
 aplica = true
 dentro_del_tope_conjunto = false
+url_verificada = true
+motor_implementa_correctamente = false
 nota = """
-La Ruta A no tiene un tope GLOBAL sobre los costos, pero sí uno por tipo de
-renta, que se pasa por alto con frecuencia porque no está en el Estatuto sino
-en el reglamento:
+⚠⚠ ESTE BLOQUE CONTUVO UNA CITA FABRICADA. Léelo entero antes de tocar el
+motor.
 
-  «En ningún caso los costos y gastos … podrán superar el valor resultante de
-  restar de los ingresos del respectivo tipo de renta los ingresos no
-  constitutivos de renta ni ganancia ocasional imputables a ese mismo tipo.»
+La versión anterior traía, ENTRE GUILLEMETS y como si fuera texto normativo,
+una frase que NO existe en la norma: «En ningún caso los costos y gastos …
+podrán superar el valor resultante de restar de los ingresos del respectivo
+tipo de renta los ingresos no constitutivos de renta ni ganancia ocasional
+imputables a ese mismo tipo». Su URL (i=228049) devuelve «norma no
+disponible». La cita se escribió de memoria y nadie la abrió.
 
-O sea que el exceso de costos de un tipo de renta NO genera una pérdida que se
-pueda restar de los otros tipos de la misma cédula. Quien tuvo un mal año en
-honorarios y a la vez recibió rendimientos o arriendos no puede cruzar lo uno
-contra lo otro.
+Es el peor error que puede cometer este repositorio, porque la garantía del
+proyecto es «cada cifra con su fuente». Y el test que debía protegerla
+—test_cada_tope_tiene_fuente— solo comprueba que el campo `fuente` no esté
+vacío.
 
-Para aplicarlo hay que saber a qué tipo de renta pertenece cada costo. El
-perfil lo pregunta en el bloque opcional [costos.atribucion]; si no está, el
-motor usa la única ACTIVIDAD con ingresos que tenga el contribuyente, y si
-tiene las dos, deja los costos sin atribuir y lo dice en el chequeo R-11 en
-vez de repartirlos a ojo.
+TEXTO LITERAL, verificado el 2026-07-29 contra el Decreto 2231 de 2023 art. 6
+en el Gestor Normativo de Función Pública (la URL de abajo, que sí resuelve).
+
+Inciso 5:
+
+  «Cuando los costos y gastos procedentes asociados a las rentas de trabajo
+  que no provengan de una relación laboral o legal y reglamentaria, a rentas
+  de capital o a rentas no laborales, excedan los ingresos por concepto de
+  cada una de dichas rentas, tendrá lugar una pérdida fiscal, la cual será
+  declarada cuando el contribuyente perciba ingresos por un solo tipo de
+  renta de la cédula general.»
+
+Inciso 6:
+
+  «En el evento en que se perciban ingresos por más de un tipo de renta de la
+  cédula general, los costos y gastos de que trata el inciso anterior, al
+  momento de ser declarados, no podrán superar el valor resultante de restar,
+  a los ingresos de las rentas de trabajo que no provengan de una relación
+  laboral o legal y reglamentaria, de las rentas de capital o de las rentas
+  no laborales, los ingresos no constitutivos de renta. El valor que exceda
+  deberá estar registrado en la contabilidad y/o el control de detalle de que
+  trata el artículo 772-1 del Estatuto Tributario para que proceda la
+  compensación de la pérdida fiscal contra la renta que dio su origen, en los
+  periodos gravables posteriores en los términos del artículo 147 del
+  Estatuto Tributario.»
+
+LO QUE ESO SIGNIFICA, y en qué se aparta de lo que hace el motor hoy:
+
+  1. El techo por tipo de renta es exigible SOLO cuando se perciben ingresos
+     por MÁS DE UN TIPO de renta de la cédula general. El motor hace lo
+     contrario: cuando hay dos actividades con ingresos y el perfil no trae
+     [costos.atribucion], NO aplica el techo y emite el chequeo R-11 con
+     severidad media. Es exactamente el caso que la norma regula.
+
+  2. Con UN SOLO tipo de renta no hay techo: hay PÉRDIDA FISCAL, y se
+     declara. El motor tope los costos a los ingresos del tipo y emite R-10
+     diciendo que el exceso «no se puede restar». Eso es legalmente falso en
+     ese escenario.
+
+  3. El exceso, cuando hay más de un tipo, es COMPENSABLE contra la renta que
+     lo originó en períodos siguientes (art. 147 ET), siempre que esté
+     registrado en la contabilidad o en el control de detalle del art. 772-1.
+     Ni R-10 ni el motor lo mencionan, así que un contribuyente que lea «no
+     se pueden restar» no llevará el control de detalle y perderá un derecho
+     real.
+
+`motor_implementa_correctamente = false` está arriba a propósito y NO es
+decorativo: mientras siga en false, este techo no debe usarse para una
+declaración real. Ver el chequeo R-10 y `_costos_aceptados` en
+engine/depuracion.py.
 """
-fuente = "Decreto 1625 de 2016 art. 1.2.1.20.5 inciso final, sustituido por el Decreto 2231 de 2023"
-url = "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=228049"
+fuente = "Decreto 1625 de 2016 art. 1.2.1.20.5 incisos 5 y 6, modificados por el art. 6 del Decreto 2231 de 2023"
+url = "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=227330"
 
 [topes.dependientes_10pct]
 porcentaje_renta_trabajo = 0.10
@@ -173,21 +222,55 @@ tope_mensual_uvt = 32
 meses = 12
 dentro_del_tope_conjunto = true
 excluyente_con = "dependientes_72uvt"
+url_verificada = true
+motor_implementa_correctamente = false
 nota = """
-Excluyente con la deducción de 72 UVT PARA EL MISMO DEPENDIENTE, no para el
-contribuyente: el Decreto 1625 art. 1.2.1.20.3 dice «un mismo dependiente solo
-dará lugar a una de estas dos deducciones».
+⚠⚠ EL MOTOR TOMA UNA POSICIÓN LITIGIOSA ACÁ Y NO LO DECÍA. Léelo entero.
 
-Como esta deducción NO depende de cuántos dependientes haya, gastar más de uno
-en ella es tirarlos. La combinación que casi siempre gana con el tope conjunto
-libre es: el 10% por UNO y 72 UVT por cada uno de los demás. El motor evalúa
-las tres —72 UVT puras, 10% puro y la mezcla— y toma la mejor.
+TEXTO LITERAL del Decreto 1625 art. 1.2.1.20.3 num. 1.1.2 inciso 2 (modificado
+por el art. 3 del Decreto 2231 de 2023), verificado el 2026-07-29 contra el
+Gestor Normativo de Función Pública:
 
-Por lo mismo el quinto dependiente todavía vale: cuatro por 72 UVT (que es
-donde topa el art. 336 num. 3 inciso 2) y uno por el 10%.
+  «La deducción por dependientes a que se refieren el inciso 2 del numeral 3
+  del artículo 336 y la del artículo 387 del Estatuto Tributario aplican
+  únicamente a los ingresos provenientes de rentas de trabajo y un mismo
+  dependiente solo dará lugar a una de estas dos deducciones, excepto cuando
+  se tenga rentas provenientes de una relación laboral y legal o
+  reglamentaria, caso en el cual se podrá aplicar ambas deducciones por un
+  mismo dependiente.»
+
+La versión anterior de esta nota citaba solo el fragmento «un mismo
+dependiente solo dará lugar a una de estas dos deducciones» y SE COMÍA la
+excepción, que es justo la que decide el caso.
+
+Y el ET art. 387 inciso 2 dice, literal, que la deducción del 10% opera sobre
+«el total de los ingresos brutos PROVENIENTES DE LA RELACIÓN LABORAL O LEGAL
+Y REGLAMENTARIA del respectivo mes».
+
+CONSECUENCIA, que es lo grave: el usuario objetivo de este proyecto —el
+independiente por honorarios, cuyo salario `perfil.py` declara FUERA DE
+ALCANCE— probablemente NO tiene derecho a la deducción del art. 387. El
+Consejo de Estado, Sección Cuarta, Auto de 21-ene-2025 exp. 28541, sostuvo
+que «los trabajadores que no obtengan ingresos provenientes de una relación
+legal y reglamentaria solo pueden aplicar la deducción del inciso 2 del
+numeral 3 del artículo 336 del ET».
+
+El motor evalúa las tres combinaciones —72 UVT puras, 10% puro y la mezcla— y
+toma la mejor, así que hoy le concede a un independiente una deducción
+discutida, sin advertírselo. Bajo esa tesis el máximo útil de dependientes
+vuelve a ser 4, no 5.
+
+`motor_implementa_correctamente = false`: mientras siga en false, la vía del
+10% y la mezcla no deben usarse para una declaración real sin contador. La
+posición contraria es defendible y está en discusión —el Auto 28541 suspendió
+un aparte del Concepto DIAN 100208192-87 de 2024— pero el motor no puede
+elegir la posición litigiosa EN SILENCIO. Ojo con el art. 23 de la Ley 383 de
+1997 (mod. art. 84 Ley 2277 de 2022): el beneficio concurrente improcedente
+acarrea la pérdida del mayor beneficio más la sanción por inexactitud del
+art. 648.
 """
-fuente = "Estatuto Tributario art. 387"
-url = "https://estatuto.co/387"
+fuente = "Estatuto Tributario art. 387 inciso 2; Decreto 1625 de 2016 art. 1.2.1.20.3 num. 1.1.2 inciso 2, modificado por el art. 3 del Decreto 2231 de 2023"
+url = "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=227330"
 
 [topes.intereses_vivienda]
 tope_uvt = 1200
@@ -263,9 +346,15 @@ consignaciones_uvt_contratistas_del_estado = 4000
 maximo_establecimientos = 1
 nota = """
 El umbral de consignaciones tiene un calificador que decide el caso y que se
-omite con frecuencia: el art. 437 par. 3 num. 6 dice «consignaciones
-bancarias, depósitos o inversiones financieras PROVENIENTES DE ACTIVIDADES
-GRAVADAS CON EL IMPUESTO SOBRE LAS VENTAS -IVA».
+omite con frecuencia: el art. 437 par. 3 num. 6 se refiere a las
+consignaciones bancarias, depósitos o inversiones financieras PROVENIENTES DE
+ACTIVIDADES GRAVADAS con el impuesto sobre las ventas.
+
+⚠ Esta redacción es un RESUMEN, no una transcripción. Antes iba entre
+guillemets sin que nadie hubiera abierto la fuente. Si vas a citarla literal,
+abre el ET art. 437 en el normograma de la DIAN, compara carácter por
+carácter y marca `url_verificada = true` — el test
+`test_toda_cita_literal_declara_su_url_verificada` te lo va a exigir.
 
 O sea que NO cuenta todo lo que entró a la cuenta. Un traslado entre cuentas
 propias, un préstamo recibido o dinero de terceros en tránsito no provienen

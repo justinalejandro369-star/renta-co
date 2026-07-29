@@ -984,3 +984,101 @@ class TestPlantillasContraElMotor(unittest.TestCase):
         self.assertIn("R-02", texto,
                       "la cifra de contratistas no dice de dónde sale")
         self.assertIn("costos.pagos_a_contratistas", texto)
+
+
+class TestCitasNormativas(unittest.TestCase):
+    """Una cita fabricada es el peor error que puede cometer este repo.
+
+    Pasó: `[topes.costos_por_tipo_de_renta]` traía, entre guillemets y como
+    si fuera texto normativo, una frase que NO existe en el Decreto 2231, con
+    una URL que devuelve «norma no disponible». Se escribió de memoria y
+    nadie la abrió.
+
+    `test_cada_tope_tiene_fuente` no lo vio porque solo comprueba que el
+    campo `fuente` no esté vacío. Estas guardas miran lo que de verdad
+    importa: que una cita ENTRE GUILLEMETS venga con la URL marcada como
+    verificada, y que un bloque cuyo motor no implementa la norma lo diga.
+    """
+
+    def _bloques(self, anio=2025):
+        import tomllib
+
+        with open(RAIZ / "knowledge" / f"ag{anio}" / "parametros.toml", "rb") as f:
+            datos = tomllib.load(f)
+        bloques = {}
+
+        def recorrer(nodo, ruta=""):
+            if not isinstance(nodo, dict):
+                return
+            if "fuente" in nodo or "nota" in nodo:
+                bloques[ruta] = nodo
+            for k, v in nodo.items():
+                recorrer(v, f"{ruta}.{k}" if ruta else k)
+
+        recorrer(datos)
+        return bloques
+
+    def test_toda_cita_literal_declara_su_url_verificada(self):
+        """Las comillas angulares son una afirmación fuerte: «esto lo dice la
+        norma». Quien la escriba tiene que haber abierto la fuente."""
+        sin_verificar = []
+        for ruta, bloque in self._bloques().items():
+            nota = bloque.get("nota", "")
+            if "«" not in str(nota):
+                continue
+            if not bloque.get("url_verificada"):
+                sin_verificar.append(ruta)
+        self.assertEqual(
+            sin_verificar, [],
+            "estos bloques citan texto entre guillemets sin declarar "
+            "`url_verificada = true`. Abre la fuente, compara la cita "
+            "carácter por carácter, y solo entonces marca la bandera",
+        )
+
+    def test_ninguna_url_de_knowledge_apunta_a_la_pagina_de_error(self):
+        """La URL que se citaba redirigía a `norma_error.php`. Sin red no se
+        puede comprobar que resuelva, pero sí que no sea una de las formas
+        conocidas de estar rota."""
+        rotas = []
+        for anio in (2025, 2026):
+            for ruta, bloque in self._bloques(anio).items():
+                url = str(bloque.get("url", ""))
+                if not url:
+                    continue
+                if "norma_error" in url or url.endswith("i=") or " " in url:
+                    rotas.append(f"ag{anio}:{ruta} → {url}")
+        self.assertEqual(rotas, [], "URLs mal formadas en knowledge/")
+
+    def test_lo_que_el_motor_no_implementa_bien_esta_marcado(self):
+        """Un bloque puede documentar la norma correctamente y que el motor
+        todavía no la siga. Eso no se esconde: se declara, y el borrador tiene
+        que decirlo. Si alguien pone la bandera en `true`, este test lo
+        obliga a borrar también la advertencia de la nota."""
+        for ruta, bloque in self._bloques().items():
+            if "motor_implementa_correctamente" not in bloque:
+                continue
+            declara = bloque["motor_implementa_correctamente"]
+            if declara:
+                continue
+            self.assertIn(
+                "⚠⚠", str(bloque.get("nota", "")),
+                f"{ruta}: dice que el motor no implementa bien la norma y la "
+                f"nota no lo advierte de entrada",
+            )
+
+    def test_lo_que_el_motor_no_implementa_bien_llega_a_la_salida(self):
+        """Una bandera que no mira nadie no es una defensa.
+
+        Es la lección que ya costó una ronda entera: `ledger.validar()`
+        producía buenos avisos y nadie los leía. `motor_implementa_correcta-
+        mente = false` tiene que salir en pantalla, no quedarse en un TOML.
+        """
+        par = P.cargar(2025)
+        avisos = " ".join(par.advertencias())
+        pendientes = [r for r, b in self._bloques().items()
+                      if b.get("motor_implementa_correctamente") is False]
+        self.assertTrue(pendientes, "sin bloques marcados esto no prueba nada")
+        for ruta in pendientes:
+            self.assertIn(ruta, avisos,
+                          f"{ruta} está marcado como no implementado y el "
+                          f"motor no lo advierte al calcular")

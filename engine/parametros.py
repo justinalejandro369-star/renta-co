@@ -98,7 +98,42 @@ class Parametros:
                 "La tabla de plazos día-por-día no está cargada. Verifica tu fecha "
                 "exacta en el portal de la DIAN antes de tomarla como definitiva."
             )
+        avisos += self._pendientes_de_implementar()
         return avisos
+
+    def _pendientes_de_implementar(self) -> list[str]:
+        """Bloques donde knowledge/ documenta la norma y el motor no la sigue.
+
+        Existen porque verificar una cita contra la fuente primaria y
+        reescribir el motor son dos trabajos distintos, y el primero no puede
+        quedar bloqueado por el segundo: un knowledge correcto con el motor
+        atrasado es mejor que los dos mal.
+
+        Pero la divergencia NO se puede quedar en un TOML que nadie abre.
+        Sale acá, y de acá va al encabezado de `calcular`. Es la lección que
+        ya costó una ronda: `ledger.validar()` producía buenos avisos y nadie
+        los miraba, y 17.550.000 COP sin clasificar salían con exit 0. Cada
+        vez que agregues una defensa, pregúntate quién la mira.
+        """
+        pendientes = []
+
+        def recorrer(nodo, ruta=""):
+            if not isinstance(nodo, dict):
+                return
+            if nodo.get("motor_implementa_correctamente") is False:
+                pendientes.append(ruta)
+            for k, v in nodo.items():
+                recorrer(v, f"{ruta}.{k}" if ruta else k)
+
+        recorrer(self._d)
+        return [
+            f"El motor NO implementa correctamente la norma de «{ruta}». La "
+            f"cita verificada y en qué se aparta el cálculo están en la nota "
+            f"de ese bloque en knowledge/ag{self.anio_gravable}/"
+            f"parametros.toml. Ese renglón del borrador NO sirve para una "
+            f"declaración real sin contador."
+            for ruta in sorted(pendientes)
+        ]
 
 
 def _leer_toml(ruta: Path) -> dict:

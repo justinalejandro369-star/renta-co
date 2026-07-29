@@ -219,6 +219,36 @@ def _forma(t: str) -> tuple[list[str], list[str], list[int]] | None:
 SIN_FRACCION_SIGNIFICATIVA = {"COP", "CLP", "PYG", "IDR", "VND", "KRW", "JPY"}
 
 
+def _decimal_por_tipo(seps: list[str]) -> list[int]:
+    """Índice del separador decimal cuando lo delata su TIPO, no su longitud.
+
+    Tres decimales CON separador de miles —"1,234.500", "1.234,500"— tienen
+    todos los grupos de tres dígitos, así que `_forma` no ve ningún decimal y
+    el número caía en «mezcla puntos y comas como separadores de miles».
+
+    Lo desambigua el tipo: los separadores de miles de un número son todos
+    iguales, así que un último separador distinto de los anteriores solo
+    puede ser el decimal.
+
+    **Vive acá, en una sola función, porque la primera versión de esta regla
+    se escribió dentro de `parse_monto` y NO en `convencion_del_archivo`.**
+    El resultado fue peor que no haberla escrito: el votante seguía metiendo
+    la coma Y el punto en `miles`, así que tiraba la evidencia más fuerte del
+    archivo, devolvía `None` sin un solo aviso, y en ese mismo archivo
+    "2.500" pasaba de leerse como 2,5 a leerse como 2.500 — factor mil, con
+    código de salida 0. Antes del arreglo a medias, esa fila fallaba
+    ruidosamente y salía 1.
+
+    Es literalmente la ley de este proyecto: los hallazgos más graves de cada
+    ronda son arreglos de la ronda anterior aplicados a medias. Si vas a
+    agregar una señal nueva de desambiguación, agrégala acá y comprueba que
+    los dos lados la usen.
+    """
+    if len(seps) > 1 and seps[-1] != seps[0] and len(set(seps[:-1])) == 1:
+        return [len(seps) - 1]
+    return []
+
+
 def _relleno_de_ceros(entero: str) -> bool:
     """¿La parte entera viene rellena con ceros a la izquierda?
 
@@ -331,20 +361,7 @@ def parse_monto(texto: str, sep_decimal: str | None = None,
     if not decimales and len(seps) == 1:
         decimales = _resolver_ambiguo(grupos[0], seps[0], sep_decimal, moneda)
 
-    # Tres decimales CON separador de miles: "1,234.500" y "1.234,500".
-    # Todos los grupos miden tres, así que la LONGITUD no dice nada y el
-    # número caía en "mezcla puntos y comas como separadores de miles".
-    # Falla ruidosamente —la fila se salta y se cuenta, no produce un número
-    # malo— pero es un formato legítimo que quedaba sin leer.
-    #
-    # Lo desambigua el TIPO: los separadores de miles de un número son todos
-    # iguales, así que un último separador distinto de los anteriores solo
-    # puede ser el decimal. La señal es de la misma clase que las otras tres
-    # de `_resolver_ambiguo`: sale de la estructura del propio número y no de
-    # una convención supuesta.
-    if (not decimales and len(seps) > 1
-            and seps[-1] != seps[0] and len(set(seps[:-1])) == 1):
-        decimales = [len(seps) - 1]
+    decimales = decimales or _decimal_por_tipo(seps)
 
     if len(decimales) > 1:
         raise malo("hay más de un separador decimal")
@@ -415,6 +432,14 @@ def convencion_del_archivo(valores) -> tuple[str | None, list[str]]:
         # Un token malformado no vota: "1.2.3" no dice nada de la convención.
         if len(idx) > 1 or (idx and idx[0] != len(seps) - 1):
             continue
+        # La MISMA regla que usa `parse_monto`, desde la misma función. Este
+        # `or` es el arreglo de una regresión propia: la señal del tipo se
+        # escribió solo en el parser, así que acá "1,234.500" metía la coma Y
+        # el punto en `miles`, se tiraba la evidencia más fuerte del archivo,
+        # se devolvía None SIN AVISO, y en ese mismo archivo "2.500" pasaba
+        # de leerse 2,5 a leerse 2.500. Factor mil, con código de salida 0 —
+        # y antes de "arreglar" el parser esa fila fallaba ruidosamente.
+        idx = idx or _decimal_por_tipo(seps)
         if idx:
             decimales.add(seps[-1])
             miles.update(seps[:-1])
