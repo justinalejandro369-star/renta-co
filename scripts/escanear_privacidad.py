@@ -65,6 +65,14 @@ IGNORAR_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules",
                 ".pytest_cache", ".ruff_cache"}
 
 ARCHIVO_IGNORADOS = ".privacidadignore"
+
+# El inventario es un REPORTE de hallazgos, así que sus líneas tienen la
+# forma de lo que reporta: el escáner se gritaba a sí mismo sobre su propia
+# salida —tercera vez que pasa en este proyecto— y además se habría
+# inventariado a sí mismo, creciendo en cada regeneración. Está en
+# .privacidadignore y se salta acá: no es un archivo fuente, es una vista
+# enmascarada de archivos que ya están inventariados línea por línea.
+ARCHIVO_INVENTARIO = "privacidad-esperado.txt"
 MAX_BYTES = 8 * 1024 * 1024
 
 TABULARES = {".csv", ".tsv"}
@@ -281,23 +289,49 @@ def normalizar(texto: str) -> str:
     return sin_tildes.lower()
 
 
+# Secciones de primer nivel del perfil donde una cadena PUEDE ser el nombre
+# de una persona. Fuera de ellas, `nombre` significa otra cosa: en
+# [[patrimonio.activos]] significa "Apartamento en Chapinero" y "Reconocimiento
+# inicial USD", que es de donde salían los tokens `art`, `trm` y `usd`.
+SECCIONES_DE_PERSONAS = {
+    "contribuyente", "personas", "dependientes", "contratistas", "conyuge",
+    "conyuge_o_companero", "titulares",
+}
+
+# Y dentro de esas secciones, solo estas claves. `nombre` a secas en
+# [contribuyente] sí es una persona; `nota`, `descripcion` o `fuente` no.
+CLAVES_DE_PERSONA = re.compile(
+    r"^(?:nombres?|apellidos?|nombre_completo|titular(?:es)?|"
+    r"c[oó]nyuge|companer[oa]|compañer[oa]|hijos?|madre|padre|padres|"
+    r"hermanos?|dependientes?|contratistas?|beneficiarios?)$",
+    re.IGNORECASE,
+)
+
+
 def nombres_del_perfil(ruta: Path | None) -> list[str]:
     """Tokens de nombre propio del perfil, normalizados.
 
     Acepta tokens de 3 caracteres ('Ana', 'Luz'), parte los apellidos
     compuestos por guion, y no exige mayúscula inicial: un perfil escrito
     en minúscula sigue protegido.
+
+    La versión anterior recorría CUALQUIER clave que empatara
+    `nombre|titular|…` sin mirar dónde estaba. Como `perfil.toml` usa
+    `nombre` para los ACTIVOS del patrimonio, sobre el propio ejemplo del
+    repo extraía los tokens `art`, `trm`, `usd`, `inicial` y `reconocimiento`
+    y reportaba 12 falsos positivos de confianza ALTA en el README. Una
+    detección con esa tasa de ruido no se vuelve a usar, y es la ÚNICA
+    detección de nombres propios que existe: el ruido no la degradaba, la
+    apagaba.
+
+    Ahora la clave tiene que estar en una sección de PERSONAS y llamarse
+    como una persona. Las dos condiciones a la vez, no una.
     """
     if not ruta or not ruta.exists():
         return []
     with open(ruta, "rb") as f:
         datos = tomllib.load(f)
 
-    CLAVES = re.compile(
-        r"nombre|apellido|titular|conyuge|c[oó]nyuge|dependiente|hijo|"
-        r"madre|padre|hermano|contratista|beneficiario|contribuyente",
-        re.IGNORECASE,
-    )
     COMUNES = {
         "los", "las", "del", "para", "con", "sin", "por", "que", "una", "uno",
         "cuenta", "banco", "ahorros", "tarjeta", "credito", "saldo", "wallet",
@@ -306,20 +340,32 @@ def nombres_del_perfil(ruta: Path | None) -> list[str]:
 
     tokens: set[str] = set()
 
-    def recorrer(nodo, clave_padre=""):
+    def cosechar(valor: str):
+        for palabra in re.split(r"[\s\-]+", valor):
+            limpia = normalizar(palabra.strip(".,;:()\"'"))
+            if len(limpia) >= 3 and limpia.isalpha() and limpia not in COMUNES:
+                tokens.add(limpia)
+
+    def recorrer(nodo, clave=""):
+        """Baja por el árbol de UNA sección de personas.
+
+        Dentro de ella se aceptan las claves de persona a cualquier
+        profundidad, para que `[[personas]] nombre = "..."` y
+        `[contribuyente] nombre = "..."` funcionen igual.
+        """
         if isinstance(nodo, dict):
             for k, v in nodo.items():
                 recorrer(v, k)
         elif isinstance(nodo, list):
             for v in nodo:
-                recorrer(v, clave_padre)
-        elif isinstance(nodo, str) and CLAVES.search(clave_padre):
-            for palabra in re.split(r"[\s\-]+", nodo):
-                limpia = normalizar(palabra.strip(".,;:()\"'"))
-                if len(limpia) >= 3 and limpia.isalpha() and limpia not in COMUNES:
-                    tokens.add(limpia)
+                recorrer(v, clave)
+        elif isinstance(nodo, str) and CLAVES_DE_PERSONA.fullmatch(clave):
+            cosechar(nodo)
 
-    recorrer(datos)
+    for seccion, contenido in datos.items():
+        if normalizar(seccion) in SECCIONES_DE_PERSONAS:
+            recorrer(contenido, seccion)
+
     return sorted(tokens)
 
 
@@ -675,6 +721,57 @@ def escanear_indice(nombres) -> tuple[list[tuple[str, list]], int]:
 
 # ---------------------------------------------------------------------
 
+# Formas que un caso de prueba o un docstring de formato produce de por sí:
+# los tests traen cédulas de laboratorio y el parser documenta cada formato
+# de monto con un ejemplo. No entran al inventario porque lo llenarían de
+# ruido y lo volverían inútil, que es lo mismo que le pasó a `--perfil`.
+FORMAS_DE_LABORATORIO = {
+    "cédula", "cédula o monto", "cédula o documento",
+    "cédula corta o extranjería", "cuenta o identificador largo",
+    "cuenta bancaria", "NIT", "tarjeta",
+}
+
+
+def inventario_de_lo_excluido(raiz: Path) -> list[str]:
+    """Lo que hay en los archivos que `.privacidadignore` deja fuera.
+
+    El modo estricto sale 1 A PROPÓSITO, así que CI nunca lo pudo usar como
+    compuerta y los archivos excluidos quedaron sin ninguna revisión
+    automática. Ahí fue justo donde se coló una ruta HOME real.
+
+    La salida no es exigir cero: es exigir que lo que hay esté INVENTARIADO,
+    y que cualquier línea nueva rompa el build. Sin número de línea, para que
+    agregar un test arriba no mueva el inventario entero.
+    """
+    globs = globs_ignorados(raiz, estricto=False)
+    excluidos = sorted(
+        a for a in archivos_de([str(raiz)])
+        if esta_ignorado(a, globs, raiz) and a.name != ARCHIVO_INVENTARIO
+    )
+    filas = set()
+    for archivo in excluidos:
+        for _, etiqueta, muestra, confianza in escanear(archivo):
+            if confianza != "alta" or etiqueta in FORMAS_DE_LABORATORIO:
+                continue
+            filas.add(f"{archivo.relative_to(raiz)} · {etiqueta} · {muestra}")
+    return sorted(filas)
+
+
+def imprimir_inventario(raiz: Path) -> int:
+    print("# Línea base de scripts/escanear_privacidad.py --inventario.")
+    print("#")
+    print("# Lo que los archivos de .privacidadignore contienen HOY, sin las")
+    print("# formas que un caso de prueba produce de por sí. Cualquier línea")
+    print("# nueva rompe el build: mírala antes de regenerar este archivo.")
+    print("#")
+    print("# Regenerar:")
+    print("#   python3 scripts/escanear_privacidad.py --inventario > \\")
+    print("#       scripts/privacidad-esperado.txt")
+    for fila in inventario_de_lo_excluido(raiz):
+        print(fila)
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description="Busca datos personales antes de compartir o commitear."
@@ -688,7 +785,14 @@ def main(argv=None) -> int:
                     help="Ignorar .privacidadignore. Lo que usa CI")
     ap.add_argument("--mostrar-baja", action="store_true",
                     help="Listar también los hallazgos de confianza baja")
+    ap.add_argument("--inventario", action="store_true",
+                    help="Imprimir la línea base de lo que hay en los "
+                         "archivos de .privacidadignore. Ver "
+                         "scripts/privacidad-esperado.txt")
     args = ap.parse_args(argv)
+
+    if args.inventario:
+        return imprimir_inventario(Path.cwd())
 
     nombres = nombres_del_perfil(args.perfil)
     if args.perfil and not nombres:

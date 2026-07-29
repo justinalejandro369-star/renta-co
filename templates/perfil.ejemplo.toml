@@ -25,6 +25,30 @@ residente_fiscal = true
 # motor prefiere decir que no puede concluir a suponer que no.
 # es_comerciante = false
 
+# Tu nombre. El motor NO lo usa para calcular nada: lo lee el escáner de
+# privacidad cuando lo corres con --perfil, para poder encontrarlo en los
+# entregables ANTES de que salgan hacia el contador o hacia un issue.
+#
+#     python3 scripts/escanear_privacidad.py --perfil <expediente>/perfil.toml .
+#
+# Sin este campo, esa detección no tiene qué buscar y queda apagada — te lo
+# dice con un aviso. Escribe nombre y apellidos completos.
+# nombre = "Nombre Apellido Apellido"
+
+# ── Las otras personas que salen en tus documentos ────────────────────
+# Tampoco las usa el motor, y por la misma razón que el campo de arriba:
+# los nombres de tus contratistas, tu cónyuge y tus dependientes aparecen
+# en los extractos y en el ledger, y el escáner no puede buscar lo que no
+# sabe que existe.
+#
+# [personas]
+# conyuge      = "Nombre Apellido"
+# madre        = "Nombre Apellido"
+# padre        = "Nombre Apellido"
+# hijos        = ["Nombre Apellido", "Nombre Apellido"]
+# hermanos     = ["Nombre Apellido"]
+# contratistas = ["Nombre Apellido", "Nombre Apellido"]
+
 # ── Ingresos ──────────────────────────────────────────────────────────
 [ingresos]
 # Honorarios, compensación por servicios personales, prestación de servicios.

@@ -24,6 +24,10 @@ Un expediente tributario es de lo más sensible que hay: cédula, patrimonio, mo
 
 Con `--perfil` también busca los nombres propios que aparezcan en el perfil, que es lo que un patrón genérico nunca va a atrapar.
 
+Para que esa búsqueda tenga qué buscar, el perfil necesita un campo `nombre` en `[contribuyente]` y, si aplica, un bloque `[personas]` con cónyuge, padres, hijos y contratistas. Si no están, el escáner lo dice —«El perfil no aportó nombres»— y esa detección queda apagada. **Es la única que encuentra nombres propios: sin ella, un memo que diga «lo firma Fulanito Pérez» sale limpio.**
+
+Solo se leen esas dos secciones. El `nombre` de un activo de `[patrimonio]` no es el nombre de una persona: mirarlo era lo que llenaba el reporte de tokens como `trm`, `usd` y `art`.
+
 ## Qué busca
 
 | Patrón | Ejemplo |

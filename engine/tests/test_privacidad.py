@@ -281,6 +281,83 @@ class TestRepositorio(unittest.TestCase):
         )
         del os
 
+    # El filtro de formas y el recorrido viven en el escáner, no acá. Copiar
+    # la lógica al test es la misma clase de divergencia que ya costó una
+    # ronda: dos copias, se actualiza una, y la que queda vieja es la que
+    # decide si el build pasa.
+    FORMAS_ESPERABLES = esc.FORMAS_DE_LABORATORIO
+    INVENTARIO = RAIZ / "scripts" / "privacidad-esperado.txt"
+
+    def test_lo_excluido_esta_inventariado_y_no_crece_solo(self):
+        """La compuerta que faltaba sobre `.privacidadignore`.
+
+        No se puede exigir que `--estricto` salga 0: los archivos excluidos
+        traen cédulas de PRUEBA a propósito, y por eso CI nunca lo corrió
+        como gate. Pero eso los dejó sin NINGUNA revisión automática, y ahí
+        fue exactamente donde se coló la ruta HOME real (ver el test de
+        arriba).
+
+        La salida no es exigir cero: es exigir que lo que hay esté
+        INVENTARIADO. Las formas que un caso de prueba produce de por sí
+        —cédulas, cuentas, NIT— se filtran; lo demás —correos, direcciones,
+        teléfonos, rutas de usuario, IBAN— queda congelado en
+        `scripts/privacidad-esperado.txt`. Cualquier línea nueva rompe el
+        build y obliga a mirarla.
+
+        Regenerarlo es una decisión visible en el diff:
+
+            python3 scripts/escanear_privacidad.py --inventario > \\
+                scripts/privacidad-esperado.txt
+
+        Corre SIEMPRE, sin bandera, en las tres versiones de Python de CI.
+        """
+        self.assertTrue(
+            self.INVENTARIO.exists(),
+            f"falta {self.INVENTARIO.relative_to(RAIZ)}; genéralo con "
+            f"`python3 scripts/escanear_privacidad.py --inventario`",
+        )
+        esperado = [
+            l for l in self.INVENTARIO.read_text(encoding="utf-8").splitlines()
+            if l.strip() and not l.startswith("#")
+        ]
+        obtenido = esc.inventario_de_lo_excluido(RAIZ)
+
+        nuevos = [l for l in obtenido if l not in esperado]
+        self.assertEqual(
+            nuevos, [],
+            "un archivo excluido de .privacidadignore trae un dato que el "
+            "inventario no conocía. .privacidadignore silencia los montos y "
+            "las cédulas de laboratorio, no esto. Míralo ANTES de regenerar "
+            f"el inventario: {nuevos[:5]}",
+        )
+        sobran = [l for l in esperado if l not in obtenido]
+        self.assertEqual(
+            sobran, [],
+            "el inventario tiene líneas que ya no existen. Regenéralo para "
+            f"que siga sirviendo de línea base: {sobran[:5]}",
+        )
+
+    def test_el_inventario_es_capaz_de_fallar(self):
+        """Una aserción que no puede fallar no es una aserción. Se comprueba
+        contra el mecanismo real —`escanear` sobre un archivo de verdad— y no
+        contra una lista inventada."""
+        ruta = Path(tempfile.mkdtemp()) / "excluido.py"
+        ruta.write_text(
+            '# ejemplo: escribeme@bufete-ficticio.com.co\n', encoding="utf-8"
+        )
+        etiquetas = {
+            e for _, e, _, c in esc.escanear(ruta)
+            if c == "alta" and e not in self.FORMAS_ESPERABLES
+        }
+        self.assertIn("correo", etiquetas)
+        self.assertNotIn(
+            "correo", {l.split(" · ")[1] for l in
+                       self.INVENTARIO.read_text(encoding="utf-8").splitlines()
+                       if " · " in l and "test_privacidad" not in l},
+            "si esa etiqueta ya estuviera inventariada fuera de los tests, "
+            "el inventario no probaría nada",
+        )
+
 
 class TestUmbralAcumulado(unittest.TestCase):
     """Medir cada glob contra el total dejaba pasar varios globs pequeños
@@ -617,3 +694,89 @@ class TestHookDePreCommit(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNombresDelPerfil(unittest.TestCase):
+    """`--perfil` era inusable por ruido: sobre el propio ejemplo del repo
+    extraía los tokens `art`, `trm`, `usd`, `inicial` y `reconocimiento` y
+    reportaba 12 falsos positivos ALTA en el README.
+
+    La causa: recorría cualquier clave que empatara `nombre|titular|…` sin
+    mirar dónde estaba, y `perfil.toml` usa `nombre` para los ACTIVOS del
+    patrimonio. Como es la ÚNICA detección de nombres propios que existe, el
+    ruido no la degradaba: la apagaba.
+    """
+
+    def _perfil(self, texto: str) -> Path:
+        ruta = Path(tempfile.mkdtemp()) / "perfil.toml"
+        ruta.write_text(texto, encoding="utf-8")
+        return ruta
+
+    def test_el_nombre_de_un_activo_no_es_el_nombre_de_una_persona(self):
+        ruta = self._perfil(
+            '[contribuyente]\nnombre = "Yamile Restrepo"\n'
+            '[[patrimonio.activos]]\n'
+            'nombre = "Reconocimiento inicial USD segun art. 288"\n'
+            'valor = 350000000\n'
+        )
+        tokens = esc.nombres_del_perfil(ruta)
+        self.assertIn("yamile", tokens)
+        self.assertIn("restrepo", tokens)
+        for ruido in ("reconocimiento", "inicial", "usd", "art", "segun"):
+            self.assertNotIn(ruido, tokens, f"'{ruido}' es vocabulario, no un nombre")
+
+    def test_el_ejemplo_del_repo_no_produce_ni_un_token_de_vocabulario(self):
+        """La aserción sobre el archivo REAL, no sobre uno de laboratorio:
+        es el que produjo los 94 falsos positivos del hallazgo."""
+        tokens = esc.nombres_del_perfil(RAIZ / "expediente.ejemplo" / "perfil.toml")
+        self.assertTrue(tokens, "el ejemplo tiene que aportar nombres, o la "
+                                "detección queda muerta en el flujo real")
+        for ruido in ("trm", "usd", "art", "cop", "banco", "wallet",
+                      "inmueble", "vehiculo", "avaluo"):
+            self.assertNotIn(ruido, tokens)
+
+    def test_los_nombres_de_las_otras_personas_tambien_se_recogen(self):
+        ruta = self._perfil(
+            '[personas]\n'
+            'madre = "Amparo Osorno"\n'
+            'contratistas = ["Nicolás Betancur", "Sebastián Zuluaga"]\n'
+        )
+        tokens = esc.nombres_del_perfil(ruta)
+        for esperado in ("amparo", "osorno", "nicolas", "betancur",
+                         "sebastian", "zuluaga"):
+            self.assertIn(esperado, tokens)
+
+    def test_una_nota_dentro_de_una_seccion_de_personas_no_cuenta(self):
+        """Las dos condiciones a la vez —sección de personas Y clave de
+        persona— y no una de las dos."""
+        ruta = self._perfil(
+            '[contribuyente]\n'
+            'nombre = "Yamile Restrepo"\n'
+            'nota = "verificar residencia fiscal antes de declarar"\n'
+        )
+        tokens = esc.nombres_del_perfil(ruta)
+        self.assertIn("yamile", tokens)
+        self.assertNotIn("residencia", tokens)
+        self.assertNotIn("verificar", tokens)
+
+    def test_una_clave_de_persona_fuera_de_su_seccion_tampoco(self):
+        ruta = self._perfil(
+            '[[patrimonio.pasivos]]\n'
+            'titular = "Banco Ficticio de Colombia"\n'
+            'valor = 48000000\n'
+        )
+        self.assertEqual(esc.nombres_del_perfil(ruta), [])
+
+    def test_un_nombre_del_perfil_sigue_rompiendo_el_build(self):
+        """El arreglo del ruido no puede haber apagado la detección."""
+        hallazgos = escanear_texto(
+            "El memo lo firma Yamile Restrepo el 15 de octubre.",
+            nombres=["yamile", "restrepo"],
+        )
+        altas = [h for h in hallazgos if h[3] == "alta"]
+        self.assertEqual(len(altas), 2, hallazgos)
+        self.assertTrue(all(h[1] == "nombre del perfil" for h in altas))
+
+    def test_el_nombre_sale_enmascarado_en_el_reporte(self):
+        hallazgos = escanear_texto("Firma: Yamile", nombres=["yamile"])
+        self.assertEqual(hallazgos[0][2], "y*****")

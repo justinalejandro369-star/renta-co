@@ -18,6 +18,19 @@ residente_fiscal = true
 # Desarrolladora independiente: presta servicios profesionales, que NO son
 # actos de comercio (art. 20 C.Co.). Decide OBL-02.
 es_comerciante = false
+# Nombre INVENTADO. El motor no lo usa para nada: lo lee el escáner de
+# privacidad con `--perfil` para poder encontrarlo en los entregables antes
+# de que salgan al contador o a un issue.
+nombre = "Yamile Restrepo Osorno"
+
+# ── Las otras personas del expediente ─────────────────────────────────
+# Tampoco las usa el motor. Están acá por la misma razón: sus nombres
+# aparecen en los extractos y en el ledger, y el escáner no puede buscar lo
+# que no sabe que existe. Todos inventados.
+[personas]
+conyuge = ""
+madre = "Amparo Osorno Quintero"
+contratistas = ["Nicolás Betancur Arango", "Sebastián Zuluaga Mejía"]
 
 # ── Ingresos ──────────────────────────────────────────────────────────
 # En pesos, ya convertidos con TRM diaria por engine/ledger.py.

@@ -19,3 +19,9 @@ scripts/escanear_privacidad.py
 
 # Este mismo archivo.
 .privacidadignore
+
+# Inventario de lo anterior. Es un REPORTE de hallazgos enmascarados, así
+# que sus líneas tienen la forma de lo que reporta. No es un archivo
+# fuente: cada línea suya corresponde a una línea ya inventariada de los
+# archivos de arriba. Ver test_lo_excluido_esta_inventariado_y_no_crece_solo.
+scripts/privacidad-esperado.txt

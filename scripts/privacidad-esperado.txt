@@ -1,0 +1,25 @@
+# Línea base de scripts/escanear_privacidad.py --inventario.
+#
+# Lo que los archivos de .privacidadignore contienen HOY, sin las
+# formas que un caso de prueba produce de por sí. Cualquier línea
+# nueva rompe el build: mírala antes de regenerar este archivo.
+#
+# Regenerar:
+#   python3 scripts/escanear_privacidad.py --inventario > \
+#       scripts/privacidad-esperado.txt
+engine/tests/test_privacidad.py · IBAN · ES9XXXXXXXXXXXXXXXXXX332
+engine/tests/test_privacidad.py · correo · e********@b******************.co
+engine/tests/test_privacidad.py · correo · j*********@b***************.co
+engine/tests/test_privacidad.py · correo · p******@e******.com
+engine/tests/test_privacidad.py · dirección · Calle 1XX #XX-XX Apto 301 Barrio C
+engine/tests/test_privacidad.py · dirección · Calle 4X #X2-34
+engine/tests/test_privacidad.py · ruta de usuario · /Users/f*******
+engine/tests/test_privacidad.py · ruta de usuario · /home/m************
+engine/tests/test_privacidad.py · ruta de usuario · C:\Users\J********
+engine/tests/test_privacidad.py · teléfono fijo · (6XX) XXX X566
+engine/tests/test_privacidad.py · teléfono fijo · +5X XXX XXXX455
+engine/tests/test_privacidad.py · teléfono fijo · 6XX XXX X900
+engine/tests/test_privacidad.py · teléfono · +5X XXX XXXX567
+scripts/escanear_privacidad.py · dirección · Calle 1XX #XX-XX Apto 301 Barrio C
+scripts/escanear_privacidad.py · dirección · Calle XXX #XX-XX Apto XXX Barrio
+scripts/escanear_privacidad.py · ruta de usuario · /Users/f*******

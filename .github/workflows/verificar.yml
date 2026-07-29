@@ -47,20 +47,86 @@ jobs:
       - name: Sin datos personales en el árbol
         run: python3 scripts/escanear_privacidad.py .
 
-      - name: Sin datos personales en los commits del PR
-        if: github.event_name == 'pull_request'
+      - name: Sin datos personales en los commits nuevos
+        # SIN condición de evento, a propósito. Estaba en
+        # `if: github.event_name == 'pull_request'`, y este proyecto se
+        # desarrolla con push directo a main: en 40 commits este paso no
+        # corrió NUNCA. Un paso de CI que nadie ha visto fallar no es una
+        # compuerta, es una decoración — y es justo el que atrapa el dato
+        # que se agrega en un commit y se borra en el siguiente, que deja
+        # el árbol limpio y la historia sucia para siempre.
         run: |
           set -u
-          BASE="origin/${{ github.base_ref }}"
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          # Las líneas AGREGADAS por el PR, sin el prefijo '+' del diff.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            RANGO="origin/${{ github.base_ref }}..HEAD"
+          else
+            ANTES="${{ github.event.before }}"
+            # En el primer push de una rama, `before` es el SHA de ceros y no
+            # existe como objeto. Se detecta preguntándole a git si el objeto
+            # existe, y NO comparando contra el literal de cuarenta ceros:
+            # esa cadena tiene forma de identificador largo y el escáner de
+            # este mismo workflow la reportaba como dato personal ALTA. El
+            # paso se rompía a sí mismo con su propio código fuente.
+            if [ -z "$ANTES" ] || ! git cat-file -e "${ANTES}^{commit}" 2>/dev/null; then
+              if git rev-parse HEAD~1 >/dev/null 2>&1; then
+                RANGO="HEAD~1..HEAD"
+              else
+                RANGO="HEAD"
+              fi
+            else
+              RANGO="${ANTES}..HEAD"
+            fi
+          fi
+          echo "Revisando el rango $RANGO"
+          # Las líneas de todos los archivos llegan concatenadas en UNO, así
+          # que `.privacidadignore` —que filtra por ruta— no se puede aplicar
+          # después. Se aplica antes, como pathspec de git.
+          #
+          # Sin esto el paso fallaría en casi cualquier commit que toque los
+          # tests: traen cédulas de laboratorio a propósito, que es
+          # exactamente lo que ese archivo existe para silenciar. Esos
+          # archivos NO quedan sin revisar: los cubre el inventario del paso
+          # siguiente.
+          #
+          # Los pathspec van en los parámetros posicionales, no en una
+          # variable con espacios: una cadena sin comillas se parte en bash
+          # y NO se parte en zsh, así que probarlo en un Mac daba verde
+          # mientras CI hacía otra cosa. Con `set --` se comporta igual en
+          # los dos.
+          set -- .
+          while IFS= read -r g; do
+            case "$g" in ''|\#*) continue ;; esac
+            set -- "$@" ":(exclude,glob)$g"
+          done < .privacidadignore
+          echo "Pathspec: $*"
           # `grep` devuelve 1 cuando no encuentra nada, que acá es el caso
           # bueno: por eso no se usa `set -e` ni `pipefail` en este bloque.
-          git log -p "$BASE..HEAD" -- . \
+          git log -p "$RANGO" -- "$@" \
             | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//' \
-            > /tmp/pr-agregado.txt || true
-          echo "Líneas agregadas por el PR: $(wc -l < /tmp/pr-agregado.txt)"
-          python3 scripts/escanear_privacidad.py /tmp/pr-agregado.txt
+            > /tmp/agregado.txt || true
+          echo "Líneas agregadas: $(wc -l < /tmp/agregado.txt)"
+          python3 scripts/escanear_privacidad.py /tmp/agregado.txt
+
+      - name: El inventario de lo excluido está al día
+        # `--estricto` sale 1 A PROPÓSITO —los tests traen cédulas de
+        # prueba— así que nunca se pudo usar como compuerta, y eso dejó los
+        # archivos de .privacidadignore sin ninguna revisión automática.
+        # Ahí fue justo donde se coló una ruta HOME real.
+        #
+        # La compuerta no es exigir cero: es exigir que lo que hay esté
+        # inventariado. El test lo verifica en las tres versiones de Python
+        # del otro job; acá se comprueba además que el archivo commiteado
+        # coincida con lo que produce el escáner hoy.
+        run: |
+          set -eu
+          python3 scripts/escanear_privacidad.py --inventario > /tmp/inventario.txt
+          if ! diff -u scripts/privacidad-esperado.txt /tmp/inventario.txt; then
+            echo "✗ scripts/privacidad-esperado.txt está desactualizado." >&2
+            echo "  MIRA el diff de arriba antes de regenerarlo:" >&2
+            echo "  python3 scripts/escanear_privacidad.py --inventario > scripts/privacidad-esperado.txt" >&2
+            exit 1
+          fi
 
       - name: El archivo de exclusiones no puede vaciar el escaneo
         run: |
