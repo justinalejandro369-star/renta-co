@@ -188,6 +188,62 @@ PERSONAS: list[dict] = [
             "deducciones.aportes_voluntarios": 189_236_200,
         },
     },
+
+    {
+        "id": "P15",
+        "nombre": "Mal año en honorarios, buen año en rendimientos",
+        "descripcion": "Facturó poco y gastó mucho en su actividad, pero "
+                       "recibió arriendos y rendimientos. Los dos tipos de "
+                       "renta conviven en la misma cédula.",
+        "espera": "El costo de la actividad NO se puede restar de la renta de "
+                  "capital: se topa en los ingresos de trabajo menos sus "
+                  "INCRNGO (Decreto 1625 art. 1.2.1.20.5). Antes del tope, "
+                  "este perfil declaraba $110 M de renta líquida en vez de "
+                  "$300 M, y pagaba $58 M de menos.",
+        "datos": {
+            "ingresos.rentas_trabajo_honorarios": 10_000_000,
+            "ingresos.rentas_capital": 300_000_000,
+            "costos.otros": 200_000_000,
+        },
+    },
+
+    {
+        "id": "P16",
+        "nombre": "Dos actividades a la vez, costos sin atribuir",
+        "descripcion": "Honorarios y rentas no laborales en el mismo año, sin "
+                       "bloque [costos.atribucion] en el perfil.",
+        "espera": "El motor NO adivina de cuál actividad son los costos: los "
+                  "deja sin topar y lo dice en R-11. Adivinar mal le subiría "
+                  "el impuesto a alguien que no lo debe.",
+        "datos": {
+            "ingresos.rentas_trabajo_honorarios": 80_000_000,
+            "ingresos.otras_rentas_no_laborales": 30_000_000,
+            "costos.pagos_a_contratistas": 50_000_000,
+            "costos.internet_software": 4_000_000,
+        },
+    },
+
+    {
+        "id": "P17",
+        "nombre": "Las mismas dos actividades, con la atribución declarada",
+        "descripcion": "Idéntico a P16 pero con [costos.atribucion] escrito: "
+                       "los contratistas son de la actividad no laboral, que "
+                       "solo facturó 30 M.",
+        "espera": "Ahora el techo sí muerde: de los 50 M de contratistas solo "
+                  "pasan 30 M. Renta líquida 76 M contra los 56 M de P16 — "
+                  "declarar la atribución CAMBIA el número, y por eso R-11 "
+                  "pide declararla en vez de que el motor la invente.",
+        "datos": {
+            "ingresos.rentas_trabajo_honorarios": 80_000_000,
+            "ingresos.otras_rentas_no_laborales": 30_000_000,
+            "costos.pagos_a_contratistas": 50_000_000,
+            "costos.internet_software": 4_000_000,
+            "costos.atribucion": {
+                "pagos_a_contratistas": "otras_rentas_no_laborales",
+                "internet_software": "rentas_trabajo_honorarios",
+            },
+        },
+    },
 ]
 
 
@@ -256,6 +312,42 @@ ANCLAS = [
         "razon": "Con 180 M de renta de trabajo y el tope libre: la vía del 10% "
                  "da min(18.000.000; 384 UVT = 19.122.816) = 18.000.000, contra "
                  "4 × 72 UVT = 14.342.112 de la otra. Gana el 10%.",
+    },
+    {
+        "id": "P15",
+        "ruta": "A",
+        "campo": "renta_liquida",
+        "esperado": 300_000_000,
+        "razon": "Ingresos 10.000.000 de trabajo + 300.000.000 de capital = "
+                 "310.000.000, sin INCRNGO. Los 200.000.000 de costos son de "
+                 "la actividad, y la única actividad con ingresos es la de "
+                 "trabajo: su techo es 10.000.000 − 0 = 10.000.000. Pasan "
+                 "10.000.000 y se rechazan 190.000.000, que NO se pueden "
+                 "restar de la renta de capital. 310.000.000 − 10.000.000 = "
+                 "300.000.000. Restando los costos completos daban "
+                 "110.000.000, o sea $58 M menos de impuesto.",
+    },
+    {
+        "id": "P16",
+        "ruta": "A",
+        "campo": "renta_liquida",
+        "esperado": 56_000_000,
+        "razon": "Dos actividades con ingresos y sin [costos.atribucion]: el "
+                 "motor no adivina de cuál son los 54.000.000 de costos, así "
+                 "que no les aplica techo. 110.000.000 − 54.000.000 = "
+                 "56.000.000. Es el lado seguro: topar sobre una atribución "
+                 "inventada cobraría impuesto que no se debe.",
+    },
+    {
+        "id": "P17",
+        "ruta": "A",
+        "campo": "renta_liquida",
+        "esperado": 76_000_000,
+        "razon": "Los mismos datos de P16 con la atribución declarada. Los "
+                 "50.000.000 de contratistas son de la renta no laboral, cuyo "
+                 "techo es 30.000.000: se rechazan 20.000.000. Los 4.000.000 "
+                 "de internet son de los honorarios, techo 80.000.000: pasan. "
+                 "110.000.000 − 34.000.000 = 76.000.000.",
     },
     {
         "id": "P07",

@@ -850,3 +850,178 @@ class TestClasificacionYSalidas(unittest.TestCase):
         with abrir_csv(ruta) as f:
             contenido = f.read()
         self.assertIn("RETENCIÓN", contenido)
+
+
+class TestTopeDeCostosPorTipoDeRenta(unittest.TestCase):
+    """Decreto 1625 art. 1.2.1.20.5 inciso final.
+
+    Los costos se topan POR TIPO DE RENTA, no contra la cédula. El motor los
+    restaba del total, así que una pérdida en honorarios se comía las rentas
+    de capital. Las aserciones son sobre la CLASE —cualquier par de tipos, en
+    cualquier orden— y no sobre el caso que se acababa de arreglar.
+    """
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+
+    def _perfil(self, **claves):
+        datos = {"contribuyente": {"anio_gravable": 2025, "residente_fiscal": True}}
+        for clave, valor in claves.items():
+            seccion, campo = clave.replace("__", ".").split(".", 1)
+            datos.setdefault(seccion, {})[campo] = valor
+        completos, supuestos = PF._completar(datos)
+        return PF.Perfil(completos, None, supuestos)
+
+    def test_el_costo_de_trabajo_no_se_resta_de_la_renta_de_capital(self):
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=10_000_000,
+            ingresos__rentas_capital=300_000_000,
+            costos__otros=200_000_000,
+        )
+        L = liquidar(p, self.par, "A")
+        # 310 M de ingresos, techo de trabajo = 10 M. Restar los costos
+        # completos daba 110 M.
+        self.assertEqual(L.renta_liquida, 300_000_000)
+        self.assertEqual(L.costos_rechazados_por_tipo, 190_000_000)
+
+    def test_el_costo_de_la_actividad_no_laboral_tampoco(self):
+        """La misma clase con el otro par de tipos, para que el arreglo no
+        quede atado al campo que lo motivó."""
+        p = self._perfil(
+            ingresos__otras_rentas_no_laborales=8_000_000,
+            ingresos__rentas_capital=150_000_000,
+            costos__arriendo_oficina=40_000_000,
+        )
+        L = liquidar(p, self.par, "A")
+        self.assertEqual(L.renta_liquida, 150_000_000)
+        self.assertEqual(L.costos_rechazados_por_tipo, 32_000_000)
+
+    def test_el_techo_descuenta_los_incrngo_de_ese_mismo_tipo(self):
+        """El techo es ingresos − INCRNGO del tipo, no ingresos a secas."""
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=100_000_000,
+            ingresos__rentas_capital=50_000_000,
+            incrngo__aportes_obligatorios_salud_pension=30_000_000,
+            costos__pagos_a_contratistas=100_000_000,
+        )
+        L = liquidar(p, self.par, "A")
+        # Techo de trabajo = 100 M − 30 M = 70 M. Se rechazan 30 M.
+        self.assertEqual(L.costos_rechazados_por_tipo, 30_000_000)
+        # 150 M − 30 M de INCRNGO − 70 M de costos = 50 M.
+        self.assertEqual(L.renta_liquida, 50_000_000)
+
+    def test_el_componente_inflacionario_baja_el_techo_de_capital(self):
+        """Cada INCRNGO baja el techo de SU tipo. Si todos bajaran el de
+        trabajo, el de capital quedaría inflado y dejaría pasar costos."""
+        p = self._perfil(
+            ingresos__rentas_capital=50_000_000,
+            incrngo__componente_inflacionario=20_000_000,
+            costos__otros=50_000_000,
+        )
+        L = liquidar(p, self.par, "A")
+        self.assertEqual(L.costos_rechazados_por_tipo, 20_000_000)
+
+    def test_un_solo_tipo_de_renta_no_cambia_nada(self):
+        """El caso normal del proyecto no se puede haber movido."""
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=200_000_000,
+            costos__pagos_a_contratistas=60_000_000,
+        )
+        L = liquidar(p, self.par, "A")
+        self.assertEqual(L.costos_rechazados_por_tipo, 0)
+        self.assertEqual(L.renta_liquida, 140_000_000)
+
+    def test_dos_actividades_sin_atribucion_no_se_topan_ni_se_adivinan(self):
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=80_000_000,
+            ingresos__otras_rentas_no_laborales=30_000_000,
+            costos__pagos_a_contratistas=50_000_000,
+        )
+        L = liquidar(p, self.par, "A")
+        self.assertEqual(L.costos_rechazados_por_tipo, 0)
+        self.assertEqual(L.costos_sin_atribuir, 50_000_000)
+        self.assertEqual(L.renta_liquida, 60_000_000)
+
+    def test_la_atribucion_declarada_manda_sobre_el_defecto(self):
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=80_000_000,
+            ingresos__otras_rentas_no_laborales=30_000_000,
+            costos__pagos_a_contratistas=50_000_000,
+        )
+        p.datos["costos"]["atribucion"] = {
+            "pagos_a_contratistas": "otras_rentas_no_laborales"
+        }
+        L = liquidar(p, self.par, "A")
+        self.assertEqual(L.costos_rechazados_por_tipo, 20_000_000)
+        self.assertEqual(L.costos_sin_atribuir, 0)
+        self.assertEqual(L.renta_liquida, 80_000_000)
+
+    def test_la_renta_de_capital_no_reclama_los_costos_de_la_actividad(self):
+        """Con honorarios y renta de capital, el costo es de la actividad.
+        Si el defecto mirara 'el único tipo con ingresos' en vez de 'la única
+        ACTIVIDAD con ingresos', este perfil quedaría sin atribuir y el techo
+        no se aplicaría — que es el caso del hallazgo."""
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=10_000_000,
+            ingresos__rentas_capital=300_000_000,
+            costos__otros=200_000_000,
+        )
+        self.assertEqual(
+            p.tipo_por_defecto_de_costos(), "rentas_trabajo_honorarios"
+        )
+
+    def test_la_ruta_b_no_resta_costos_y_no_rechaza_nada(self):
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=10_000_000,
+            ingresos__rentas_capital=300_000_000,
+            costos__otros=200_000_000,
+        )
+        L = liquidar(p, self.par, "B")
+        self.assertEqual(L.costos_rechazados_por_tipo, 0)
+
+    def test_r10_avisa_cuando_el_techo_muerde(self):
+        from engine.depuracion import verificar_obligaciones
+
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=10_000_000,
+            ingresos__rentas_capital=300_000_000,
+            costos__otros=200_000_000,
+        )
+        ids = {c["id"] for c in verificar_obligaciones(p, self.par)}
+        self.assertIn("R-10", ids)
+
+    def test_r11_avisa_cuando_no_se_pudo_atribuir(self):
+        from engine.depuracion import verificar_obligaciones
+
+        p = self._perfil(
+            ingresos__rentas_trabajo_honorarios=80_000_000,
+            ingresos__otras_rentas_no_laborales=30_000_000,
+            costos__pagos_a_contratistas=50_000_000,
+        )
+        checks = {c["id"]: c for c in verificar_obligaciones(p, self.par)}
+        self.assertIn("R-11", checks)
+        self.assertIn("costos.atribucion", checks["R-11"]["detalle"])
+
+    def test_una_atribucion_mal_escrita_es_un_error_y_no_se_ignora(self):
+        """Una clave con typo apagaba el techo en silencio: el costo dejaba
+        de tener tipo y el tope no se le aplicaba."""
+        p = self._perfil(ingresos__rentas_trabajo_honorarios=80_000_000)
+        p.datos["costos"]["atribucion"] = {"pagos_a_contratista": "rentas_capital"}
+        errores = PF.validar(p)
+        self.assertTrue(any("costos.atribucion" in e for e in errores), errores)
+
+    def test_un_tipo_de_renta_inexistente_tambien(self):
+        p = self._perfil(ingresos__rentas_trabajo_honorarios=80_000_000)
+        p.datos["costos"]["atribucion"] = {"otros": "rentas_de_pension"}
+        errores = PF.validar(p)
+        self.assertTrue(any("no es un tipo de renta" in e for e in errores), errores)
+
+    def test_el_renglon_de_rechazo_sale_en_las_dos_rutas(self):
+        """El comparativo imprime las dos rutas lado a lado POR POSICIÓN: un
+        renglón condicional desalinea la columna entera."""
+        p = self._perfil(ingresos__rentas_trabajo_honorarios=80_000_000)
+        conceptos = {
+            ruta: [r.concepto for r in liquidar(p, self.par, ruta).renglones]
+            for ruta in ("A", "B")
+        }
+        self.assertEqual(conceptos["A"], conceptos["B"])

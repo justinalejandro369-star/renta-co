@@ -111,13 +111,61 @@ def _liquidar_escenario(c: dict, ruta: str, escenario: dict) -> dict:
     netos = ingresos - incrngo
 
     # 3. Costos y gastos — solo en la ruta que los eligió.
+    #
+    #    Y topados POR TIPO DE RENTA: el Decreto 1625 art. 1.2.1.20.5 inciso
+    #    final no deja que el costo de un tipo se reste de otro. Se escribe
+    #    acá otra vez, de arriba abajo, para que el diferencial pueda ver una
+    #    diferencia con el motor: si esta implementación llamara a la del
+    #    motor, comparar las dos no probaría nada.
     if ruta == "A":
-        costos = (v("costos.pagos_a_contratistas")
-                  + v("costos.comisiones_plataforma")
-                  + v("costos.equipo_tecnologico")
-                  + v("costos.internet_software")
-                  + v("costos.arriendo_oficina")
-                  + v("costos.otros"))
+        campos = ("pagos_a_contratistas", "comisiones_plataforma",
+                  "equipo_tecnologico", "internet_software",
+                  "arriendo_oficina", "otros")
+        atribucion = c.get("costos.atribucion", {}) or {}
+
+        # Techo de cada tipo: sus ingresos menos sus INCRNGO.
+        techo = {
+            "rentas_trabajo_honorarios":
+                trabajo - v("incrngo.aportes_obligatorios_salud_pension"),
+            "rentas_capital":
+                v("ingresos.rentas_capital") - v("incrngo.componente_inflacionario"),
+            "otras_rentas_no_laborales":
+                v("ingresos.otras_rentas_no_laborales"),
+        }
+        # `incrngo.otros` no tiene tipo propio: solo se imputa cuando hay un
+        # único tipo con ingresos.
+        con_ingresos = [t for t in techo if v(f"ingresos.{t}") > 0]
+        if len(con_ingresos) == 1:
+            techo[con_ingresos[0]] -= v("incrngo.otros")
+        for t in techo:
+            if techo[t] < 0:
+                techo[t] = 0.0
+
+        # Atribución por defecto: la única ACTIVIDAD con ingresos. La renta
+        # de capital no es una actividad.
+        actividad = [t for t in ("rentas_trabajo_honorarios",
+                                 "otras_rentas_no_laborales")
+                     if v(f"ingresos.{t}") > 0]
+        if len(actividad) == 1:
+            defecto = actividad[0]
+        elif actividad:
+            defecto = None
+        else:
+            defecto = con_ingresos[0] if len(con_ingresos) == 1 else None
+
+        pedido = {t: 0.0 for t in techo}
+        costos = 0.0                       # lo que no se pudo atribuir no se topa
+        for campo in campos:
+            monto = v(f"costos.{campo}")
+            if not monto:
+                continue
+            tipo = atribucion.get(campo) or defecto
+            if tipo in pedido:
+                pedido[tipo] += monto
+            else:
+                costos += monto
+        for t, monto in pedido.items():
+            costos += monto if monto < techo[t] else techo[t]
     else:
         costos = 0
 

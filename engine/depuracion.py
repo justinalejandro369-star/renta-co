@@ -20,7 +20,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .parametros import Parametros
-from .perfil import Perfil
+from .perfil import TIPOS_DE_RENTA, Perfil
+
+# Etiquetas legibles de los tres tipos de renta de la cédula general.
+NOMBRE_TIPO = {
+    "rentas_trabajo_honorarios": "rentas de trabajo",
+    "rentas_capital": "rentas de capital",
+    "otras_rentas_no_laborales": "otras rentas no laborales",
+}
 
 RUTAS = {
     "A": "Costos y gastos (art. 336 num. 4)",
@@ -78,6 +85,10 @@ class Liquidacion:
     tope_conjunto: float = 0
     rechazado_por_tope: float = 0
     dependientes_via: str = ""
+    costos_solicitados: float = 0
+    costos_rechazados_por_tipo: float = 0
+    costos_sin_atribuir: float = 0
+    detalle_tope_costos: list = field(default_factory=list)
 
     def _r(self, concepto, valor, signo=0, nota="", fuente=""):
         self.renglones.append(Renglon(concepto, round(valor), signo, nota, fuente))
@@ -113,6 +124,47 @@ def _fuente(par: Parametros, ruta_valor: str, respaldo: str) -> str:
     return respaldo if citada == "sin fuente citada" else citada
 
 
+def _costos_aceptados(p: Perfil, ruta: str) -> tuple[float, float, float, list]:
+    """Costos que la Ruta A puede restar, después del techo por tipo de renta.
+
+    El Decreto 1625 art. 1.2.1.20.5 inciso final (sustituido por el Decreto
+    2231 de 2023) dice que los costos y gastos «en ningún caso podrán superar
+    el valor de los ingresos» de SU tipo de renta, menos los INCRNGO de ese
+    mismo tipo. El motor los restaba del total de la cédula, así que una
+    pérdida en honorarios se comía las rentas de capital y bajaba el impuesto
+    de alguien que sí lo debe. Con honorarios de $10.000.000, rentas de
+    capital de $300.000.000 y costos de $200.000.000, la renta líquida daba
+    $110.000.000 en vez de $300.000.000.
+
+    Devuelve (aceptados, rechazados, sin_atribuir, detalle).
+
+    Lo que queda SIN ATRIBUIR no se topa. Es deliberado: adivinar el tipo
+    equivocado le sube el impuesto a alguien que no lo debe, y eso es tan
+    grave como bajárselo. El chequeo R-11 lo dice en voz alta; el R-10
+    reporta lo que sí se rechazó.
+    """
+    if ruta != "A" or not p.total_costos:
+        return 0.0, 0.0, 0.0, []
+
+    por_tipo, sin_atribuir = p.costos_por_tipo()
+    incrngo_tipo = p.incrngo_por_tipo()
+
+    aceptados = sin_atribuir
+    rechazados = 0.0
+    detalle = []
+    for tipo in TIPOS_DE_RENTA:
+        pedido = por_tipo.get(tipo, 0.0)
+        if not pedido:
+            continue
+        techo = max(p.get(f"ingresos.{tipo}") - incrngo_tipo.get(tipo, 0.0), 0.0)
+        pasa = min(pedido, techo)
+        aceptados += pasa
+        if pedido > pasa:
+            rechazados += pedido - pasa
+            detalle.append((tipo, pedido, techo))
+    return aceptados, rechazados, sin_atribuir, detalle
+
+
 def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     if ruta not in RUTAS:
         raise ValueError(f"Ruta '{ruta}' no válida. Usa 'A' o 'B'.")
@@ -144,15 +196,31 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
     L._r("= Ingresos netos (base del límite del 40%)", netos)
 
     # --- 3. costos, solo ruta A ----------------------------------------
-    costos = p.total_costos if ruta == "A" else 0
+    costos, rechazo_costos, sin_atribuir, detalle_costos = _costos_aceptados(p, ruta)
+    L.costos_solicitados = p.total_costos if ruta == "A" else 0
+    L.costos_rechazados_por_tipo = rechazo_costos
+    L.costos_sin_atribuir = sin_atribuir
+    L.detalle_tope_costos = detalle_costos
     L._r(
         "− Costos y gastos procedentes", costos, -1,
-        nota=("Sin tope, pero cada uno exige factura o documento soporte, y los "
-              "pagos a contratistas exigen verificar sus aportes a seguridad social "
-              "(art. 108 par. 2 ET)." if ruta == "A"
+        nota=("Cada uno exige factura o documento soporte, y los pagos a "
+              "contratistas exigen verificar sus aportes a seguridad social "
+              "(art. 108 par. 2 ET). No hay un tope global, pero sí uno POR "
+              "TIPO DE RENTA: el costo de un tipo no puede superar sus "
+              "ingresos menos sus INCRNGO." if ruta == "A"
               else "No aplica en Ruta B: son excluyentes con la renta exenta."),
         fuente="ET art. 336 num. 4",
     )
+    # Renglón incondicional aunque valga cero: el comparativo imprime las dos
+    # rutas lado a lado POR POSICIÓN, y un renglón condicional desalinea la
+    # columna entera.
+    L._r("  [costos rechazados por el tope por tipo de renta]", rechazo_costos, 0,
+         nota="El Decreto 1625 art. 1.2.1.20.5 no topa los costos contra la "
+              "cédula sino contra CADA tipo de renta. Lo que excede el techo "
+              "de su tipo no se puede restar de otro: no genera pérdida "
+              "trasladable a las demás rentas de la cédula.",
+         fuente=_fuente(par, "topes.costos_por_tipo_de_renta.aplica",
+                        "Decreto 1625 de 2016 art. 1.2.1.20.5 inciso final"))
 
     # --- 4. deducciones dentro del tope conjunto ------------------------
     gmf = p.get("deducciones.gmf_pagado") * par.exigir("topes.gmf.porcentaje_deducible")
@@ -741,6 +809,56 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
             ),
             "severidad": "alta",
             "fuente": "ET art. 336-1, adicionado por Ley 2277 de 2022 art. 60",
+        })
+
+    # ¿el techo de costos por tipo de renta recortó algo?
+    #
+    # Se reporta aunque gane la Ruta B: es un hecho de los DATOS, no del
+    # camino elegido, y el usuario que ve "Ruta A: costos $200.000.000" en el
+    # comparativo tiene que saber que la norma solo deja pasar una parte.
+    _, rechazo_tipo, sin_atribuir, detalle_tipo = _costos_aceptados(p, "A")
+    if rechazo_tipo > 0:
+        renglones = "; ".join(
+            f"{NOMBRE_TIPO[t]}: costos {_cop(pedido)} contra un techo de {_cop(techo)}"
+            for t, pedido, techo in detalle_tipo
+        )
+        checks.append({
+            "id": "R-10",
+            "titulo": "Costos por encima del techo de su tipo de renta",
+            "estado": f"{_cop(rechazo_tipo)} no se pueden restar",
+            "detalle": (
+                f"{renglones}. El Decreto 1625 art. 1.2.1.20.5 inciso final no "
+                f"topa los costos contra la cédula: los topa contra los ingresos "
+                f"menos los INCRNGO de CADA tipo de renta. El exceso no genera "
+                f"pérdida que se pueda restar de otro tipo. Si crees que estos "
+                f"costos pertenecen a otro tipo de renta, decláralo en "
+                f"[costos.atribucion] del perfil.toml en vez de dejarlo al "
+                f"criterio por defecto."
+            ),
+            "severidad": "alta",
+            "fuente": _fuente(par, "topes.costos_por_tipo_de_renta.aplica",
+                              "Decreto 1625 de 2016 art. 1.2.1.20.5 inciso final"),
+        })
+
+    if sin_atribuir > 0:
+        checks.append({
+            "id": "R-11",
+            "titulo": "Costos sin tipo de renta: el techo no se les pudo aplicar",
+            "estado": f"{_cop(sin_atribuir)} sin atribuir",
+            "detalle": (
+                f"Tienes ingresos de más de un tipo de renta y no dijiste a cuál "
+                f"pertenece cada costo, así que el motor NO pudo aplicarles el "
+                f"techo del Decreto 1625 art. 1.2.1.20.5. No los repartió a ojo "
+                f"a propósito: atribuirlos al tipo equivocado te subiría el "
+                f"impuesto sin que lo debas. Escribe el bloque "
+                f"[costos.atribucion] en perfil.toml —una línea por campo de "
+                f"[costos], con uno de {', '.join(TIPOS_DE_RENTA)}— y vuelve a "
+                f"calcular. Mientras tanto, esta cifra puede estar restando de "
+                f"más."
+            ),
+            "severidad": "media",
+            "fuente": _fuente(par, "topes.costos_por_tipo_de_renta.aplica",
+                              "Decreto 1625 de 2016 art. 1.2.1.20.5 inciso final"),
         })
 
     # ¿agente de retención?

@@ -73,6 +73,27 @@ internet_software     = 0
 arriendo_oficina      = 0
 otros                 = 0
 
+# A qué TIPO DE RENTA pertenece cada costo. Opcional, y solo importa si
+# tienes ingresos de más de un tipo.
+#
+# El Decreto 1625 art. 1.2.1.20.5 inciso final no topa los costos contra la
+# cédula: los topa contra los ingresos menos los INCRNGO de CADA tipo. El
+# exceso de un tipo NO se puede restar de otro. Si tuviste un mal año en
+# honorarios y a la vez recibiste arriendos, no puedes cruzar lo uno contra
+# lo otro.
+#
+# Si no escribes este bloque, el motor atribuye los costos a la única
+# ACTIVIDAD con ingresos que tengas (rentas de trabajo u otras rentas no
+# laborales; la renta de capital no es una actividad). Si tienes las dos,
+# no adivina: deja los costos sin topar y te lo dice en el chequeo R-11.
+#
+# Valores válidos: rentas_trabajo_honorarios, rentas_capital,
+#                  otras_rentas_no_laborales
+#
+# [costos.atribucion]
+# pagos_a_contratistas = "otras_rentas_no_laborales"
+# arriendo_oficina     = "rentas_trabajo_honorarios"
+
 # ── Deducciones ───────────────────────────────────────────────────────
 [deducciones]
 # TOTAL de 4x1000 pagado en el año, sumando todos los bancos.

@@ -72,6 +72,26 @@ ESQUEMA: dict[str, dict] = {
     },
 }
 
+# Los tres tipos de renta de la cédula general. El orden es el del art. 335
+# y siguientes, y es el que usa la atribución de costos del Decreto 1625
+# art. 1.2.1.20.5.
+TIPOS_DE_RENTA = (
+    "rentas_trabajo_honorarios", "rentas_capital", "otras_rentas_no_laborales",
+)
+
+# Los dos tipos que produce una ACTIVIDAD. La renta de capital —rendimientos,
+# arrendamientos, regalías— no lo es, y por eso no compite por los costos de
+# operación cuando hay actividad de por medio. Ver
+# `Perfil.tipo_por_defecto_de_costos`.
+TIPOS_DE_ACTIVIDAD = ("rentas_trabajo_honorarios", "otras_rentas_no_laborales")
+
+# A qué tipo de renta resta cada INCRNGO. `None` = no tiene tipo evidente.
+ATRIBUCION_INCRNGO = {
+    "aportes_obligatorios_salud_pension": "rentas_trabajo_honorarios",
+    "componente_inflacionario": "rentas_capital",
+    "otros": None,
+}
+
 # Campos cuya ausencia cambia materialmente el resultado.
 CRITICOS = [
     ("ingresos.rentas_trabajo_honorarios", "No hay ingresos por honorarios cargados."),
@@ -152,6 +172,104 @@ class Perfil:
     @property
     def total_costos(self) -> float:
         return sum(self.get(f"costos.{k}") for k in ESQUEMA["costos"])
+
+    # ---- atribución por tipo de renta --------------------------------
+    #
+    # El Decreto 1625 art. 1.2.1.20.5 inciso final (adicionado por el
+    # Decreto 2231 de 2023) no topa los costos contra la cédula: los topa
+    # POR CADA TIPO DE RENTA contra los ingresos menos los INCRNGO de ESE
+    # tipo. Para poder aplicarlo hay que saber a qué tipo pertenece cada
+    # peso, y el perfil no lo preguntaba.
+
+    def incrngo_por_tipo(self) -> dict[str, float]:
+        """Reparte los INCRNGO entre los tipos de renta.
+
+        Los aportes obligatorios los hace quien percibe honorarios: van a
+        rentas de trabajo. El componente inflacionario es de rendimientos
+        financieros (arts. 38 a 40 ET): va a rentas de capital. `otros` no
+        tiene tipo evidente, así que se atribuye al tipo con ingresos si
+        hay uno solo, y si no, queda sin atribuir — el mismo criterio que
+        los costos.
+        """
+        por_tipo = {t: 0.0 for t in TIPOS_DE_RENTA}
+        sin_atribuir = 0.0
+        for campo, tipo in ATRIBUCION_INCRNGO.items():
+            valor = self.get(f"incrngo.{campo}")
+            if not valor:
+                continue
+            if tipo is None:
+                sin_atribuir += valor
+            else:
+                por_tipo[tipo] += valor
+        unico = self.tipo_unico_con_ingresos()
+        if sin_atribuir:
+            # Sin tipo único no se reparte: se deja fuera del techo, que es
+            # el lado seguro (un INCRNGO mal atribuido SUBE el techo de otro
+            # tipo y deja pasar costos que la norma rechaza).
+            if unico:
+                por_tipo[unico] += sin_atribuir
+        return por_tipo
+
+    def tipo_unico_con_ingresos(self) -> str | None:
+        """El único tipo de renta con ingresos, si es que hay uno solo."""
+        con_ingresos = [t for t in TIPOS_DE_RENTA if self.get(f"ingresos.{t}") > 0]
+        return con_ingresos[0] if len(con_ingresos) == 1 else None
+
+    def tipo_por_defecto_de_costos(self) -> str | None:
+        """A qué tipo de renta pertenecen los costos cuando nadie lo dijo.
+
+        Los seis campos de `[costos]` —contratistas, comisión de plataforma,
+        equipo, internet, arriendo de oficina y otros— son costos de una
+        ACTIVIDAD. Una actividad produce rentas de trabajo por honorarios o
+        rentas no laborales; no produce rentas de capital, que son
+        rendimientos, arrendamientos y regalías. Por eso la renta de capital
+        no compite por estos costos cuando hay una actividad de por medio.
+
+        Si el contribuyente tiene ingresos de UNA sola actividad, ahí van.
+        Si tiene de las dos y no declaró `[costos.atribucion]`, no se
+        adivina: devuelve None y el techo no se aplica sobre esa parte, con
+        el chequeo R-11 diciéndolo. Y si no tiene actividad ninguna, se cae
+        al único tipo con ingresos que haya.
+        """
+        actividad = [t for t in TIPOS_DE_ACTIVIDAD if self.get(f"ingresos.{t}") > 0]
+        if len(actividad) == 1:
+            return actividad[0]
+        if actividad:
+            return None
+        return self.tipo_unico_con_ingresos()
+
+    def costos_por_tipo(self) -> tuple[dict[str, float], float]:
+        """Reparte los costos entre los tipos de renta.
+
+        Devuelve (por_tipo, sin_atribuir). Tres fuentes, en este orden:
+
+        1. `[costos.atribucion]` del perfil, si el usuario la escribió.
+        2. Si no, `tipo_por_defecto_de_costos()`: la única actividad con
+           ingresos que tenga el contribuyente.
+        3. Si tiene las dos actividades y no declaró la atribución, el costo
+           queda SIN ATRIBUIR. No se adivina y no se prorratea: el motor no
+           aplica el techo sobre esa parte y lo dice.
+
+        El orden importa. Adivinar hacia el lado equivocado sube el impuesto
+        de alguien que no lo debe, y eso es tan grave como bajarlo.
+        """
+        declarada = self.datos.get("costos", {}).get("atribucion", {})
+        if not isinstance(declarada, dict):
+            declarada = {}
+        unico = self.tipo_por_defecto_de_costos()
+
+        por_tipo = {t: 0.0 for t in TIPOS_DE_RENTA}
+        sin_atribuir = 0.0
+        for campo in ESQUEMA["costos"]:
+            valor = self.get(f"costos.{campo}")
+            if not valor:
+                continue
+            tipo = declarada.get(campo) or unico
+            if tipo in por_tipo:
+                por_tipo[tipo] += valor
+            else:
+                sin_atribuir += valor
+        return por_tipo, sin_atribuir
 
     def _suma_patrimonio(self, grupo: str) -> float:
         """Suma un grupo del patrimonio ignorando lo que no sea un número.
@@ -352,6 +470,30 @@ def validar(perfil: Perfil, anios_disponibles: list[int] | None = None) -> list[
             f"deducciones.dependientes = {dep}. El art. 336 num. 3 inciso 2 ET "
             f"permite máximo 4. Corrígelo o el cálculo quedará mal."
         )
+
+    # `[costos.atribucion]` decide contra qué techo se compara cada costo
+    # (Decreto 1625 art. 1.2.1.20.5). Una clave mal escrita ahí no rompe
+    # nada visible: el costo simplemente deja de tener tipo y el techo no se
+    # le aplica. Es una defensa que se apaga sola en silencio, así que se
+    # valida.
+    atribucion = perfil.datos.get("costos", {}).get("atribucion", {})
+    if not isinstance(atribucion, dict):
+        errores.append(
+            "costos.atribucion debe ser un bloque [costos.atribucion] que "
+            "asocie cada campo de costos a un tipo de renta."
+        )
+    else:
+        for campo, tipo in atribucion.items():
+            if campo not in ESQUEMA["costos"]:
+                errores.append(
+                    f"costos.atribucion.{campo} no es un campo de [costos]. "
+                    f"Los que hay: {', '.join(sorted(ESQUEMA['costos']))}."
+                )
+            elif tipo not in TIPOS_DE_RENTA:
+                errores.append(
+                    f"costos.atribucion.{campo} = {tipo!r} no es un tipo de "
+                    f"renta. Usa uno de: {', '.join(TIPOS_DE_RENTA)}."
+                )
 
     anio = perfil.anio_gravable
     if anios_disponibles is not None and anio not in anios_disponibles:

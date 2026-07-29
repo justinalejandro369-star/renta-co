@@ -141,6 +141,32 @@ R-03. Quien piense superar el 60% debe mirar los dos requisitos juntos.
 fuente = "Estatuto Tributario art. 336-1, adicionado por Ley 2277 de 2022 art. 60"
 url = "https://estatuto.co/336-1"
 
+[topes.costos_por_tipo_de_renta]
+aplica = true
+dentro_del_tope_conjunto = false
+nota = """
+La Ruta A no tiene un tope GLOBAL sobre los costos, pero sí uno por tipo de
+renta, que se pasa por alto con frecuencia porque no está en el Estatuto sino
+en el reglamento:
+
+  «En ningún caso los costos y gastos … podrán superar el valor resultante de
+  restar de los ingresos del respectivo tipo de renta los ingresos no
+  constitutivos de renta ni ganancia ocasional imputables a ese mismo tipo.»
+
+O sea que el exceso de costos de un tipo de renta NO genera una pérdida que se
+pueda restar de los otros tipos de la misma cédula. Quien tuvo un mal año en
+honorarios y a la vez recibió rendimientos o arriendos no puede cruzar lo uno
+contra lo otro.
+
+Para aplicarlo hay que saber a qué tipo de renta pertenece cada costo. El
+perfil lo pregunta en el bloque opcional [costos.atribucion]; si no está, el
+motor usa la única ACTIVIDAD con ingresos que tenga el contribuyente, y si
+tiene las dos, deja los costos sin atribuir y lo dice en el chequeo R-11 en
+vez de repartirlos a ojo.
+"""
+fuente = "Decreto 1625 de 2016 art. 1.2.1.20.5 inciso final, sustituido por el Decreto 2231 de 2023"
+url = "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=228049"
+
 [topes.dependientes_10pct]
 porcentaje_renta_trabajo = 0.10
 tope_mensual_uvt = 32
