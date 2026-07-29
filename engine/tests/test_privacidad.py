@@ -257,7 +257,26 @@ class TestRepositorio(unittest.TestCase):
 
         # Los ejemplos ficticios del repo son intencionales y se listan acá
         # para que un usuario que de verdad se llame así no rompa el build.
-        FICTICIOS = {"fulanito", "usuario", "user", "runner", "home", "root"}
+        #
+        # La lista tenía el nombre de usuario con el que corre GitHub
+        # Actions, y ese era el agujero entero: este test —escrito
+        # ESPECÍFICAMENTE porque una ruta HOME real se coló al repo— se
+        # SALTABA en CI y solo corría en la máquina de quien lo escribió.
+        # Mientras tanto la fuga seguía viva en la historia publicada, y
+        # ninguna de las otras tres compuertas la miraba. Hubo que reescribir
+        # la historia del repo para sacarla.
+        #
+        # La lección no es «acuérdate de correr el estricto», que ya se sabía:
+        # es que una guarda con una excepción amplia no es una guarda.
+        #
+        # Ojo si vas a documentar esto: el nombre de usuario de CI NO se
+        # puede escribir literal en ningún archivo del árbol, porque este
+        # test compara contra el HOME de la máquina y en CI ese nombre ES el
+        # HOME. Escribirlo en el comentario que explica el arreglo rompía el
+        # build — pasó, y es la cuarta vez en este proyecto que el texto que
+        # describe a un detector dispara a ese detector. Descríbelo, no lo
+        # transcribas.
+        FICTICIOS = {"fulanito", "usuario", "root"}
         if usuario.lower() in FICTICIOS:
             self.skipTest(f"el usuario de esta máquina ({usuario}) es un ficticio")
 
