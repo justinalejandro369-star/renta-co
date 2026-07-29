@@ -867,3 +867,120 @@ class TestAvisoDeMezclaDeAnios(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPlantillasContraElMotor(unittest.TestCase):
+    """Las plantillas no pueden pedir aritmética que el motor no emite.
+
+    `AGENTS.md` regla 1: «la aritmética la hace el motor, no tú». Tres
+    plantillas la rompían por omisión: pedían UNA casilla de «Deducciones» y
+    el motor emitía cinco renglones sueltos sin su suma, así que quien
+    llenaba la plantilla tenía que sumarlos a mano — sobre las cifras que van
+    al formulario.
+
+    Este test cierra la CLASE: cada fila de la tabla del comparativo tiene
+    que corresponder a un renglón que el motor emite de verdad.
+    """
+
+    TEMPLATES = RAIZ / "templates"
+
+    def _renglones(self) -> list[str]:
+        from engine.depuracion import liquidar
+
+        par = P.cargar(2025)
+        p = PF.cargar(RAIZ / "expediente.ejemplo")
+        return [r.concepto for r in liquidar(p, par, "A").renglones]
+
+    # Filas del comparativo que NO son un renglón: son metadatos de la tabla
+    # o cifras que el motor publica por otra vía, con su nombre.
+    FILAS_QUE_NO_SON_RENGLON = {
+        "Concepto": "encabezado de la tabla",
+        "Impuesto (art. 241)": "IMPUESTO SOBRE LA RENTA",
+        "− Descuentos": "− Descuento por donaciones",
+        "− Retenciones": "− Retenciones practicadas en el año",
+        "= **Saldo a {{pagar/favor}}**": "= SALDO A PAGAR / A FAVOR",
+        "− INCRNGO": "− Ingresos no constitutivos de renta (INCRNGO)",
+        "Ingresos brutos cédula general": "= Total ingresos brutos cédula general",
+        "= Ingresos netos": "= Ingresos netos (base del límite del 40%)",
+        "− Costos y gastos": "− Costos y gastos procedentes",
+        "− Renta exenta 25%": "− Renta exenta 25%",
+        "− Deducciones dentro del tope": "  = Subtotal deducciones dentro del tope",
+        "− Deducciones fuera del tope": "  = Subtotal deducciones fuera del tope",
+        "[tope 40% / 1.340 UVT]": "  [tope conjunto 40% / 1.340 UVT]",
+        "[rechazado por el tope]": "  [rechazado por el tope]",
+        "[costos rechazados por el tope por tipo de renta]":
+            "  [costos rechazados por el tope por tipo de renta]",
+        "= **Renta líquida gravable**": "= RENTA LÍQUIDA GRAVABLE",
+    }
+
+    def _filas_del_comparativo(self) -> list[str]:
+        texto = (self.TEMPLATES / "comparativo.md").read_text(encoding="utf-8")
+        filas = []
+        for linea in texto.splitlines():
+            if not linea.startswith("| ") or set(linea) <= set("|- "):
+                continue
+            primera = linea.split("|")[1].strip()
+            if primera:
+                filas.append(primera)
+            # Solo la primera tabla: las de palancas y supuestos no son
+            # renglones de la depuración.
+            if primera.startswith("= **Saldo"):
+                break
+        return filas
+
+    def test_cada_fila_del_comparativo_existe_como_renglon(self):
+        renglones = self._renglones()
+        huerfanas = []
+        for fila in self._filas_del_comparativo():
+            equivalente = self.FILAS_QUE_NO_SON_RENGLON.get(fila)
+            if equivalente is None:
+                huerfanas.append(f"{fila!r} no está en el mapa de equivalencias")
+            elif (equivalente not in renglones
+                  and not equivalente.startswith("encabezado")
+                  and not equivalente.startswith("= SALDO")):
+                huerfanas.append(f"{fila!r} → {equivalente!r} no lo emite el motor")
+        self.assertEqual(
+            huerfanas, [],
+            "el comparativo pide cifras que el motor no emite; o el motor "
+            "emite el subtotal, o la plantilla deja de pedirlo",
+        )
+
+    def test_el_subtotal_de_deducciones_cuadra_con_sus_renglones(self):
+        """El subtotal tiene que ser la suma de los renglones que dice
+        sumar, no una cifra parecida."""
+        from engine.depuracion import liquidar
+
+        par = P.cargar(2025)
+        p = PF.cargar(RAIZ / "expediente.ejemplo")
+        for ruta in ("A", "B"):
+            por_concepto = {r.concepto: r.valor
+                            for r in liquidar(p, par, ruta).renglones}
+            partes = sum(por_concepto[c] for c in (
+                "− GMF deducible (50% del 4x1000 pagado)",
+                "− Intereses de vivienda",
+                "− Medicina prepagada",
+                "− Aportes voluntarios AFP / AFC",
+                "− Dependientes (10% renta de trabajo)",
+            ))
+            self.assertEqual(
+                por_concepto["  = Subtotal deducciones dentro del tope"], partes,
+                f"ruta {ruta}: el subtotal no es la suma de sus renglones",
+            )
+            fuera = sum(por_concepto[c] for c in (
+                "− Dependientes (72 UVT c/u — FUERA del tope)",
+                "− Deducción 1% compras con factura electrónica",
+            ))
+            self.assertEqual(
+                por_concepto["  = Subtotal deducciones fuera del tope"], fuera,
+                f"ruta {ruta}: el subtotal de fuera no cuadra",
+            )
+
+    def test_ninguna_plantilla_pide_una_cifra_sin_decir_de_donde_sale(self):
+        """`checklist-documentos.md` pedía un `{{$X}}` de «PILA de cada
+        contratista habilita X en Ruta A» que no existía en ninguna salida.
+        Cada `{{$X}}` de esa plantilla tiene que venir con su origen."""
+        texto = (self.TEMPLATES / "checklist-documentos.md").read_text(
+            encoding="utf-8")
+        self.assertIn("R-02", texto,
+                      "la cifra de contratistas no dice de dónde sale")
+        self.assertIn("costos.pagos_a_contratistas", texto)

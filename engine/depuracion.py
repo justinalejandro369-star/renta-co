@@ -504,6 +504,17 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
          fuente=_fuente(par, "topes.dependientes_10pct.tope_mensual_uvt",
                         "ET art. 387"))
 
+    # Subtotal explícito. Las plantillas `comparativo.md` y
+    # `formulario-210.md` piden UNA casilla de «Deducciones» y el motor
+    # emitía cinco renglones sueltos sin su suma, así que el modelo que llena
+    # la plantilla tenía que sumarlos a mano — contra la primera regla de
+    # AGENTS.md, y sobre las cifras que van al formulario.
+    L._r("  = Subtotal deducciones dentro del tope", ded_fijas + e["dep_dentro"], 0,
+         nota="GMF + vivienda + prepagada + AFP/AFC + dependientes por el 10%. "
+              "Es lo que compite contra el tope del 40% junto con la renta "
+              "exenta, y lo que va a la casilla única de «Deducciones» del "
+              "210. NO incluye la renta exenta, que va en su propia casilla.")
+
     L._r("  [tope conjunto 40% / 1.340 UVT]", tope, 0,
          nota="Lo que exceda este tope se pierde.",
          fuente=_fuente(par, "topes.conjunto_deducciones_exentas.tope_uvt",
@@ -524,6 +535,9 @@ def liquidar(p: Perfil, par: Parametros, ruta: str) -> Liquidacion:
          nota="Exige factura electrónica a tu NIT/cédula y pago electrónico.",
          fuente=_fuente(par, "topes.deduccion_1pct_factura_electronica.tope_uvt",
                         "ET art. 336 num. 5"))
+    L._r("  = Subtotal deducciones fuera del tope", e["dep_fuera"] + fuera_fijas, 0,
+         nota="Dependientes por 72 UVT + el 1% de factura electrónica. No "
+              "compiten contra el tope del 40%: restan enteras.")
 
     # --- 8. impuesto ---------------------------------------------------
     L.renta_liquida = renta_liquida

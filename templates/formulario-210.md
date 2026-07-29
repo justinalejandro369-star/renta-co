@@ -45,7 +45,7 @@ inventada le cuesta media hora encontrarla.
 | ___ | Ingresos no constitutivos de renta | {{$X}} | planillas PILA + certificado del banco |
 | ___ | Costos y gastos procedentes | {{$X}} | solo si se eligió **Ruta A** |
 | ___ | Renta exenta del 25% (art. 206 num. 10) | {{$X}} | solo si se eligió **Ruta B** |
-| ___ | Deducciones (GMF, vivienda, prepagada, AFP/AFC) | {{$X}} | certificados |
+| ___ | Deducciones (GMF, vivienda, prepagada, AFP/AFC, dependientes 10%) | {{$X}} | renglón `= Subtotal deducciones dentro del tope` |
 | ___ | Deducción por dependientes | {{$X}} | soporte de la condición |
 | ___ | Deducción 1% compras con factura electrónica | {{$X}} | facturas electrónicas |
 | ___ | **Renta líquida de la cédula general** | **{{$X}}** | motor |

@@ -45,6 +45,8 @@ Uno por **cada** banco donde se tuvo cuenta. El 50% es deducible.
 
 ### 8. {{PILA de cada contratista}} — habilita **{{$X}}** en Ruta A
 Art. 108 par. 2 ET. Sin esto la DIAN puede rechazar la totalidad del costo.
+La cifra es la que imprime el chequeo **R-02** de `bin/renta calcular`, que
+la toma de `costos.pagos_a_contratistas`. No la sumes de las facturas.
 
 ### 9. {{Certificado de medicina prepagada}} — vale **{{$X}}**
 {{Verificar antes si el tope del 40% ya está saturado: si lo está, vale $0}}.
