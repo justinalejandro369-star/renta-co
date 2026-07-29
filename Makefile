@@ -1,14 +1,15 @@
-.PHONY: test benchmark ejemplo privacidad inventario citas verificar limpiar ayuda
+.PHONY: test benchmark ejemplo privacidad inventario citas golden verificar limpiar ayuda
 
 ayuda:
 	@echo "renta-co"
 	@echo ""
 	@echo "  make test        corre la suite de tests"
-	@echo "  make benchmark   14 personas: invariantes + diferencial + anclas"
+	@echo "  make benchmark   las 7 capas de verificación sobre 20 personas"
 	@echo "  make ejemplo     corre el expediente de ejemplo de punta a punta"
 	@echo "  make privacidad  escanea el repo en busca de datos personales"
 	@echo "  make inventario  regenera la línea base de lo que .privacidadignore excluye"
 	@echo "  make citas       chequea las citas de knowledge/ contra la fuente (USA RED)"
+	@echo "  make golden      APRUEBA la línea base del motor. Mira el diff antes de commitear"
 	@echo "  make verificar   todo lo anterior menos citas (lo que corre CI en cada push)"
 	@echo "  make limpiar     borra __pycache__ y artefactos"
 
@@ -39,6 +40,14 @@ inventario:
 # semanal (.github/workflows/citas.yml) o a mano.
 citas:
 	python3 scripts/verificar_citas.py
+
+# Aprueba la línea base del golden master. NO lo corras por reflejo cuando el
+# benchmark se ponga rojo: cada línea que cambie es una decisión que estás
+# tomando, y tiene que caber en el mensaje del commit. Un `--aprobar` reflejo
+# convierte esta capa en un archivo que se regenera solo, o sea en nada.
+golden:
+	python3 -m benchmark.golden --aprobar
+	@git diff --stat -- benchmark/golden.json || true
 
 verificar: test benchmark ejemplo privacidad
 	@echo ""

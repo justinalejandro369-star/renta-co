@@ -13,6 +13,17 @@ engine/tests/*.py
 # Docstring del parser de montos: documenta cada formato con un ejemplo.
 engine/adapters/generico.py
 
+# Golden master: montos en pesos de las personas ficticias, sin separadores
+# de miles porque JSON no los admite en un número. Un monto de nueve dígitos
+# sin separador tiene exactamente la forma de una cédula, y el escáner no lo
+# puede distinguir sin contexto — con razón.
+#
+# Se DERIVA de benchmark/personas.py, que está inventariado y no es un
+# archivo que alguien edite a mano: si un dato real llegara acá, tendría que
+# haber entrado antes por personas.py, que sí se escanea. Y su contenido
+# entra al inventario como cualquier otro excluido: nada queda sin revisar.
+benchmark/golden.json
+
 # Documentación del propio escáner: muestra ejemplos de lo que detecta.
 skills/renta-privacidad/SKILL.md
 scripts/escanear_privacidad.py

@@ -7,12 +7,105 @@
 # Regenerar:
 #   python3 scripts/escanear_privacidad.py --inventario > \
 #       scripts/privacidad-esperado.txt
+benchmark/golden.json · cédula corta o extranjería · 2XXX000
+benchmark/golden.json · cédula o documento · 1XXXX000
+benchmark/golden.json · cédula o documento · 1XXXX112
+benchmark/golden.json · cédula o documento · 1XXXX228
+benchmark/golden.json · cédula o documento · 1XXXX270
+benchmark/golden.json · cédula o documento · 1XXXX360
+benchmark/golden.json · cédula o documento · 1XXXX374
+benchmark/golden.json · cédula o documento · 1XXXX408
+benchmark/golden.json · cédula o documento · 1XXXX416
+benchmark/golden.json · cédula o documento · 1XXXX477
+benchmark/golden.json · cédula o documento · 1XXXX569
+benchmark/golden.json · cédula o documento · 1XXXX584
+benchmark/golden.json · cédula o documento · 1XXXX652
+benchmark/golden.json · cédula o documento · 1XXXX816
+benchmark/golden.json · cédula o documento · 1XXXX880
+benchmark/golden.json · cédula o documento · 1XXXXX000
+benchmark/golden.json · cédula o documento · 1XXXXX065
+benchmark/golden.json · cédula o documento · 1XXXXX200
+benchmark/golden.json · cédula o documento · 1XXXXX284
+benchmark/golden.json · cédula o documento · 1XXXXX300
+benchmark/golden.json · cédula o documento · 1XXXXX340
+benchmark/golden.json · cédula o documento · 1XXXXX416
+benchmark/golden.json · cédula o documento · 1XXXXX466
+benchmark/golden.json · cédula o documento · 1XXXXX480
+benchmark/golden.json · cédula o documento · 1XXXXX540
+benchmark/golden.json · cédula o documento · 1XXXXX562
+benchmark/golden.json · cédula o documento · 1XXXXX750
+benchmark/golden.json · cédula o documento · 1XXXXX888
+benchmark/golden.json · cédula o documento · 1XXXXXX284
+benchmark/golden.json · cédula o documento · 2XXXX000
+benchmark/golden.json · cédula o documento · 2XXXX120
+benchmark/golden.json · cédula o documento · 2XXXX236
+benchmark/golden.json · cédula o documento · 2XXXX360
+benchmark/golden.json · cédula o documento · 2XXXX364
+benchmark/golden.json · cédula o documento · 2XXXX516
+benchmark/golden.json · cédula o documento · 2XXXX868
+benchmark/golden.json · cédula o documento · 2XXXXX000
+benchmark/golden.json · cédula o documento · 2XXXXX063
+benchmark/golden.json · cédula o documento · 2XXXXX550
+benchmark/golden.json · cédula o documento · 2XXXXX708
+benchmark/golden.json · cédula o documento · 2XXXXXX000
+benchmark/golden.json · cédula o documento · 2XXXXXX284
+benchmark/golden.json · cédula o documento · 3XXXX000
+benchmark/golden.json · cédula o documento · 3XXXX210
+benchmark/golden.json · cédula o documento · 3XXXX296
+benchmark/golden.json · cédula o documento · 3XXXX854
+benchmark/golden.json · cédula o documento · 3XXXXX000
+benchmark/golden.json · cédula o documento · 3XXXXX382
+benchmark/golden.json · cédula o documento · 3XXXXX592
+benchmark/golden.json · cédula o documento · 3XXXXX790
+benchmark/golden.json · cédula o documento · 4XXXX000
+benchmark/golden.json · cédula o documento · 4XXXX682
+benchmark/golden.json · cédula o documento · 4XXXXX000
+benchmark/golden.json · cédula o documento · 4XXXXX063
+benchmark/golden.json · cédula o documento · 5XXXX000
+benchmark/golden.json · cédula o documento · 5XXXX910
+benchmark/golden.json · cédula o documento · 5XXXXX669
+benchmark/golden.json · cédula o documento · 6XXXX000
+benchmark/golden.json · cédula o documento · 6XXXX408
+benchmark/golden.json · cédula o documento · 6XXXX660
+benchmark/golden.json · cédula o documento · 7XXXX000
+benchmark/golden.json · cédula o documento · 7XXXX565
+benchmark/golden.json · cédula o documento · 7XXXX966
+benchmark/golden.json · cédula o documento · 7XXXXX340
+benchmark/golden.json · cédula o documento · 8XXXX000
+benchmark/golden.json · cédula o documento · 8XXXX701
+benchmark/golden.json · cédula o documento · 8XXXX944
+benchmark/golden.json · cédula o documento · 8XXXXX000
+benchmark/golden.json · cédula o documento · 8XXXXX669
+benchmark/golden.json · cédula o documento · 9XXXX000
+benchmark/golden.json · cédula o documento · 9XXXX184
+benchmark/golden.json · cédula o documento · 9XXXX228
+benchmark/golden.json · cédula o documento · 9XXXXX000
+engine/tests/test_cli.py · cédula o documento · 3XXXX000
+engine/tests/test_cli.py · cédula o documento · 5XXXX000
 engine/tests/test_privacidad.py · IBAN · ES9XXXXXXXXXXXXXXXXXX332
+engine/tests/test_privacidad.py · NIT · 9XX.XXX.X56-7
 engine/tests/test_privacidad.py · correo deletreado · c******* at b***** d** c**
 engine/tests/test_privacidad.py · correo deletreado · p****** a***** e****** p**** c**
 engine/tests/test_privacidad.py · correo · e********@b******************.co
 engine/tests/test_privacidad.py · correo · j*********@b***************.co
 engine/tests/test_privacidad.py · correo · p******@e******.com
+engine/tests/test_privacidad.py · cuenta o identificador largo · 1XXXXXXXXXX234
+engine/tests/test_privacidad.py · cuenta o identificador largo · 9XXXXXXXXXXXXXXXXXX332
+engine/tests/test_privacidad.py · cédula corta o extranjería · 1XXX567
+engine/tests/test_privacidad.py · cédula corta o extranjería · 7XX234
+engine/tests/test_privacidad.py · cédula o documento · 0XXXXXX789
+engine/tests/test_privacidad.py · cédula o documento · 1XXXX000
+engine/tests/test_privacidad.py · cédula o documento · 1XXXX309
+engine/tests/test_privacidad.py · cédula o documento · 1XXXXXX781
+engine/tests/test_privacidad.py · cédula o documento · 3XXXXX000
+engine/tests/test_privacidad.py · cédula o documento · 4XXXX000
+engine/tests/test_privacidad.py · cédula o documento · 7XXXX921
+engine/tests/test_privacidad.py · cédula o monto · 1.XXX.086
+engine/tests/test_privacidad.py · cédula o monto · 1/XXX/086
+engine/tests/test_privacidad.py · cédula o monto · 1X.XXX.816
+engine/tests/test_privacidad.py · cédula o monto · 9XX.XXX.456
+engine/tests/test_privacidad.py · cédula · 1.XXX.XXX.781
+engine/tests/test_privacidad.py · cédula · 1/XXX/XXX/781
 engine/tests/test_privacidad.py · dirección (rural) · Km X vía La C*****
 engine/tests/test_privacidad.py · dirección (rural) · V***** El S*****
 engine/tests/test_privacidad.py · dirección (unidad) · Apto XXX Barrio C********
@@ -23,10 +116,17 @@ engine/tests/test_privacidad.py · dirección · Calle 4X #X2-34
 engine/tests/test_privacidad.py · ruta de usuario · /Users/f*******
 engine/tests/test_privacidad.py · ruta de usuario · /home/m************
 engine/tests/test_privacidad.py · ruta de usuario · C:\Users\J********
+engine/tests/test_privacidad.py · tarjeta · 4XXX XXXX XXXX X111
 engine/tests/test_privacidad.py · teléfono fijo · (6XX) XXX X566
 engine/tests/test_privacidad.py · teléfono fijo · +5X XXX XXXX455
 engine/tests/test_privacidad.py · teléfono fijo · 6XX XXX X900
 engine/tests/test_privacidad.py · teléfono · +5X XXX XXXX567
+scripts/escanear_privacidad.py · cédula o documento · 1XXXXX208
+scripts/escanear_privacidad.py · cédula o documento · 1XXXXXX781
+scripts/escanear_privacidad.py · cédula o monto · 1.XXX.086
+scripts/escanear_privacidad.py · cédula · 1.XXX.XXX.000
+scripts/escanear_privacidad.py · cédula · 1.XXX.XXX.781
+scripts/escanear_privacidad.py · cédula · 1/XXX/XXX/781
 scripts/escanear_privacidad.py · dirección (rural) · Km X vía La C*****
 scripts/escanear_privacidad.py · dirección (rural) · V***** El S*****
 scripts/escanear_privacidad.py · dirección (unidad) · Apto XXX Barrio C****
@@ -34,7 +134,10 @@ scripts/escanear_privacidad.py · dirección (unidad) · Apto XXX Torre X
 scripts/escanear_privacidad.py · dirección · Calle 1XX #XX-XX Apto 301 Barrio C
 scripts/escanear_privacidad.py · dirección · Calle XXX #XX-XX Apto XXX Barrio
 scripts/escanear_privacidad.py · ruta de usuario · /Users/f*******
+skills/renta-privacidad/SKILL.md · NIT · 9XX.XXX.X56-7
 skills/renta-privacidad/SKILL.md · correo deletreado · p****** a***** d****** p**** c**
+skills/renta-privacidad/SKILL.md · cédula o monto · 1.XXX.086
+skills/renta-privacidad/SKILL.md · cédula o monto · 9XX.XXX.456
 skills/renta-privacidad/SKILL.md · dirección (rural) · Km X vía La C*****
 skills/renta-privacidad/SKILL.md · dirección (rural) · V***** El S*****
 skills/renta-privacidad/SKILL.md · dirección (unidad) · Apto XXX Torre X

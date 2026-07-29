@@ -338,11 +338,6 @@ class TestRepositorio(unittest.TestCase):
         )
         del os
 
-    # El filtro de formas y el recorrido viven en el escáner, no acá. Copiar
-    # la lógica al test es la misma clase de divergencia que ya costó una
-    # ronda: dos copias, se actualiza una, y la que queda vieja es la que
-    # decide si el build pasa.
-    FORMAS_ESPERABLES = esc.FORMAS_DE_LABORATORIO
     INVENTARIO = RAIZ / "scripts" / "privacidad-esperado.txt"
 
     def test_lo_excluido_esta_inventariado_y_no_crece_solo(self):
@@ -355,11 +350,16 @@ class TestRepositorio(unittest.TestCase):
         arriba).
 
         La salida no es exigir cero: es exigir que lo que hay esté
-        INVENTARIADO. Las formas que un caso de prueba produce de por sí
-        —cédulas, cuentas, NIT— se filtran; lo demás —correos, direcciones,
-        teléfonos, rutas de usuario, IBAN— queda congelado en
-        `scripts/privacidad-esperado.txt`. Cualquier línea nueva rompe el
-        build y obliga a mirarla.
+        INVENTARIADO. TODO lo de confianza alta, sin filtrar por forma,
+        queda congelado en `scripts/privacidad-esperado.txt`. Cualquier
+        línea nueva rompe el build y obliga a mirarla.
+
+        El filtro por forma que tenía antes —descartaba cédula, cuenta, NIT
+        y tarjeta «porque los tests las producen de por sí»— dejaba fuera
+        exactamente las joyas de la corona: una cédula, una cuenta y un NIT
+        reales metidos en ESTE archivo pasaban los tres pasos de CI en
+        verde. Una lista de excepciones por forma es una lista de lo que hay
+        que usar para colar un dato.
 
         Regenerarlo es una decisión visible en el diff:
 
@@ -402,10 +402,7 @@ class TestRepositorio(unittest.TestCase):
         ruta.write_text(
             '# ejemplo: escribeme@bufete-ficticio.com.co\n', encoding="utf-8"
         )
-        etiquetas = {
-            e for _, e, _, c in esc.escanear(ruta)
-            if c == "alta" and e not in self.FORMAS_ESPERABLES
-        }
+        etiquetas = {e for _, e, _, c in esc.escanear(ruta) if c == "alta"}
         self.assertIn("correo", etiquetas)
         self.assertNotIn(
             "correo", {l.split(" · ")[1] for l in

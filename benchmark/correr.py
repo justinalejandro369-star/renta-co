@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Benchmark de renta-co.
 
-Seis capas de verificación, de la más débil a la más fuerte. El conteo del
+Siete capas de verificación, de la más débil a la más fuerte. El conteo del
 cierre se DERIVA de la tupla `CAPAS`, no está escrito a mano: este mismo
 docstring decía «cuatro capas» con cinco corriendo, que es la clase de
 desfase que ya le costó al catálogo de riesgos tres conteos distintos en
@@ -31,6 +31,13 @@ tres archivos.
                      que se le dan; ésta mide cuáles no se le dan nunca. La
                      cobertura de línea no lo ve: el `if` del tope se ejecuta
                      siempre, lo que no pasaba nunca es que el tope MORDIERA.
+  7. GOLDEN MASTER — el motor de hoy contra el motor de ayer, congelado en
+                     `benchmark/golden.json`. Es la única que no pregunta
+                     «¿esto está bien?» sino «¿esto cambió, y alguien lo
+                     decidió?». Las dos peores regresiones de la ronda 7 las
+                     introdujo la sesión que estaba arreglando el repo y
+                     pasaron todas las capas de entonces, porque ninguna
+                     comparaba contra el motor de ayer.
 
     python -m benchmark.correr
     python -m benchmark.correr --verbose
@@ -47,7 +54,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from benchmark import cobertura, metamorficas, referencia
+from benchmark import cobertura, golden, metamorficas, referencia
 from benchmark.personas import ANCLAS, PERSONAS
 from engine import parametros as P
 from engine import perfil as PF
@@ -406,6 +413,12 @@ def main(argv=None) -> int:
         # siempre, lo que no pasaba nunca es que el tope MORDIERA.
         ("COBERTURA DEL ESPACIO DE ENTRADA (regiones, no líneas)",
          lambda: cobertura.correr(par, PERSONAS, construir_perfil)),
+        # La única capa que no pregunta «¿esto está bien?» sino «¿esto cambió,
+        # y alguien lo decidió?». Las dos peores regresiones de la ronda 7 las
+        # introdujo la sesión que arreglaba el repo, y pasaron todas las capas
+        # de entonces porque ninguna comparaba contra el motor de ayer.
+        ("GOLDEN MASTER (el motor de hoy contra el de ayer)",
+         lambda: golden.correr(par, PERSONAS, construir_perfil)),
     )
     for etiqueta, fn in CAPAS:
         fallos = fn()

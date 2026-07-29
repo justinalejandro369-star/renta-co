@@ -838,17 +838,6 @@ def escanear_indice(nombres) -> tuple[list[tuple[str, list]], int]:
 
 # ---------------------------------------------------------------------
 
-# Formas que un caso de prueba o un docstring de formato produce de por sí:
-# los tests traen cédulas de laboratorio y el parser documenta cada formato
-# de monto con un ejemplo. No entran al inventario porque lo llenarían de
-# ruido y lo volverían inútil, que es lo mismo que le pasó a `--perfil`.
-FORMAS_DE_LABORATORIO = {
-    "cédula", "cédula o monto", "cédula o documento",
-    "cédula corta o extranjería", "cuenta o identificador largo",
-    "cuenta bancaria", "NIT", "tarjeta",
-}
-
-
 def inventario_de_lo_excluido(raiz: Path) -> list[str]:
     """Lo que hay en los archivos que `.privacidadignore` deja fuera.
 
@@ -859,6 +848,23 @@ def inventario_de_lo_excluido(raiz: Path) -> list[str]:
     La salida no es exigir cero: es exigir que lo que hay esté INVENTARIADO,
     y que cualquier línea nueva rompa el build. Sin número de línea, para que
     agregar un test arriba no mueva el inventario entero.
+
+    ⚠ NO SE FILTRA POR FORMA, y ése es el arreglo.
+
+    La primera versión descartaba un conjunto llamado FORMAS_DE_LABORATORIO
+    —cédula, cuenta, NIT, tarjeta— con el argumento de que los tests las
+    producen de por sí y llenarían el inventario de ruido. El argumento era
+    razonable y el efecto fue que el inventario cubría correos, teléfonos,
+    direcciones y rutas HOME, y dejaba fuera exactamente LAS JOYAS DE LA
+    CORONA. Reproducido en la ronda 7: una cédula, una cuenta y un NIT
+    reales metidos en `engine/tests/test_privacidad.py` pasaban los tres
+    pasos de CI en verde.
+
+    Se arregló el incidente de la ruta HOME y no la clase. La clase es: una
+    lista de excepciones POR FORMA es una lista de lo que el atacante debe
+    usar. El ruido no se maneja filtrando; lo maneja la línea base por
+    construcción —el archivo está commiteado y se diffea, así que lo
+    conocido no molesta y lo nuevo rompe el build.
     """
     globs = globs_ignorados(raiz, estricto=False)
     excluidos = sorted(
@@ -868,7 +874,7 @@ def inventario_de_lo_excluido(raiz: Path) -> list[str]:
     filas = set()
     for archivo in excluidos:
         for _, etiqueta, muestra, confianza in escanear(archivo):
-            if confianza != "alta" or etiqueta in FORMAS_DE_LABORATORIO:
+            if confianza != "alta":
                 continue
             filas.add(f"{archivo.relative_to(raiz)} · {etiqueta} · {muestra}")
     return sorted(filas)
