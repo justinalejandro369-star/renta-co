@@ -1134,6 +1134,52 @@ class TestMenoresDelMotorRonda7(unittest.TestCase):
             "cambiar el flag no cambió nada: el motor no lo está leyendo",
         )
 
+    def test_la_particion_del_tope_no_pierde_ni_duplica_nada(self):
+        """Cada deducción va a UN lado del tope, no a ninguno y no a los dos.
+
+        Este test existe porque el de arriba no bastaba. La mutación
+        M87-flags-del-tope-no-se-leen —cambiar el filtro de `ded_fijas` por
+        `if True` sin tocar el de `fuera_fijas`— ESCAPÓ: deja el 1% de
+        factura electrónica contado a los dos lados, y «voltear el flag
+        cambia el impuesto» seguía siendo cierto.
+
+        Es exactamente la lección de todas las rondas: la aserción se
+        escribió para el caso que se acababa de arreglar y no para la clase
+        de error. La clase acá es la PARTICIÓN, y se comprueba con los dos
+        subtotales que el motor ya emite.
+        """
+        p = self._perfil(deducciones={
+            "gmf_pagado": 4_000_000,
+            "intereses_vivienda": 8_000_000,
+            "medicina_prepagada": 9_561_408,
+            "aportes_voluntarios": 30_000_000,
+            "compras_con_factura_electronica": 40_000_000,
+            "dependientes": 3,
+        })
+        SUELTOS = (
+            "− GMF deducible (50% del 4x1000 pagado)",
+            "− Intereses de vivienda",
+            "− Medicina prepagada",
+            "− Aportes voluntarios AFP / AFC",
+            "− Dependientes (10% renta de trabajo)",
+            "− Dependientes (72 UVT c/u — FUERA del tope)",
+            "− Deducción 1% compras con factura electrónica",
+        )
+        for ruta in ("A", "B"):
+            por_concepto = {r.concepto: r.valor
+                            for r in liquidar(p, self.par, ruta).renglones}
+            self.assertGreater(
+                por_concepto["− Deducción 1% compras con factura electrónica"], 0,
+                "sin el 1% de factura electrónica esta guarda no prueba nada",
+            )
+            self.assertEqual(
+                por_concepto["  = Subtotal deducciones dentro del tope"]
+                + por_concepto["  = Subtotal deducciones fuera del tope"],
+                sum(por_concepto[c] for c in SUELTOS),
+                f"ruta {ruta}: alguna deducción está contada dos veces o "
+                f"ninguna. Los dos lados del tope tienen que sumar el total.",
+            )
+
     def test_sacar_del_tope_una_deduccion_no_puede_subir_el_impuesto(self):
         """Invariante de la partición: lo que queda FUERA del tope siempre
         resta entero, así que sacarla nunca puede empeorar."""

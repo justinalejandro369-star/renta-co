@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Inyector de mutaciones — mide si la suite sirve para algo.
 
-    python3 scripts/mutaciones.py          # las 52
+    python3 scripts/mutaciones.py          # las 100
     python3 scripts/mutaciones.py M11      # una sola
 
 Un test que pasa no dice nada; lo que dice algo es un test que FALLA cuando
@@ -11,6 +11,13 @@ la capa de datos no detectaba nada.
 
 Regla de uso: después de agregar tests, agrega también la mutación que
 dicen atrapar, y comprueba que la atrapan. Si escapa, el test no sirve.
+
+Y ojo con la otra forma de que una mutación escape: que el test sí exista
+pero no pruebe la CLASE. M87 —cambiar el filtro de `ded_fijas` por `if True`
+sin tocar el de `fuera_fijas`— escapó teniendo un test dedicado, porque el
+test comprobaba «voltear el flag cambia el impuesto» y eso seguía siendo
+cierto con el 1% de factura electrónica contado a los dos lados del tope. Lo
+que faltaba era la invariante: los dos lados tienen que SUMAR el total.
 
 Ojo con las mutaciones FALSAS —las que no cambian el comportamiento—. Una
 de ellas (leer `ingresos_brutos_uvt` en vez de `consignaciones_uvt`, que en
@@ -136,8 +143,8 @@ MUTACIONES = [
      "    if not isinstance(valor, (int, float)) or isinstance(valor, bool):\n        return [f\"{ruta} debe ser un n\u00famero",
      "    if False:\n        return [f\"{ruta} debe ser un n\u00famero"),
     ("M27-dependientes-sin-tope", "engine/perfil.py",
-     "    elif dep > 4:",
-     "    elif dep > 40:"),
+     "    elif dep > 5:",
+     "    elif dep > 50:"),
 
     # ---- parámetros ------------------------------------------------
     ("M28-cop-no-multiplica", "engine/parametros.py",
@@ -275,8 +282,8 @@ MUTACIONES = [
      "    desfase = _desfase_con_el_ledger(Path(args.expediente), p)",
      "    desfase = []"),
     ("M68-dep72-sin-rentas-de-trabajo", "engine/depuracion.py",
-     "    if trabajo > 0:\n        dep_72 = (min(n_dep, max_dep)",
-     "    if True:\n        dep_72 = (min(n_dep, max_dep)"),
+     "    if trabajo > 0:\n        dep_72 = min(n_dep, max_dep) * uvt_por_dep * uvt",
+     "    if True:\n        dep_72 = min(n_dep, max_dep) * uvt_por_dep * uvt"),
     ("M69-sensibilidad-sobreestima", "engine/depuracion.py",
      "        return min(self.base_a, self.base_b) - min(self.saldo_a, self.saldo_b)",
      "        return max(self.ahorro_a, self.ahorro_b)"),
@@ -311,6 +318,65 @@ MUTACIONES = [
     ("M79-preambulo-rompe-la-importacion", "engine/adapters/generico.py",
      "        if linea.strip() and linea.count(\",\") + linea.count(\";\") >= 1:",
      "        if True:"),
+
+    # ---- ronda 7: el tope de costos por tipo de renta, la
+    #      exclusividad por dependiente, los flags del knowledge,
+    #      el art. 577, la discontinuidad del 241 y los patrones
+    #      nuevos del escáner ------------------------------------
+    ('M80-costos-sin-tope-por-tipo', 'engine/depuracion.py',
+     '        pasa = min(pedido, techo)',
+     '        pasa = pedido'),
+    ('M81-techo-ignora-los-incrngo-del-tipo', 'engine/depuracion.py',
+     '        techo = max(p.get(f"ingresos.{tipo}") - incrngo_tipo.get(tipo, 0.0), 0.0)',
+     '        techo = max(p.get(f"ingresos.{tipo}"), 0.0)'),
+    ('M82-la-renta-de-capital-reclama-los-costos', 'engine/perfil.py',
+     '        actividad = [t for t in TIPOS_DE_ACTIVIDAD if self.get(f"ingresos.{t}") > 0]',
+     '        actividad = [t for t in TIPOS_DE_RENTA if self.get(f"ingresos.{t}") > 0]'),
+    ('M83-atribucion-declarada-se-ignora', 'engine/perfil.py',
+     '            tipo = declarada.get(campo) or unico',
+     '            tipo = unico'),
+    ('M84-atribucion-con-typo-pasa-callada', 'engine/perfil.py',
+     '            if campo not in ESQUEMA["costos"]:',
+     '            if False:'),
+    ('M85-dependientes-sin-escenario-mixto', 'engine/depuracion.py',
+     '    if trabajo > 0 and n_dep > 1:\n        dep_72_resto = min(n_dep - 1, max_dep) * uvt_por_dep * uvt',
+     '    if False:\n        dep_72_resto = min(n_dep - 1, max_dep) * uvt_por_dep * uvt'),
+    ('M86-el-mixto-gasta-todos-los-dependientes', 'engine/depuracion.py',
+     '        dep_72_resto = min(n_dep - 1, max_dep) * uvt_por_dep * uvt',
+     '        dep_72_resto = min(n_dep, max_dep) * uvt_por_dep * uvt'),
+    ('M87-flags-del-tope-no-se-leen', 'engine/depuracion.py',
+     '        if par.get(f"{bloque}.dentro_del_tope_conjunto", True)',
+     '        if True'),
+    ('M88-marginal-devuelve-el-tramo-anterior', 'engine/depuracion.py',
+     '        if hasta == 0 or base_uvt < hasta:\n            return rango["tarifa"]',
+     '        if hasta == 0 or base_uvt <= hasta:\n            return rango["tarifa"]'),
+    ('M89-577-no-aproxima', 'engine/depuracion.py',
+     '    return int(round(valor / 1000) * 1000)',
+     '    return int(valor)'),
+    ('M90-no-avisa-la-discontinuidad-del-241', 'engine/depuracion.py',
+     '        if desde <= base_cop <= hasta:',
+     '        if False:'),
+    ('M91-monto-sin-la-senal-del-tipo', 'engine/adapters/generico.py',
+     '    if (not decimales and len(seps) > 1\n            and seps[-1] != seps[0] and len(set(seps[:-1])) == 1):',
+     '    if (False and len(seps) > 1\n            and seps[-1] != seps[0] and len(set(seps[:-1])) == 1):'),
+    ('M92-perfil-cosecha-cualquier-seccion', 'scripts/escanear_privacidad.py',
+     '        if normalizar(seccion) in SECCIONES_DE_PERSONAS:',
+     '        if True:'),
+    ('M93-perfil-cosecha-cualquier-clave', 'scripts/escanear_privacidad.py',
+     '        elif isinstance(nodo, str) and CLAVES_DE_PERSONA.fullmatch(clave):',
+     '        elif isinstance(nodo, str):'),
+    ('M94-el-inventario-no-mira-lo-excluido', 'scripts/escanear_privacidad.py',
+     '        if esta_ignorado(a, globs, raiz) and a.name != ARCHIVO_INVENTARIO',
+     '        if False'),
+    ('M95-nada-cruza-lineas', 'scripts/escanear_privacidad.py',
+     '    hallazgos += hallazgos_partidos(texto)',
+     '    hallazgos += []'),
+    ('M96-lo-partido-nunca-es-alta', 'scripts/escanear_privacidad.py',
+     '                    enmascarar(bruto), "alta" if contexto else "baja",',
+     '                    enmascarar(bruto), "baja",'),
+    ('M97-subtotal-de-deducciones-incompleto', 'engine/depuracion.py',
+     '    L._r("  = Subtotal deducciones dentro del tope", ded_fijas + e["dep_dentro"], 0,',
+     '    L._r("  = Subtotal deducciones dentro del tope", ded_fijas, 0,'),
 ]
 
 
