@@ -176,6 +176,42 @@ retenciones_practicadas     = 0   # suma de todos los certificados de retención
 saldo_a_favor_anio_anterior = 0
 
 # ── Verificaciones de riesgo ──────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────
+#  Año anterior — dos cuentas que la DIAN hace sola
+# ─────────────────────────────────────────────────────────────────────
+#
+# Sin estos dos datos el motor no puede correr ni la comparación patrimonial
+# (R-15) ni el beneficio de auditoría (R-16), y los dos chequeos dicen «NO SE
+# PUEDE CONCLUIR». Ese «no puede concluir» NO es un aprobado.
+#
+# Los dos salen de tu declaración del año pasado. Si no declaraste, ponlos en
+# 0 y déjalo dicho en el memo — no los borres.
+[anio_anterior]
+
+# Casilla «Total patrimonio líquido» de tu declaración del año anterior.
+#
+# El art. 236 grava como renta líquida el aumento de patrimonio que no
+# expliquen tus rentas. Es la primera cuenta automática que hace la DIAN, y
+# la fórmula de comparación es la del art. 237:
+#
+#     renta gravable + ganancia ocasional neta + rentas exentas
+#       − impuestos de renta pagados durante el año
+#
+# patrimonio_liquido = 0
+
+# Casilla «Impuesto neto de renta» de tu declaración del año anterior.
+#
+# Con este dato el motor te dice si te sirve el beneficio de auditoría del
+# art. 689-3: subiendo el impuesto neto un 35% frente al año anterior, la
+# declaración queda EN FIRME a los 6 MESES en vez de a los 36; con un 25%, a
+# los 12. Para un independiente con ingresos creciendo suele estar al alcance
+# sin hacer nada distinto, y cambia por completo el perfil de riesgo.
+#
+# Vigente para los años gravables 2024, 2025 y 2026 (Ley 2294 de 2023 art.
+# 69). El texto del art. 689-3 dice «2022 y 2023»: quien lo lea solo en el
+# Estatuto concluye que ya no aplica.
+# impuesto_neto = 0
+
 [verificaciones]
 # Consignaciones PROVENIENTES DE ACTIVIDADES GRAVADAS CON IVA.
 #
@@ -195,6 +231,18 @@ consignaciones_totales_anio = 0
 
 # ¿Tienes la planilla PILA de cada contratista al que le pagaste?
 contratistas_con_pila_verificada = false
+
+# ¿Descargaste la información exógena y la conciliaste contra tu ledger?
+#
+# Es lo que la DIAN YA SABE de ti antes de que declares: tus clientes, bancos
+# y plataformas reportaron lo que te pagaron y lo que te retuvieron. Un
+# ingreso que un tercero reportó y tú no declaraste es una diferencia que la
+# DIAN ve sin fiscalizar a nadie. Y una retención que TÚ declaras y nadie
+# reportó es la causal expresa del art. 689-3 para perder el beneficio de
+# auditoría.
+#
+# Va ANTES de calcular. Usa templates/conciliacion-exogena.md.
+exogena_descargada_y_conciliada = false
 
 # ¿Existe documento soporte de esos pagos, con numeración consecutiva?
 tiene_documento_soporte_de_pagos = false

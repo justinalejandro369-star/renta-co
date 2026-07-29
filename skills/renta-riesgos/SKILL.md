@@ -11,7 +11,7 @@ Escribe el resultado en `expediente/05-riesgos/riesgos.md`. Formato en `template
 
 ## Catálogo base del perfil freelance
 
-Evalúa los **trece**, siempre. Los que no apliquen se marcan como no aplicables, no se omiten — así el contador ve que se miraron.
+Evalúa los **dieciséis**, siempre. Los que no apliquen se marcan como no aplicables, no se omiten — así el contador ve que se miraron.
 
 **R-01, R-02, R-09, R-10 y R-11 los emite el motor** con los datos del perfil (`bin/renta calcular`), así que esos cinco llegan ya evaluados: cópialos de la salida, no los redactes de nuevo. Los otros seis los levantas tú.
 
@@ -127,6 +127,49 @@ Míralo de frente, porque es incómodo: **la palanca que esta herramienta promoc
 La segunda inconsistencia del mismo Comunicado 058: «la inclusión improcedente del beneficio de deducción del 1% sobre las compras soportadas con factura electrónica».
 
 **Mitigación:** son DOS condiciones concurrentes y casi nadie verifica la segunda — factura electrónica de venta con el NIT o cédula del contribuyente como ADQUIRIENTE, **y** pago por medio electrónico. Guarda el soporte del medio de pago junto con la factura.
+
+### R-15 · Renta por comparación patrimonial (arts. 236 y 237)
+**Severidad ALTA · El motor lo emite**
+
+Es la primera cuenta que la DIAN hace de forma automática. Si el patrimonio líquido creció más de lo que explican las rentas, la diferencia **se grava como renta líquida** (art. 236).
+
+Lo que se compara NO es la renta líquida a secas. El art. 237 fija la fórmula: `renta gravable + ganancia ocasional neta + rentas exentas − impuestos de renta y complementarios pagados durante el año`.
+
+**Mitigación:** el chequeo necesita `anio_anterior.patrimonio_liquido` en el perfil; sin él el motor dice que no puede concluir, y ese «no puede concluir» no es un aprobado. Si queda diferencia, hay que encontrar la causa justificativa y escribirla: valorizaciones nominales de inmuebles, herencias y donaciones (van a ganancia ocasional), préstamos recibidos —suben activo y pasivo a la vez—, INCRNGO. Si no hay ninguna, es ingreso no declarado.
+
+**Ojo:** como «impuestos pagados» el motor solo ve las retenciones. Si el contribuyente pagó el saldo de la declaración anterior, ese pago también resta y la diferencia sin justificar es MAYOR que la que imprime el motor.
+
+### R-16 · Beneficio de auditoría (art. 689-3)
+**Severidad INFO · Es una OPORTUNIDAD, no un riesgo · El motor lo emite**
+
+Subir el impuesto neto ≥35% frente al año anterior deja la declaración en firme a los **6 meses** en vez de a los 36; ≥25%, a los 12. Para un independiente con ingresos creciendo suele estar al alcance sin hacer nada distinto, y cambia por completo el perfil de riesgo de la declaración.
+
+Vigente para los años gravables 2024, 2025 y 2026 por la **Ley 2294 de 2023 art. 69**. El texto del art. 689-3 dice «2022 y 2023»: quien lo lea solo en el Estatuto concluye que ya no aplica.
+
+**Las tres condiciones que se pierden al resumir, y las tres muerden en este perfil:**
+1. Presentación oportuna y **PAGO TOTAL** dentro del plazo. Un día tarde o pagar en cuotas y el beneficio se cae entero.
+2. Si la declaración arroja **pérdida fiscal**, la DIAN conserva la facultad de fiscalizarla aunque corra el término. Es relevante acá: con un solo tipo de renta, los costos que exceden los ingresos producen pérdida fiscal declarable.
+3. No procede si se demuestra que las **retenciones declaradas son inexistentes** — otra razón para conciliar la exógena.
+
+**No lo presentes como una recomendación automática.** Renunciar a una deducción para alcanzar el umbral es una decisión de planeación legítima, pero es un cambio de posición: se propone, no se aplica.
+
+### R-17 · Conciliación contra la información exógena
+**Severidad ALTA · El motor lo emite · Va ANTES de calcular**
+
+La exógena es lo que la DIAN **ya sabe** antes de que el contribuyente declare: terceros —clientes, bancos, plataformas— reportaron lo que le pagaron y lo que le retuvieron, y de ahí sale la declaración sugerida del Muisca.
+
+Un ingreso que un tercero reportó y el contribuyente no declaró es una diferencia que la DIAN ve **sin fiscalizar a nadie**. Una retención declarada que nadie reportó es la causal expresa del art. 689-3 para perder el beneficio de auditoría.
+
+**Mitigación:** descargarla del portal (Consulta de información exógena reportada por terceros), conciliarla contra el ledger con `templates/conciliacion-exogena.md`, explicar cada diferencia, y solo entonces marcar `verificaciones.exogena_descargada_y_conciliada = true`.
+
+### Firmeza y conservación
+
+No es un riesgo numerado, pero cierra el expediente y faltaba por completo:
+
+- **Firmeza general:** 3 años desde el vencimiento del plazo para declarar (art. 714). Con beneficio de auditoría, 6 o 12 meses.
+- **Conservación:** el art. 632 obliga a guardar los soportes por el término de firmeza. En la práctica **5 años**, por las correcciones del art. 588 y la firmeza especial de las declaraciones con pérdidas o compensaciones (art. 147).
+- **El expediente no se borra al presentar. Se archiva.** Es el papel de trabajo.
+- **Firma de contador:** NO es obligatoria para este perfil. El art. 596 la exige a quienes estén obligados a llevar contabilidad **Y** superen 100.000 UVT de patrimonio bruto o ingresos brutos. Decirlo genera confianza — y trae su corolario incómodo: sin firma no hay ningún filtro profesional entre esta salida y el Muisca, así que toda la carga de control queda en los chequeos del motor y en quien los lea.
 
 ## Cómo escribir cada riesgo
 

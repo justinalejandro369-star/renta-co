@@ -477,3 +477,237 @@ fuente = "Estatuto Tributario arts. 336-1 y 651"
 [sanciones.minima]
 uvt = 10
 fuente = "Estatuto Tributario art. 639"
+
+# ─────────────────────────────────────────────────────────────────────
+#  Firmeza de la declaración
+# ─────────────────────────────────────────────────────────────────────
+[firmeza]
+
+[firmeza.general]
+meses = 36
+nota = """
+Regla general del art. 714, modificado por la Ley 1819 de 2016 art. 277: la
+declaración queda en firme a los TRES AÑOS de la fecha del vencimiento del
+plazo para declarar, o de la presentación si fue extemporánea, o de la
+solicitud de devolución si arrojó saldo a favor.
+
+Ni firmeza, ni conservar, ni 5 años aparecían en ningún sitio del repo,
+mientras PRIVACY.md enseñaba a borrar el expediente. El expediente ES el
+papel de trabajo: si la DIAN pregunta dentro del término de firmeza, lo que
+respalda cada renglón son esos archivos. Ver `[firmeza.conservacion]`.
+"""
+fuente = "Estatuto Tributario art. 714, modificado por Ley 1819 de 2016 art. 277"
+url = "https://estatuto.co/714"
+
+[firmeza.conservacion]
+anios = 5
+nota = """
+El art. 632, modificado por la Ley 962 de 2005 art. 46, obliga a conservar
+por el término de firmeza los soportes de la declaración. En la práctica se
+guardan CINCO años: tres de firmeza general más el margen de las
+correcciones del art. 588 y de la firmeza especial de las declaraciones con
+pérdidas o compensaciones (art. 147, hasta doce años en el peor caso).
+
+Consecuencia operativa para este proyecto: el expediente no se borra al
+presentar. Se archiva.
+"""
+fuente = "Estatuto Tributario art. 632, modificado por Ley 962 de 2005 art. 46"
+url = "https://estatuto.co/632"
+
+[firmeza.beneficio_de_auditoria]
+incremento_firmeza_6_meses = 0.35
+incremento_firmeza_12_meses = 0.25
+piso_impuesto_neto_uvt = 71
+anios_gravables = [2022, 2023, 2024, 2025, 2026]
+url_verificada = true
+verificado_el = 2026-07-29
+nota = """
+Es la palanca de planeación más grande que existe para el perfil objetivo de
+esta herramienta —un independiente con ingresos creciendo— y el repo no la
+mencionaba ni una vez. Bajar la firmeza de 36 meses a 6 cambia por completo
+el perfil de riesgo de una declaración.
+
+TEXTO LITERAL del art. 689-3, verificado el 2026-07-29 contra el normograma
+de la DIAN (Ley 2155 de 2021 art. 51, que es el que lo adiciona):
+
+  «Para los periodos gravables 2022 y 2023, la liquidación privada de los
+  contribuyentes del impuesto sobre la renta y complementarios que
+  incrementen su impuesto neto de renta en por lo menos un porcentaje mínimo
+  del treinta y cinco por ciento (35%), en relación con el impuesto neto de
+  renta del año inmediatamente anterior, quedará en firme si dentro de los
+  seis (6) meses siguientes a la fecha de su presentación no se hubiere
+  notificado emplazamiento para corregir o requerimiento especial o
+  emplazamiento especial o liquidación provisional, siempre que la
+  declaración sea debidamente presentada en forma oportuna y el pago total se
+  realice en los plazos que para tal efecto fije el Gobierno nacional.»
+
+  «Si el incremento del impuesto neto de renta es de al menos un porcentaje
+  mínimo del veinticinco por ciento (25%), en relación con el impuesto neto
+  de renta del año inmediatamente anterior, la declaración de renta quedará
+  en firme si dentro de los doce (12) meses siguientes a la fecha de su
+  presentación no se hubiere notificado emplazamiento para corregir o
+  requerimiento especial o emplazamiento especial o liquidación provisional,
+  siempre que la declaración sea debidamente presentada en forma oportuna y
+  el pago total se realice en los plazos que para tal efecto fije el Gobierno
+  nacional.»
+
+  «PARÁGRAFO 2o. Cuando el impuesto neto sobre la renta de la declaración
+  correspondiente al año gravable frente al cual debe cumplirse el requisito
+  del incremento sea inferior a 71 UVT, no procederá la aplicación del
+  beneficio de auditoría.»
+
+VIGENCIA PARA 2024–2026, verificada en la misma fuente. El texto del art.
+689-3 dice «2022 y 2023»; la prórroga NO está en el Estatuto sino en la ley
+del plan de desarrollo, y por eso es fácil leer el artículo y concluir que
+ya no aplica:
+
+  «ARTÍCULO 69. EL BENEFICIO DE AUDITORÍA. Prorróguese por los años gravables
+  2024, 2025 y 2026 el beneficio de auditoría consagrado en el artículo 51 de
+  la Ley 2155 de 2021.»
+
+CONDICIONES QUE SE PIERDEN AL RESUMIR, y las tres muerden en este perfil:
+
+  1. Presentación OPORTUNA y **PAGO TOTAL** dentro del plazo. Un saldo a
+     pagar en cuotas o un día tarde y el beneficio se cae entero.
+  2. Si la declaración arroja PÉRDIDA FISCAL, la DIAN conserva la facultad de
+     fiscalizarla aunque haya corrido el término. Es relevante acá: el
+     Decreto 1625 art. 1.2.1.20.5 inciso 5 dice que con UN SOLO tipo de renta
+     los costos que exceden los ingresos producen pérdida fiscal declarable.
+  3. No aplica a quien tenga beneficios por ubicación en zona geográfica
+     determinada, ni cuando se demuestre que las retenciones declaradas son
+     inexistentes.
+
+El piso de las 71 UVT se mide sobre el impuesto neto del año CONTRA EL CUAL
+se compara —el anterior—, no sobre el del año que se declara.
+
+⚠ El motor solo puede evaluar esto si el perfil trae
+`anio_anterior.impuesto_neto`. Sin ese dato, el chequeo R-16 dice que no
+puede concluir en vez de suponer.
+"""
+fuente = "Estatuto Tributario art. 689-3, adicionado por Ley 2155 de 2021 art. 51; prorrogado para los años gravables 2024 a 2026 por Ley 2294 de 2023 art. 69"
+url = "https://normograma.dian.gov.co/dian/compilacion/docs/ley_2155_2021.htm"
+cita_literal = [
+  "Para los periodos gravables 2022 y 2023, la liquidación privada de los contribuyentes del impuesto sobre la renta y complementarios que incrementen su impuesto neto de renta en por lo menos un porcentaje mínimo del treinta y cinco por ciento (35%), en relación con el impuesto neto de renta del año inmediatamente anterior, quedará en firme si dentro de los seis (6) meses siguientes a la fecha de su presentación no se hubiere notificado emplazamiento para corregir o requerimiento especial o emplazamiento especial o liquidación provisional, siempre que la declaración sea debidamente presentada en forma oportuna y el pago total se realice en los plazos que para tal efecto fije el Gobierno nacional.",
+  "Si el incremento del impuesto neto de renta es de al menos un porcentaje mínimo del veinticinco por ciento (25%), en relación con el impuesto neto de renta del año inmediatamente anterior, la declaración de renta quedará en firme si dentro de los doce (12) meses siguientes a la fecha de su presentación no se hubiere notificado emplazamiento para corregir o requerimiento especial o emplazamiento especial o liquidación provisional, siempre que la declaración sea debidamente presentada en forma oportuna y el pago total se realice en los plazos que para tal efecto fije el Gobierno nacional.",
+  "Cuando el impuesto neto sobre la renta de la declaración correspondiente al año gravable frente al cual debe cumplirse el requisito del incremento sea inferior a 71 UVT, no procederá la aplicación del beneficio de auditoría.",
+]
+sha256_fuente = "776b7d349a5519b5e3e037718df4c8466a6a260c5f78490b834a8a5cc193a9fb"
+
+# La prórroga va en SU PROPIO bloque porque está en OTRA norma y en otra URL,
+# y es la que decide si el beneficio existe para el año que se declara. El
+# art. 689-3 dice «2022 y 2023» y punto: quien lo lea en el Estatuto concluye
+# que ya no aplica. Meter esa cita dentro de la nota del bloque padre la
+# dejaba fuera del chequeo automático, porque `verificar_citas.py` busca cada
+# `cita_literal` en la URL de SU bloque. Una afirmación de vigencia sin
+# verificar es la más cara de todas: decide si la palanca se puede usar.
+[firmeza.beneficio_de_auditoria.prorroga]
+anios = [2024, 2025, 2026]
+url_verificada = true
+verificado_el = 2026-07-29
+nota = """
+  «ARTÍCULO 69. EL BENEFICIO DE AUDITORÍA. Prorróguese por los años gravables
+  2024, 2025 y 2026 el beneficio de auditoría consagrado en el artículo 51 de
+  la Ley 2155 de 2021. Dicha prórroga se cumplirá en las mismas condiciones
+  que exige el citado artículo de la Ley 2155 de 2021.»
+"""
+cita_literal = [
+  "Prorróguese por los años gravables 2024, 2025 y 2026 el beneficio de auditoría consagrado en el artículo 51 de la Ley 2155 de 2021.",
+]
+fuente = "Ley 2294 de 2023 art. 69 (Plan Nacional de Desarrollo 2022-2026)"
+url = "https://normograma.dian.gov.co/dian/compilacion/docs/ley_2294_2023.htm"
+sha256_fuente = "b8613920037cf46e37d0bb83d3f345632497f954be3ac4da1d31bd6e3be16a2a"
+
+# ─────────────────────────────────────────────────────────────────────
+#  Renta por comparación patrimonial — arts. 236 y 237
+# ─────────────────────────────────────────────────────────────────────
+[comparacion_patrimonial]
+aplica = true
+url_verificada = true
+verificado_el = 2026-07-29
+nota = """
+Es la primera cuenta que hace la DIAN de forma automática, y el motor no la
+corría.
+
+⚠ LA PRIMERA VERSIÓN DE ESTE BLOQUE SE ESCRIBIÓ DE MEMORIA y tenía los dos
+artículos mal. Es la quinta cita inexacta de este archivo, y la única cuyo
+error cambia el CÁLCULO y no solo el texto. Queda escrita porque enseña
+exactamente lo que este repo sigue haciendo mal: parafrasear una norma que
+no se abrió.
+
+  · El art. 236 decía «el aumento se debe a causas justificativas»; la norma
+    dice «el aumento patrimonial obedece a causas justificativas».
+  · El art. 237 lo describía como «ajustes por inflación y valorizaciones
+    nominales». No es eso: es la FÓRMULA DE AJUSTE, y define contra qué se
+    compara el incremento. Con la descripción inventada, R-15 comparaba
+    contra la renta líquida a secas y habría acusado de patrimonio
+    injustificado a quien tiene rentas exentas altas.
+
+TEXTO LITERAL, verificado el 2026-07-29 contra el Estatuto Tributario
+compilado en el normograma de la DIAN:
+
+  «Cuando la suma de la renta gravable, las rentas exentas y la ganancia
+  ocasional neta, resultare inferior a la diferencia entre el patrimonio
+  líquido del último período gravable y el patrimonio líquido del período
+  inmediatamente anterior, dicha diferencia se considera renta gravable, a
+  menos que el contribuyente demuestre que el aumento patrimonial obedece a
+  causas justificativas.»
+
+  «Para efectos de la determinación de la renta por comparación de
+  patrimonios, a la renta gravable se adicionará el valor de la ganancia
+  ocasional neta y las rentas exentas. De esta suma, se sustrae el valor de
+  los impuestos de renta y complementarios pagados durante el año gravable.»
+
+LO QUE ESO SIGNIFICA para el chequeo R-15:
+
+    justificado = renta gravable
+                + ganancia ocasional neta      ← fuera del alcance del motor
+                + rentas exentas
+                − impuestos de renta y complementarios PAGADOS en el año
+
+Los dos últimos términos van en direcciones opuestas y ninguno estaba: las
+rentas exentas suben lo justificado (menos alarmas) y los impuestos pagados
+lo bajan (más alarmas). El motor usa las retenciones practicadas como cota
+de los impuestos pagados y lo dice en el detalle del chequeo, porque el
+perfil no tiene el pago del saldo del año anterior.
+
+Lo que justifica el incremento y el motor NO ve: valorizaciones nominales de
+inmuebles, herencias y donaciones (van a ganancia ocasional, fuera de
+alcance), y préstamos recibidos —que suben el activo y el pasivo a la vez—.
+Lo que NO lo justifica es el ingreso no declarado, que es justo lo que este
+chequeo busca.
+
+⚠ Requiere `anio_anterior.patrimonio_liquido`. Sin ese dato el chequeo R-15
+dice que no puede concluir.
+"""
+cita_literal = [
+  "Cuando la suma de la renta gravable, las rentas exentas y la ganancia ocasional neta, resultare inferior a la diferencia entre el patrimonio líquido del último período gravable y el patrimonio líquido del período inmediatamente anterior, dicha diferencia se considera renta gravable, a menos que el contribuyente demuestre que el aumento patrimonial obedece a causas justificativas.",
+  "Para efectos de la determinación de la renta por comparación de patrimonios, a la renta gravable se adicionará el valor de la ganancia ocasional neta y las rentas exentas. De esta suma, se sustrae el valor de los impuestos de renta y complementarios pagados durante el año gravable.",
+]
+fuente = "Estatuto Tributario arts. 236 y 237"
+url = "https://normograma.dian.gov.co/dian/compilacion/docs/estatuto_tributario.htm"
+sha256_fuente = "ad092d61a0d3db0aec35954e0c61484799c25cb5d06ca3f47f6c84b0fff6fb70"
+
+# ─────────────────────────────────────────────────────────────────────
+#  Información exógena
+# ─────────────────────────────────────────────────────────────────────
+[exogena]
+nota = """
+La conciliación contra la exógena es la PRIMERA parada de cualquier contador
+y en este repo estaba como plan B en el bloque de cierre. Es lo que la DIAN
+ya sabe de ti antes de que declares: los terceros —clientes, bancos,
+plataformas— reportan lo que te pagaron y lo que te retuvieron, y de ahí sale
+la declaración sugerida del Muisca.
+
+Consecuencia práctica: un ingreso que un tercero reportó y tú no declaraste
+es una diferencia que la DIAN ve sin fiscalizar a nadie. Y al revés, una
+retención que tú declaras y nadie reportó es la causal expresa del art. 689-3
+para perder el beneficio de auditoría.
+
+Se baja del portal de la DIAN (Consulta de información exógena reportada por
+terceros) y se compara contra el ledger antes de calcular nada.
+
+Este bloque no trae cifras: es una obligación de PROCESO, no un parámetro.
+El chequeo que la exige es R-17.
+"""
+fuente = "Estatuto Tributario arts. 631 y 631-3; resolución anual de la DIAN que fija los obligados y los plazos"
+url = "https://www.dian.gov.co/"

@@ -73,6 +73,26 @@ Si lo usas de plantilla para tus datos, **cópialo a `expediente/` primero**. Lo
 
 No pegues tu expediente. Reproduce el problema contra `expediente.ejemplo/` o corre `/renta-co:privacidad` sobre lo que vas a pegar. Un issue con la cédula de alguien queda indexado por Google para siempre.
 
+## ⚠ Antes de borrar: el expediente es papel de trabajo
+
+Esta sección explica cómo borrarlo todo, y estuvo aquí sola durante siete
+rondas. Le faltaba lo primero que diría un contador:
+
+**No borres el expediente de una declaración que presentaste.** Archívalo.
+
+- El art. 714 deja la declaración en firme a los **3 años** del vencimiento
+  del plazo (6 o 12 meses si aplica el beneficio de auditoría del art. 689-3;
+  ver R-16). Dentro de ese término la DIAN puede preguntar.
+- El art. 632 obliga a **conservar los soportes** por ese término. En la
+  práctica se guardan **5 años**, por las correcciones del art. 588 y la
+  firmeza especial de las declaraciones con pérdidas o compensaciones
+  (art. 147, hasta doce años en el peor caso).
+- Lo que respalda cada renglón del formulario son esos archivos. Sin ellos,
+  una pregunta rutinaria se vuelve una determinación oficial.
+
+Borra el expediente cuando la declaración esté **en firme y conservada** —o
+cuando nunca la presentaste—. Lo de abajo es para eso.
+
 ## Borrar todo
 
 El plugin no guarda estado en ningún lado propio: ni en `~/.claude`, ni en un caché global, ni en variables de entorno. Todo lo tuyo vive donde apunte `--expediente`.

@@ -158,7 +158,7 @@ Y trae el calificador que casi nadie cita: el art. 437 par. 3 num. 6 habla de co
 
 ### Registra los riesgos en vez de esconderlos
 
-Trece riesgos del perfil freelance, con fundamento normativo, probabilidad de objeción y mitigación. Cinco de ellos los emite el motor con los datos del perfil. Cuando una posición es agresiva pero defendible, queda por escrito con su nivel, para que la decisión se tome informada.
+Dieciséis riesgos del perfil freelance, con fundamento normativo, probabilidad de objeción y mitigación. Ocho de ellos los emite el motor con los datos del perfil. Cuando una posición es agresiva pero defendible, queda por escrito con su nivel, para que la decisión se tome informada.
 
 ### El criterio, explícito
 

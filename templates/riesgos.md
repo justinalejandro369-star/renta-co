@@ -161,6 +161,89 @@ pago junto con la factura.
 
 ---
 
+## R-15 · Renta por comparación patrimonial (arts. 236 y 237 ET)
+
+**Qué es:** la primera cuenta que la DIAN hace de forma automática. Si tu
+patrimonio líquido creció más de lo que explican tus rentas, la diferencia se
+**grava como renta líquida**.
+
+**Lo que se compara** (fórmula del art. 237, no la renta líquida a secas):
+
+    renta gravable + ganancia ocasional neta + rentas exentas
+      − impuestos de renta y complementarios pagados durante el año
+
+**Patrimonio líquido {{año-1}}:** {{$X}} · **{{año}}:** {{$X}} · **Δ:** {{$X}}
+**Suma del art. 237:** {{$X}} · **Sin justificar:** {{$X}}
+
+**Causas justificativas que aplican en este caso:** {{}}
+
+> Suelen serlo: valorizaciones nominales de inmuebles, herencias y donaciones
+> (van a ganancia ocasional), préstamos recibidos —suben el activo y el pasivo
+> a la vez— y los INCRNGO. **No** lo es el ingreso no declarado.
+>
+> El motor solo ve las retenciones como «impuestos pagados». Si pagaste el
+> saldo de la declaración anterior, ese pago también resta.
+
+---
+
+## R-16 · Beneficio de auditoría (art. 689-3 ET)
+
+**Qué es:** subir el impuesto neto ≥35% frente al año anterior deja la
+declaración **en firme a los 6 meses** en vez de a los 36. Con ≥25%, a los 12.
+
+**Impuesto neto {{año-1}}:** {{$X}} · **{{año}}:** {{$X}} · **Incremento:** {{%}}
+**Veredicto del motor:** {{}}
+
+**Las tres condiciones que se pierden al resumir:**
+
+- [ ] Presentación **oportuna** y **PAGO TOTAL** dentro del plazo. Un día tarde
+      o pagar en cuotas y el beneficio se cae entero.
+- [ ] Si la declaración arroja **pérdida fiscal**, la DIAN conserva la facultad
+      de fiscalizarla aunque haya corrido el término.
+- [ ] No procede si se demuestra que las **retenciones declaradas son
+      inexistentes** — otra razón para conciliar la exógena (R-17).
+
+> Vigente para los años gravables 2024, 2025 y 2026 por la Ley 2294 de 2023
+> art. 69. El texto del art. 689-3 dice «2022 y 2023»: quien lo lea solo en el
+> Estatuto concluye que ya no aplica.
+
+---
+
+## R-17 · Conciliación contra la información exógena
+
+**Qué es:** lo que la DIAN **ya sabe** de ti antes de que declares. Tus
+clientes, bancos y plataformas reportaron lo que te pagaron y lo que te
+retuvieron, y de ahí sale la declaración sugerida del Muisca.
+
+- [ ] Exógena descargada del portal (Consulta de información exógena reportada
+      por terceros)
+- [ ] Conciliada contra el ledger con `templates/conciliacion-exogena.md`
+- [ ] `verificaciones.exogena_descargada_y_conciliada = true` en el perfil
+
+**Diferencias encontradas y su explicación:** {{}}
+
+> Va **antes** de calcular, no después. Un ingreso que un tercero reportó y tú
+> no declaraste es una diferencia que la DIAN ve sin fiscalizar a nadie.
+
+---
+
+## Firmeza y conservación
+
+**La declaración de {{año}} queda en firme el:** {{fecha}}
+({{36 meses / 12 meses / 6 meses según R-16}})
+
+**Conservar el expediente hasta:** {{fecha}}
+
+> Art. 714: tres años desde el vencimiento del plazo para declarar. Art. 632:
+> conservar los soportes por el término de firmeza — en la práctica **cinco
+> años**, por las correcciones del art. 588 y la firmeza especial de las
+> declaraciones con pérdidas o compensaciones (art. 147).
+>
+> **El expediente no se borra al presentar. Se archiva.** Es el papel de
+> trabajo: si la DIAN pregunta, lo que respalda cada renglón son esos archivos.
+
+---
+
 ## Resumen
 
 | ID | Riesgo | Severidad | Se resuelve con |
@@ -178,8 +261,11 @@ pago junto con la factura.
 | R-11 | Costos sin tipo de renta | MEDIA | {{}} |
 | R-07 | Deducciones improcedentes | BAJA-MEDIA | {{}} |
 | R-08 | TRM promedio | BAJA | {{}} |
+| R-15 | Comparación patrimonial | ALTA | {{}} |
+| R-16 | Beneficio de auditoría | INFO | {{}} |
+| R-17 | Exógena sin conciliar | ALTA | {{}} |
 
-> Los cinco que el motor emite —R-01, R-02, R-09, R-10, R-11— se copian de la
-> salida de `bin/renta calcular`, no se redactan de nuevo. Si el motor imprime
+> Los que el motor emite —R-01, R-02, R-09, R-10, R-11, R-15, R-16, R-17— se
+> copian de la salida de `bin/renta calcular`, no se redactan de nuevo. Si el motor imprime
 > un `R-xx` que no está en esta plantilla, agrégalo igual: un riesgo detectado
 > que no llega al expediente es el error invisible de este proyecto.

@@ -1091,6 +1091,161 @@ class TestCitasNormativas(unittest.TestCase):
                           f"motor no lo advierte al calcular")
 
 
+class TestChequeosDeCierre(unittest.TestCase):
+    """R-15, R-16 y R-17: el CONTENIDO del veredicto, no que exista.
+
+    Es la regla de todo este archivo, y acá importa el doble porque los tres
+    chequeos deciden sobre datos que el perfil puede no traer. Un chequeo que
+    calle cuando falta el dato es peor que no tenerlo: el silencio se lee
+    como aprobación.
+    """
+
+    def setUp(self):
+        self.par = P.cargar(2025)
+
+    def _checks(self, **secciones):
+        from engine.depuracion import comparar
+
+        base = {"contribuyente": {"anio_gravable": 2025, "residente_fiscal": True},
+                "ingresos": {"rentas_trabajo_honorarios": 200_000_000}}
+        for seccion, campos in secciones.items():
+            base.setdefault(seccion, {}).update(campos)
+        r = comparar(perfil_con(**base), self.par)
+        return {v["id"]: v for v in r["verificaciones"]}
+
+    # ---- R-15 · comparación patrimonial -----------------------------
+
+    def test_r15_sin_el_dato_dice_que_no_puede_concluir(self):
+        c = self._checks()["R-15"]
+        self.assertIn("NO SE PUEDE CONCLUIR", c["estado"])
+        self.assertIn("anio_anterior.patrimonio_liquido", c["detalle"])
+        self.assertNotEqual(c["severidad"], "info",
+                            "un dato faltante que impide una cuenta que la "
+                            "DIAN hace sola no es informativo")
+
+    def test_r15_detecta_el_patrimonio_que_no_explican_las_rentas(self):
+        """El caso que el chequeo existe para atrapar: patrimonio que crece
+        mucho más que la renta declarada."""
+        c = self._checks(
+            anio_anterior={"patrimonio_liquido": 100_000_000},
+            patrimonio={"activos": [{"nombre": "Apto", "valor": 900_000_000}]},
+        )["R-15"]
+        self.assertIn("REVISAR", c["estado"])
+        self.assertEqual(c["severidad"], "alta")
+        self.assertIn("236", c["fuente"])
+
+    def test_r15_no_grita_cuando_el_incremento_esta_explicado(self):
+        """El control. Sin esto, la guarda pasaría por alarmar siempre."""
+        c = self._checks(
+            anio_anterior={"patrimonio_liquido": 100_000_000},
+            patrimonio={"activos": [{"nombre": "Ahorros", "valor": 110_000_000}]},
+        )["R-15"]
+        self.assertIn("CUADRA", c["estado"])
+        self.assertEqual(c["severidad"], "info")
+
+    def test_r15_usa_la_formula_del_237_y_no_la_renta_liquida_sola(self):
+        """La quinta cita inexacta de este proyecto cambiaba ESTA cuenta.
+
+        El art. 237 manda sumar las rentas exentas y restar los impuestos
+        pagados. La primera versión comparaba contra la renta líquida a
+        secas, y por tanto acusaba de patrimonio injustificado a quien tiene
+        rentas exentas altas — o sea al usuario de la Ruta B, media
+        población objetivo.
+
+        Se comprueba por el EFECTO: dos perfiles con la misma renta líquida
+        y distinta renta exenta no pueden dar el mismo veredicto.
+        """
+        c = self._checks(
+            anio_anterior={"patrimonio_liquido": 100_000_000},
+            patrimonio={"activos": [{"nombre": "Ahorros", "valor": 260_000_000}]},
+            anticipos={"retenciones_practicadas": 20_000_000},
+        )["R-15"]
+        # La explicación tiene que mostrar los tres términos de la fórmula.
+        for pieza in ("renta gravable", "rentas exentas", "impuestos"):
+            self.assertIn(pieza, c["detalle"],
+                          f"el detalle no muestra «{pieza}» de la fórmula del "
+                          f"art. 237: {c['detalle'][:200]}")
+
+    # ---- R-16 · beneficio de auditoría ------------------------------
+
+    def test_r16_sin_el_dato_dice_que_no_puede_concluir(self):
+        c = self._checks()["R-16"]
+        self.assertIn("NO SE PUEDE CONCLUIR", c["estado"])
+        self.assertIn("anio_anterior.impuesto_neto", c["detalle"])
+
+    def test_r16_el_piso_de_71_uvt_excluye(self):
+        piso = self.par.cop(71)
+        c = self._checks(anio_anterior={"impuesto_neto": int(piso) - 1_000_000})["R-16"]
+        self.assertIn("NO APLICA", c["estado"])
+        self.assertIn("71", c["detalle"])
+
+    def test_r16_reconoce_el_incremento_del_35_por_ciento(self):
+        """Con un impuesto neto anterior bajo (pero sobre el piso), el del
+        año actual lo supera de sobra: firmeza en 6 meses."""
+        piso = int(self.par.cop(71))
+        c = self._checks(anio_anterior={"impuesto_neto": piso + 100_000})["R-16"]
+        self.assertIn("6 meses", c["estado"])
+
+    def test_r16_dice_las_tres_condiciones_que_tumban_el_beneficio(self):
+        """Un beneficio anunciado sin sus condiciones es una trampa: las tres
+        se pierden al resumir y las tres muerden en este perfil."""
+        piso = int(self.par.cop(71))
+        d = self._checks(anio_anterior={"impuesto_neto": piso + 100_000})["R-16"]["detalle"]
+        self.assertIn("PAGO TOTAL", d)
+        self.assertIn("pérdida fiscal", d)
+        self.assertIn("inexistentes", d)
+
+    def test_r16_no_sale_en_un_ano_sin_prorroga(self):
+        """El art. 689-3 dice «2022 y 2023». Que aplique a 2025 depende de la
+        Ley 2294 art. 69, que es OTRA norma: si un año no está en la lista,
+        el chequeo no puede anunciar el beneficio."""
+        anios = set(self.par.get("firmeza.beneficio_de_auditoria.anios_gravables") or [])
+        anios |= set(self.par.get("firmeza.beneficio_de_auditoria.prorroga.anios") or [])
+        self.assertIn(2025, anios)
+        self.assertNotIn(2030, anios,
+                         "no inventes prórrogas: 2030 no está prorrogado por "
+                         "ninguna ley publicada")
+
+    # ---- R-17 · exógena ---------------------------------------------
+
+    def test_r17_exige_la_conciliacion_y_es_alta(self):
+        c = self._checks()["R-17"]
+        self.assertEqual(c["severidad"], "alta")
+        self.assertIn("exógena", c["detalle"].lower())
+        self.assertIn("conciliacion-exogena.md", c["detalle"])
+
+    def test_r17_se_calla_cuando_ya_se_concilio(self):
+        checks = self._checks(
+            verificaciones={"exogena_descargada_y_conciliada": True})
+        self.assertNotIn("R-17", checks)
+
+    def test_la_plantilla_de_conciliacion_existe_de_verdad(self):
+        """R-17 manda usar un archivo. Si no existe, el chequeo manda al
+        usuario a la nada — que es peor que no mandarlo a ningún lado."""
+        ruta = RAIZ / "templates" / "conciliacion-exogena.md"
+        self.assertTrue(ruta.exists())
+        texto = ruta.read_text(encoding="utf-8")
+        self.assertIn("Retenciones", texto,
+                      "la conciliación sin el lado de las retenciones deja "
+                      "fuera la causal del art. 689-3")
+
+    # ---- firmeza y conservación -------------------------------------
+
+    def test_privacy_no_manda_borrar_el_papel_de_trabajo(self):
+        """`PRIVACY.md` enseñaba a hacer `rm -rf expediente/` sin decir que
+        el expediente es el soporte de la declaración durante el término de
+        firmeza. Borrarlo convierte una pregunta rutinaria de la DIAN en una
+        determinación oficial."""
+        texto = (RAIZ / "PRIVACY.md").read_text(encoding="utf-8")
+        self.assertIn("firme", texto)
+        self.assertIn("632", texto)
+        # Y la advertencia va ANTES de las instrucciones para borrar.
+        self.assertLess(texto.index("papel de trabajo"),
+                        texto.index("## Borrar todo"),
+                        "la advertencia de conservación va después de las "
+                        "instrucciones de borrado")
+
+
 class TestCitaChequeable(unittest.TestCase):
     """`url_verificada = true` tiene que ser una afirmación CHEQUEABLE.
 
@@ -1317,7 +1472,8 @@ class TestCatalogoDeRiesgos(unittest.TestCase):
         cuantos = len(self._mencionados_en("skills/renta-riesgos/SKILL.md"))
         palabras = {
             8: "ocho", 9: "nueve", 10: "diez", 11: "once", 12: "doce",
-            13: "trece", 14: "catorce", 15: "quince",
+            13: "trece", 14: "catorce", 15: "quince", 16: "dieciséis",
+            17: "diecisiete", 18: "dieciocho", 19: "diecinueve", 20: "veinte",
         }
         esperada = palabras.get(cuantos)
         self.assertIsNotNone(

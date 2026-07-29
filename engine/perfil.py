@@ -65,10 +65,31 @@ ESQUEMA: dict[str, dict] = {
         "retenciones_practicadas": 0,
         "saldo_a_favor_anio_anterior": 0,
     },
+    # Datos del año ANTERIOR. Dos cuentas que la DIAN hace de forma
+    # automática dependen de ellos y el motor no las podía correr:
+    #
+    #   · la renta por comparación patrimonial de los arts. 236 y 237, que es
+    #     la primera cuenta automática que hace la DIAN;
+    #   · el beneficio de auditoría del art. 689-3, que compara el impuesto
+    #     neto contra el del año inmediatamente anterior.
+    #
+    # Van en `None` y no en 0 a propósito: un 0 afirmaría que el año pasado
+    # el contribuyente no tenía patrimonio ni pagó impuesto, y sobre esa
+    # afirmación falsa los dos chequeos darían un veredicto con cara de
+    # cierto. Sin el dato, el chequeo dice que no puede concluir — que es la
+    # misma regla que ya rige `es_comerciante`.
+    "anio_anterior": {
+        "patrimonio_liquido": None,
+        "impuesto_neto": None,
+    },
     "verificaciones": {
         "consignaciones_totales_anio": 0,
         "contratistas_con_pila_verificada": False,
         "tiene_documento_soporte_de_pagos": False,
+        # Conciliación contra la información exógena: la primera parada de
+        # cualquier contador, y en este repo estaba como plan B en el bloque
+        # de cierre. Es lo que la DIAN ya sabe antes de que declares.
+        "exogena_descargada_y_conciliada": False,
     },
 }
 
@@ -396,6 +417,17 @@ def validar(perfil: Perfil, anios_disponibles: list[int] | None = None) -> list[
                 elif valor < 0:
                     errores.append(f"{ruta} no puede ser negativo ({valor})")
                 continue
+            errores += _errores_de_monto(ruta, valor)
+
+    # Los campos de `anio_anterior` no los alcanza el bucle de arriba: su
+    # defecto es `None`, no un número. Pero si el usuario SÍ los llena, son
+    # pesos y tienen que validarse como tales — si no, `180.000` se cuela por
+    # la única puerta que quedaba abierta y R-15 compara patrimonios con seis
+    # órdenes de magnitud de diferencia sin decir nada.
+    for campo in ESQUEMA["anio_anterior"]:
+        ruta = f"anio_anterior.{campo}"
+        valor = perfil.get(ruta)
+        if valor is not None:
             errores += _errores_de_monto(ruta, valor)
 
     # Patrimonio: la única sección con montos que NO está en ESQUEMA, porque

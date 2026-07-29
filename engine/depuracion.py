@@ -1143,6 +1143,239 @@ def verificar_obligaciones(p: Perfil, par: Parametros) -> list[dict]:
     return checks
 
 
+def _chequeos_de_cierre(p: Perfil, par: Parametros,
+                        mejor: Liquidacion) -> list[dict]:
+    """R-15, R-16 y R-17: las tres cuentas que hace un contador y el motor no.
+
+    Van APARTE de `verificar_obligaciones` y reciben la liquidación ya hecha,
+    en vez de liquidar por dentro. `verificar_obligaciones` es una función
+    barata sobre el perfil y hay tests que la llaman con un `Parametros`
+    recortado a los bloques que ese chequeo necesita; meterle una liquidación
+    completa adentro la volvía dependiente de TODO el archivo de parámetros y
+    reventaba con un KeyError desde un test que no tenía nada que ver.
+
+    Las tres dependen de datos que el perfil puede no traer, y las tres
+    responden «NO SE PUEDE CONCLUIR» en ese caso en vez de suponer. La regla
+    ya rige `es_comerciante` en OBL-02: suponer sobre un hecho que nunca se
+    vio produce un veredicto con cara de cierto, que es la salida más cara
+    que puede dar esta herramienta.
+    """
+    checks: list[dict] = []
+
+    # ---- R-15 · renta por comparación patrimonial (arts. 236 y 237) ----
+    #
+    # Es la primera cuenta que la DIAN hace de forma automática, y el motor
+    # no la corría. Si el patrimonio líquido creció más de lo que explican
+    # las rentas declaradas, la diferencia se GRAVA como renta líquida.
+    pl_hoy = p.patrimonio_bruto - p.pasivos
+    pl_ayer = p.get("anio_anterior.patrimonio_liquido")
+    cp = par.get("comparacion_patrimonial", {})
+    if pl_ayer is None:
+        checks.append({
+            "id": "R-15",
+            "titulo": "Comparación patrimonial (arts. 236 y 237) sin evaluar",
+            "estado": "NO SE PUEDE CONCLUIR",
+            "detalle": (
+                f"Falta `anio_anterior.patrimonio_liquido` en el perfil, así "
+                f"que no se puede correr la comparación patrimonial. Es la "
+                f"primera cuenta automática que hace la DIAN: si tu patrimonio "
+                f"líquido creció más de lo que explican las rentas que "
+                f"declaraste, la diferencia se grava como renta líquida. Sácalo "
+                f"de la casilla de patrimonio líquido de tu declaración del año "
+                f"pasado ({p.anio_gravable - 1}); si no declaraste, ponlo en 0 "
+                f"y déjalo dicho en el memo."
+            ),
+            "severidad": "media",
+            "fuente": cp.get("fuente", "ET arts. 236 y 237"),
+        })
+    else:
+        incremento = pl_hoy - pl_ayer
+        # La fórmula es la del art. 237, no «la renta líquida a secas»:
+        #
+        #     justificado = renta gravable
+        #                 + ganancia ocasional neta   ← fuera de alcance
+        #                 + rentas exentas
+        #                 − impuestos de renta PAGADOS durante el año
+        #
+        # Los dos últimos términos van en direcciones opuestas y la primera
+        # versión de este chequeo no tenía ninguno: comparaba contra la renta
+        # líquida sola, y por tanto acusaba de patrimonio injustificado a
+        # quien tiene rentas exentas altas — que es el usuario de la Ruta B,
+        # o sea media población objetivo.
+        exentas = -sum(r.valor for r in mejor.renglones
+                       if r.signo == -1 and "exenta" in r.concepto.lower())
+        # Cota de «impuestos pagados durante el año». El perfil no tiene el
+        # pago del saldo del año anterior, así que se usan las retenciones,
+        # que sí son impuesto de renta pagado en el año. Queda dicho en el
+        # detalle: subestimar este término hace que el chequeo avise de MÁS,
+        # que en un chequeo de riesgo es el lado correcto del error.
+        pagados = p.get("anticipos.retenciones_practicadas")
+        justificado = mejor.renta_liquida + exentas - pagados
+        sin_justificar = incremento - justificado
+        if sin_justificar > 0:
+            checks.append({
+                "id": "R-15",
+                "titulo": "El patrimonio creció más de lo que explican las rentas",
+                "estado": f"REVISAR — {_cop(sin_justificar)} sin justificar",
+                "detalle": (
+                    f"Tu patrimonio líquido pasó de {_cop(pl_ayer)} a "
+                    f"{_cop(pl_hoy)}: subió {_cop(incremento)}.\n"
+                    f"Contra eso, la suma del art. 237 da {_cop(justificado)}: "
+                    f"renta gravable {_cop(mejor.renta_liquida)} + rentas "
+                    f"exentas {_cop(exentas)} − impuestos de renta pagados en "
+                    f"el año {_cop(pagados)}. Quedan {_cop(sin_justificar)} sin "
+                    f"explicar.\n"
+                    f"⚠ Como «impuestos pagados» el motor solo puede ver tus "
+                    f"retenciones. Si además pagaste el saldo de la "
+                    f"declaración anterior, ese pago también resta y la "
+                    f"diferencia sin justificar es MAYOR que la de arriba. Y "
+                    f"la ganancia ocasional neta, que suma, está fuera del "
+                    f"alcance de este motor.\n"
+                    f"El art. 236 grava esa diferencia como renta líquida SALVO "
+                    f"que demuestres una causa justificativa. Las que suelen "
+                    f"serlo y este motor no ve: valorizaciones nominales de "
+                    f"inmuebles (art. 237), herencias y donaciones —que van a "
+                    f"ganancia ocasional, fuera del alcance de este motor—, "
+                    f"préstamos recibidos (suben el activo y el pasivo a la "
+                    f"vez), y los INCRNGO que ya restaste arriba.\n"
+                    f"Si no encuentras una, la diferencia es ingreso no "
+                    f"declarado y hay que declararlo. Reconstruye el patrimonio "
+                    f"activo por activo con tu contador antes de presentar."
+                ),
+                "severidad": "alta",
+                "fuente": cp.get("fuente", "ET arts. 236 y 237"),
+            })
+        else:
+            checks.append({
+                "id": "R-15",
+                "titulo": "Comparación patrimonial",
+                "estado": "CUADRA",
+                "detalle": (
+                    f"El patrimonio líquido subió {_cop(incremento)} y la suma "
+                    f"del art. 237 —renta gravable {_cop(mejor.renta_liquida)} "
+                    f"+ rentas exentas {_cop(exentas)} − impuestos pagados "
+                    f"{_cop(pagados)}— da {_cop(justificado)}: el incremento "
+                    f"está explicado. No hay renta por comparación patrimonial."
+                ),
+                "severidad": "info",
+                "fuente": cp.get("fuente", "ET arts. 236 y 237"),
+            })
+
+    # ---- R-16 · beneficio de auditoría (art. 689-3) ----
+    #
+    # La palanca de planeación más grande que existe para este perfil, y el
+    # repo no la mencionaba ni una vez: baja la firmeza de 36 meses a 6.
+    ba = par.get("firmeza.beneficio_de_auditoria", {}) or {}
+    anios = ba.get("anios_gravables") or []
+    prorroga = par.get("firmeza.beneficio_de_auditoria.prorroga", {}) or {}
+    anios = sorted(set(anios) | set(prorroga.get("anios") or []))
+    neto_ayer = p.get("anio_anterior.impuesto_neto")
+    piso = par.cop(ba.get("piso_impuesto_neto_uvt", 71))
+    if p.anio_gravable not in anios:
+        pass                                    # sin prórroga vigente, no aplica
+    elif neto_ayer is None:
+        checks.append({
+            "id": "R-16",
+            "titulo": "Beneficio de auditoría (art. 689-3) sin evaluar",
+            "estado": "NO SE PUEDE CONCLUIR",
+            "detalle": (
+                f"Falta `anio_anterior.impuesto_neto` en el perfil. Con ese "
+                f"dato el motor te dice si te conviene el beneficio de "
+                f"auditoría: subiendo el impuesto neto un 35% frente al año "
+                f"anterior, la declaración queda EN FIRME a los 6 meses en vez "
+                f"de a los 36; con un 25%, a los 12 meses. Para un "
+                f"independiente con ingresos creciendo suele estar al alcance "
+                f"sin hacer nada distinto. Sácalo de la casilla «Impuesto neto "
+                f"de renta» de tu declaración de {p.anio_gravable - 1}."
+            ),
+            "severidad": "media",
+            "fuente": ba.get("fuente", "ET art. 689-3"),
+        })
+    elif neto_ayer < piso:
+        checks.append({
+            "id": "R-16",
+            "titulo": "Beneficio de auditoría (art. 689-3)",
+            "estado": "NO APLICA — el año anterior no llega al piso",
+            "detalle": (
+                f"El par. 2 del art. 689-3 lo excluye cuando el impuesto neto "
+                f"del año contra el cual se compara es inferior a "
+                f"{ba.get('piso_impuesto_neto_uvt', 71)} UVT ({_cop(piso)}). El "
+                f"tuyo de {p.anio_gravable - 1} fue {_cop(neto_ayer)}. Tu "
+                f"declaración queda en firme por la regla general del art. 714: "
+                f"{par.get('firmeza.general.meses', 36)} meses."
+            ),
+            "severidad": "info",
+            "fuente": ba.get("fuente", "ET art. 689-3"),
+        })
+    else:
+        p35 = ba.get("incremento_firmeza_6_meses", 0.35)
+        p25 = ba.get("incremento_firmeza_12_meses", 0.25)
+        meta35, meta25 = neto_ayer * (1 + p35), neto_ayer * (1 + p25)
+        neto = mejor.impuesto_neto
+        if neto >= meta35:
+            estado = "SÍ — firmeza en 6 meses, ya lo cumples"
+            faltante = ""
+        elif neto >= meta25:
+            estado = "SÍ — firmeza en 12 meses"
+            faltante = (f" Te faltan {_cop(meta35 - neto)} de impuesto neto "
+                        f"para bajarla a 6 meses.")
+        else:
+            estado = "NO con el cálculo actual"
+            faltante = (f" Te faltan {_cop(meta25 - neto)} para los 12 meses y "
+                        f"{_cop(meta35 - neto)} para los 6.")
+        checks.append({
+            "id": "R-16",
+            "titulo": "Beneficio de auditoría (art. 689-3)",
+            "estado": estado,
+            "detalle": (
+                f"Tu impuesto neto de {p.anio_gravable} es {_cop(neto)} y el de "
+                f"{p.anio_gravable - 1} fue {_cop(neto_ayer)}. Los umbrales son "
+                f"{_cop(meta25)} (+{p25:.0%} → firmeza en 12 meses) y "
+                f"{_cop(meta35)} (+{p35:.0%} → firmeza en 6 meses).{faltante}\n"
+                f"⚠ Tres condiciones que se pierden al resumir y que muerden "
+                f"acá: (1) presentación oportuna y PAGO TOTAL dentro del plazo "
+                f"—un día tarde o pagar en cuotas y el beneficio se cae "
+                f"entero—; (2) si la declaración arroja pérdida fiscal la DIAN "
+                f"conserva la facultad de fiscalizarla aunque corra el término; "
+                f"(3) no procede si se demuestra que las retenciones "
+                f"declaradas son inexistentes — otra razón para conciliar la "
+                f"exógena (R-17).\n"
+                f"Renunciar a una deducción para alcanzar el umbral es una "
+                f"decisión legítima de planeación, pero es un cambio de "
+                f"posición: consúltalo con tu contador."
+            ),
+            "severidad": "info",
+            "fuente": ba.get("fuente", "ET art. 689-3"),
+        })
+
+    # ---- R-17 · conciliación contra la información exógena ----
+    if not p.get("verificaciones.exogena_descargada_y_conciliada"):
+        checks.append({
+            "id": "R-17",
+            "titulo": "No has conciliado contra la información exógena",
+            "estado": "PENDIENTE",
+            "detalle": (
+                "La exógena es lo que la DIAN YA SABE de ti antes de que "
+                "declares: tus clientes, bancos y plataformas reportaron lo "
+                "que te pagaron y lo que te retuvieron, y de ahí sale la "
+                "declaración sugerida del Muisca.\n"
+                "Un ingreso que un tercero reportó y tú no declaraste es una "
+                "diferencia que la DIAN ve sin fiscalizar a nadie. Y una "
+                "retención que tú declaras y nadie reportó es la causal "
+                "expresa del art. 689-3 para perder el beneficio de auditoría.\n"
+                "Descárgala del portal (Consulta de información exógena "
+                "reportada por terceros), concíliala contra tu ledger con "
+                "`templates/conciliacion-exogena.md`, y marca "
+                "`verificaciones.exogena_descargada_y_conciliada = true`. Es la "
+                "primera parada de cualquier contador y va ANTES de calcular, "
+                "no después."
+            ),
+            "severidad": "alta",
+            "fuente": par.get("exogena.fuente", "ET arts. 631 y 631-3"),
+        })
+    return checks
+
+
 # ---------------------------------------------------------------------
 # Comparación completa
 # ---------------------------------------------------------------------
@@ -1211,7 +1444,9 @@ def comparar(p: Perfil, par: Parametros) -> dict:
         "mejor_ruta": mejor,
         "diferencia_entre_rutas": abs(a.saldo - b.saldo),
         "sensibilidad": sensibilidad(p, par),
-        "verificaciones": verificar_obligaciones(p, par),
+        "verificaciones": (verificar_obligaciones(p, par)
+                           + _chequeos_de_cierre(
+                               p, par, a if mejor == "A" else b)),
         "patrimonio_bruto": p.patrimonio_bruto,
         "pasivos": p.pasivos,
         "patrimonio_liquido": p.patrimonio_bruto - p.pasivos,
