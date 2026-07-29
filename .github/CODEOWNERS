@@ -1,0 +1,47 @@
+# Quién revisa qué.
+#
+# ─────────────────────────────────────────────────────────────────────
+#  El renglón que importa: knowledge/ necesita un CONTADOR PÚBLICO
+# ─────────────────────────────────────────────────────────────────────
+#
+# `knowledge/**` no es código. Es la lectura de la norma, y es lo único de
+# este repositorio que un programador no puede revisar. Todo lo demás —el
+# motor, el escáner, las ocho capas del benchmark— comprueba que el código
+# hace lo que knowledge/ dice; ninguna capa puede comprobar que knowledge/
+# dice lo que dice la ley.
+#
+# Este proyecto ya FABRICÓ una cita normativa: escribió entre guillemets,
+# como texto del Decreto 2231, una frase que no existe, con una URL que
+# devolvía «norma no disponible». Sobrevivió a revisión humana y a todos los
+# tests. Y lleva cinco citas inexactas encontradas en dos rondas, la última
+# por una máquina —`scripts/verificar_citas.py`— y no por una persona.
+#
+# `verificar_citas.py` comprueba que la cita esté en la fuente. No puede
+# comprobar que la fuente sea la correcta, que esté vigente, ni que la
+# INTERPRETACIÓN sea sostenible. Eso solo lo hace alguien con tarjeta
+# profesional.
+#
+# Ningún proyecto comparable de impuestos open source tiene esta línea. Es el
+# hueco del estado del arte y la señal de confianza más barata que existe.
+#
+# ⚠ PENDIENTE: falta el handle. Hasta que haya un contador público revisor,
+#   esta regla apunta al mantenedor y por lo tanto NO es una revisión
+#   independiente. Que esté escrito así es a propósito: un CODEOWNERS que
+#   finge una revisión que no ocurre es peor que no tenerlo.
+/knowledge/           @justinalejandro369-star
+/knowledge/**         @justinalejandro369-star
+
+# El motor y las capas de verificación: revisión de código.
+/engine/              @justinalejandro369-star
+/benchmark/           @justinalejandro369-star
+
+# Privacidad. Un cambio acá puede publicar la cédula de alguien, y ya pasó
+# una vez con una ruta HOME real que sobrevivió cuarenta commits.
+/scripts/escanear_privacidad.py   @justinalejandro369-star
+/.privacidadignore                @justinalejandro369-star
+/PRIVACY.md                       @justinalejandro369-star
+
+# Lo que el agente lee y ejecuta sin que nadie lo mire.
+/skills/              @justinalejandro369-star
+/templates/           @justinalejandro369-star
+/AGENTS.md            @justinalejandro369-star

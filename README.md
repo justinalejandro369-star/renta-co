@@ -2,11 +2,14 @@
 
 # renta-co
 
-**Tu declaración de renta en Colombia, hecha por tu agente de código.**
+**Segunda opinión auditable sobre tu declaración de renta en Colombia.**
 
 Suelta tus extractos en una carpeta. Contesta unas preguntas.
-Sale el borrador del Formulario 210, las dos rutas de depuración comparadas en pesos,
-la deducción que te estabas perdiendo y el memo para tu contador.
+Sale el camino completo de cada consignación al renglón del Formulario 210 —con la TRM
+oficial de su fecha—, las dos rutas de depuración comparadas en pesos, las deducciones
+que no estabas usando y un memo que tu contador puede objetar línea por línea.
+
+Para revisar lo que ya preparaste, no para reemplazar a quien lo prepara.
 
 [![verificar](https://github.com/justinalejandro369-star/renta-co/actions/workflows/verificar.yml/badge.svg)](https://github.com/justinalejandro369-star/renta-co/actions/workflows/verificar.yml)
 [![licencia MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
@@ -16,6 +19,26 @@ la deducción que te estabas perdiendo y el memo para tu contador.
 [Instalación](#instalación) · [Cómo funciona](#cómo-funciona) · [Por qué existe](#por-qué-existe) · [Privacidad](PRIVACY.md) · [Aviso legal](DISCLAIMER.md)
 
 </div>
+
+<!-- ESTADO:INICIO — generado por scripts/estado_del_motor.py, no lo edites a mano -->
+
+## Estado
+
+**Este motor declara 2 norma(s) que NO implementa correctamente.** No es una lista de deseos: sale de banderas en `knowledge/ag2025/parametros.toml`, la misma advertencia que imprime `bin/renta calcular` al arrancar, y esta sección se genera de ahí — no se escribe a mano.
+
+- **Techo de costos por tipo de renta** — El Decreto 1625 art. 1.2.1.20.5 lo exige cuando hay ingresos de MÁS DE UN tipo de renta de la cédula general, y el motor hace lo contrario: si hay dos actividades y el perfil no declara `[costos.atribucion]`, no lo aplica. Con un solo tipo de renta la norma dice que hay pérdida fiscal declarable, y el motor topa.
+
+- **Deducción del 10% por dependientes (art. 387)** — El motor evalúa la vía del 10% y la mezcla también para quien no tiene rentas laborales. El Consejo de Estado (Auto 21-ene-2025, exp. 28541) sostiene que solo pueden aplicar la del art. 336 num. 3. Es una posición discutida, y el motor toma la favorable sin decirlo.
+
+Los dos renglones afectados salen marcados en la salida del motor. Mientras las banderas sigan en `false`, **esos renglones no sirven para una declaración real sin contador**.
+
+### Para qué SÍ sirve hoy
+
+Como **auditor de segunda opinión**: verificar que una declaración ya preparada incluye las deducciones que te corresponden, y que la conversión de cada ingreso en moneda extranjera usa la TRM oficial de su fecha. El camino de extracto a renglón del 210 es auditable línea por línea y tu contador lo puede objetar donde quiera.
+
+No como preparador que reemplace a un contador. Ver [DISCLAIMER.md](DISCLAIMER.md).
+
+<!-- ESTADO:FIN -->
 
 ---
 

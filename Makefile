@@ -1,4 +1,4 @@
-.PHONY: test benchmark ejemplo privacidad inventario citas golden verificar limpiar ayuda
+.PHONY: test benchmark ejemplo privacidad inventario citas golden estado verificar limpiar ayuda
 
 ayuda:
 	@echo "renta-co"
@@ -10,6 +10,7 @@ ayuda:
 	@echo "  make inventario  regenera la línea base de lo que .privacidadignore excluye"
 	@echo "  make citas       chequea las citas de knowledge/ contra la fuente (USA RED)"
 	@echo "  make golden      APRUEBA la línea base del motor. Mira el diff antes de commitear"
+	@echo "  make estado      regenera la sección Estado del README desde knowledge/"
 	@echo "  make verificar   todo lo anterior menos citas (lo que corre CI en cada push)"
 	@echo "  make limpiar     borra __pycache__ y artefactos"
 
@@ -48,6 +49,15 @@ citas:
 golden:
 	python3 -m benchmark.golden --aprobar
 	@git diff --stat -- benchmark/golden.json || true
+
+# La sección «Estado» del README sale de las mismas banderas
+# `motor_implementa_correctamente` que produce la advertencia del motor. No se
+# escribe a mano: el README prometía un producto terminado mientras el motor
+# confesaba dos normas mal implementadas al arrancar, y quien llega por GitHub
+# lee el README y nunca corre el comando.
+estado:
+	python3 scripts/estado_del_motor.py --escribir
+	@git diff --stat -- README.md || true
 
 verificar: test benchmark ejemplo privacidad
 	@echo ""

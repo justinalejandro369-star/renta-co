@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Reportar una fuga de datos personales o un cálculo silenciosamente mal
+    url: https://github.com/justinalejandro369-star/renta-co/security/advisories/new
+    about: Van por security advisory privado. Ver SECURITY.md.

@@ -1091,6 +1091,68 @@ class TestCitasNormativas(unittest.TestCase):
                           f"motor no lo advierte al calcular")
 
 
+class TestEstadoDelReadme(unittest.TestCase):
+    """El README no puede prometer lo que el motor confiesa que no hace.
+
+    Era la asimetría de producto número uno de este repositorio: el README
+    describía un producto terminado y el motor advertía al arrancar que hay
+    dos normas que no implementa correctamente. Las dos cosas eran ciertas a
+    la vez, y quien llega por GitHub lee el README y nunca corre el comando.
+
+    La sección se GENERA de las mismas banderas de knowledge/ de las que sale
+    la advertencia del motor. Escribirla a mano habría reproducido el
+    problema en un mes: es lo que le pasó al catálogo de riesgos, que llegó a
+    tener tres conteos distintos en tres archivos, y al docstring del
+    benchmark, que decía «cuatro capas» con cinco corriendo.
+    """
+
+    def _generador(self):
+        import importlib.util
+
+        ruta = RAIZ / "scripts" / "estado_del_motor.py"
+        spec = importlib.util.spec_from_file_location("estado_del_motor", ruta)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_el_readme_commiteado_es_el_que_produce_el_generador(self):
+        mod = self._generador()
+        readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+        self.assertIn(mod.INICIO, readme, "el README perdió los marcadores")
+        actual = mod.INICIO + readme.split(mod.INICIO, 1)[1].split(mod.FIN)[0] + mod.FIN
+        self.assertEqual(
+            actual.strip(), mod.bloque().strip(),
+            "la sección «Estado» del README no coincide con las banderas de "
+            "knowledge/. Corre `python3 scripts/estado_del_motor.py "
+            "--escribir` y revisa el diff",
+        )
+
+    def test_el_readme_nombra_las_normas_que_el_motor_no_implementa(self):
+        """El control: sin esto, el test de arriba pasaría con un bloque
+        vacío mientras el motor sigue advirtiendo."""
+        mod = self._generador()
+        pendientes = mod.pendientes()
+        self.assertTrue(pendientes, "sin banderas esto no prueba nada")
+        readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+        for ruta in pendientes:
+            titulo = mod.QUE_SIGNIFICA[ruta][0]
+            self.assertIn(titulo, readme,
+                          f"{ruta} está marcado como no implementado y el "
+                          f"README no lo dice")
+
+    def test_la_licencia_es_MIT_pura(self):
+        """GitHub la clasificaba como «Other» mientras el badge decía MIT,
+        porque tenía un párrafo pegado después del texto de la licencia. Un
+        badge que contradice lo que GitHub reporta es una promesa que el
+        lector puede desmentir en un clic."""
+        texto = (RAIZ / "LICENSE").read_text(encoding="utf-8").strip()
+        self.assertTrue(texto.startswith("MIT License"))
+        self.assertTrue(texto.endswith("SOFTWARE."),
+                        "LICENSE tiene texto después del MIT; muévelo a "
+                        "DISCLAIMER.md o a NOTICE")
+        self.assertNotIn("DISCLAIMER", texto)
+
+
 class TestChequeosDeCierre(unittest.TestCase):
     """R-15, R-16 y R-17: el CONTENIDO del veredicto, no que exista.
 
