@@ -1,0 +1,58 @@
+name: citas
+
+# APARTE de `verificar`, y a propósito.
+#
+# Este job usa RED. Si corriera junto a la aritmética, un DNS caído o un
+# portal de la DIAN en mantenimiento dejarían el repo rojo por algo que no es
+# un error de liquidación — y un rojo que no significa nada se empieza a
+# ignorar. Es la tercera vez en este proyecto que un falso positivo masivo
+# apaga una detección: el hook de privacidad bloqueaba el 42% de los commits
+# y el mantenedor terminó viviendo en `--no-verify`, que es como se coló una
+# ruta HOME real al repo publicado.
+#
+# Semanal, no por commit: lo que este job vigila —que una norma se modifique
+# sin que la URL muera— pasa en escala de meses, no de push.
+
+on:
+  schedule:
+    # Lunes 09:00 UTC. Cron de GitHub puede retrasarse; no importa.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+  push:
+    # Cuando alguien toca knowledge/ o el chequeo mismo, sí conviene ya.
+    paths:
+      - "knowledge/**"
+      - "scripts/verificar_citas.py"
+      - ".github/workflows/citas.yml"
+
+jobs:
+  citas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Las citas siguen en la fuente, y la fuente no cambió
+        # Comprueba tres cosas que ningún link-checker comprueba:
+        #
+        #  1. Soft-404. La URL muerta que tuvo este repo devolvía
+        #     302 → norma_error.php → HTTP 200. `lychee`,
+        #     `markdown-link-check` y `curl -fL` la reportan sana. Lo que la
+        #     delata es la URL FINAL, no el estado.
+        #  2. Que cada `cita_literal` aparezca palabra por palabra.
+        #  3. Content drift, invisible al estado HTTP: si el sha256 del texto
+        #     cambió, alguien tiene que volver a leer la norma.
+        run: python3 scripts/verificar_citas.py
+
+      - name: Si falló, esto es lo que hay que hacer
+        if: failure()
+        run: |
+          echo "::warning::Una cita de knowledge/ dejó de coincidir con su fuente."
+          echo "NO regeneres el sha256 sin leer el diff de la norma. El hash"
+          echo "cambia tanto si la DIAN re-maquetó la página como si modificó"
+          echo "el artículo que citamos, y solo lo segundo cambia el cálculo."
+          echo "Reléela, ajusta el bloque, y solo entonces:"
+          echo "  python3 scripts/verificar_citas.py --registrar"

@@ -208,7 +208,19 @@ RUIDO = re.compile(
     # dígitos "porque parece un radicado" abriría la puerta de par en par.
     r"|\b(?:concepto|conceptos|resoluci[oó]n|resoluciones|res\.|radicado|circular|"
     r"sentencia|decreto|ley)\s+(?:unificad[oa]\s+)?(?:DIAN\s+)?[\d.\-]{3,}"
-    r"|\bUVT\b",
+    r"|\bUVT\b"
+    # Digestos y objetos de git: 32+ caracteres hex CON al menos una letra
+    # a–f. Una cédula colombiana tiene 8–11 dígitos y ninguna letra, así que
+    # la forma las separa sin ambigüedad — y sin abrir ninguna puerta: un
+    # dato personal no se disfraza de sha256 sin dejar de ser legible.
+    #
+    # Séptima vez que un artefacto de este repo dispara al detector que el
+    # repo escribió. Las seis anteriores se cerraron con la regla
+    # «descríbelo, no lo transcribas»; con un sha256 esa regla no sirve,
+    # porque el hash ES el dato. Cuando el falso positivo es estructural, se
+    # arregla el detector — si no, el mantenedor termina en `--no-verify`,
+    # que es literalmente cómo se coló una ruta HOME real al repo publicado.
+    r"|\b(?=[0-9a-f]{32,}\b)[0-9a-f]*[a-f][0-9a-f]*\b",
     re.IGNORECASE,
 )
 

@@ -134,6 +134,44 @@ class TestNoRuido(unittest.TestCase):
         h = escanear_texto("El tope conjunto es de 1.340 UVT y la exención 790 UVT.")
         self.assertEqual(altas(h), [])
 
+    def test_un_digesto_no_es_una_cedula(self):
+        """Séptima vez que un artefacto de este repo dispara a su detector.
+
+        `sha256_fuente` en knowledge/ existe para detectar el *content drift*
+        de una norma citada, y sus 64 caracteres contienen corridas de 8 a 11
+        dígitos: tres hallazgos ALTA, build rojo, en el commit que introdujo
+        la defensa contra las citas fabricadas.
+
+        Las seis veces anteriores se cerraron con «descríbelo, no lo
+        transcribas». Acá esa regla no sirve: el hash ES el dato. Cuando el
+        falso positivo es estructural hay que arreglar el DETECTOR, porque la
+        alternativa —vivir en `--no-verify`— ya le costó a este repo una ruta
+        HOME publicada.
+        """
+        for digesto in (
+            "e01f735682ae0bb57d1103b81ffbdd22fc759320cf814e90ec69328761a366e4",
+            "f515e5075500321a2333d921ac86c8821c2bacd3fac4e7e3b8e3bcf3c0c81cee",
+            "9b685eb3f1c2a4d5e6f708192a3b4c5d6e7f8091",          # objeto git
+            "d41d8cd98f00b204e9800998ecf8427e",                  # md5
+        ):
+            h = escanear_texto(f'sha256_fuente = "{digesto}"')
+            self.assertEqual(altas(h), [], f"{digesto[:12]}… salió como PII")
+
+    def test_pero_el_hex_no_puede_servir_de_escondite(self):
+        """El control, y es el que importa: la excepción tiene que ser
+        ESTRUCTURAL —hex con letras, 32+— y no una puerta abierta."""
+        # Una cédula en la misma línea que un hash sigue disparando.
+        h = escanear_texto(
+            'sha256 = "e01f735682ae0bb57d1103b81ffbdd22fc759320cf814e90ec6932876"'
+            "  # cédula 1016086781"
+        )
+        self.assertTrue(altas(h), "la cédula al lado de un hash se perdió")
+        # Y una corrida larga de dígitos SIN letras no es hex: sigue siendo
+        # un identificador. Es el caso que convertiría la regla en un truco
+        # de evasión trivial.
+        h = escanear_texto("id = " + "0123456789" * 6 + "0123")
+        self.assertTrue(altas(h), "64 dígitos sin letras pasaron como digesto")
+
     def test_referencias_normativas(self):
         h = escanear_texto(
             "Art. 336 num. 4 ET, Decreto 1625 de 2016, Ley 2277 de 2022, "

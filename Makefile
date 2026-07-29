@@ -1,4 +1,4 @@
-.PHONY: test benchmark ejemplo privacidad inventario verificar limpiar ayuda
+.PHONY: test benchmark ejemplo privacidad inventario citas verificar limpiar ayuda
 
 ayuda:
 	@echo "renta-co"
@@ -8,7 +8,8 @@ ayuda:
 	@echo "  make ejemplo     corre el expediente de ejemplo de punta a punta"
 	@echo "  make privacidad  escanea el repo en busca de datos personales"
 	@echo "  make inventario  regenera la línea base de lo que .privacidadignore excluye"
-	@echo "  make verificar   todo lo anterior (lo que corre CI)"
+	@echo "  make citas       chequea las citas de knowledge/ contra la fuente (USA RED)"
+	@echo "  make verificar   todo lo anterior menos citas (lo que corre CI en cada push)"
 	@echo "  make limpiar     borra __pycache__ y artefactos"
 
 test:
@@ -31,6 +32,13 @@ privacidad:
 inventario:
 	python3 scripts/escanear_privacidad.py --inventario > scripts/privacidad-esperado.txt
 	@git diff --stat -- scripts/privacidad-esperado.txt || true
+
+# USA RED, y por eso NO entra en `verificar`. Un chequeo de red que puede
+# poner en rojo la aritmética del motor produce rojos que no significan nada,
+# y un rojo que no significa nada se empieza a ignorar. Corre solo en el job
+# semanal (.github/workflows/citas.yml) o a mano.
+citas:
+	python3 scripts/verificar_citas.py
 
 verificar: test benchmark ejemplo privacidad
 	@echo ""

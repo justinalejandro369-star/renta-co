@@ -145,6 +145,50 @@ def _leer_toml(ruta: Path) -> dict:
 # mostrarlo copiado del año anterior no es incompleto, es falso.
 NO_HEREDABLES = {"plazos"}
 
+# Campos que NUNCA se heredan: cada uno AFIRMA QUE ALGUIEN ABRIÓ LA FUENTE
+# para ese año gravable. Heredarlos presenta como verificadas citas que nadie
+# comprobó contra la norma vigente del año hijo.
+#
+# Medido: ag2026 heredaba 23 bloques de ag2025 incluyendo `fuente`, `url` y
+# `url_verificada`. O sea, `verificar_citas.py` habría reportado ✓ sobre un
+# año cuyas citas nadie leyó, y la bandera que existe justo para impedir una
+# cita fabricada se copiaba sola de año en año.
+#
+# `fuente` y `url` SÍ se heredan a propósito: son el punto de partida para
+# verificar, y quitarlos dejaría al año hijo sin ninguna pista. Lo que no se
+# hereda es la AFIRMACIÓN de haberlos verificado.
+CAMPOS_NO_HEREDABLES = {
+    "url_verificada", "verificado_el", "sha256_fuente", "cita_literal",
+}
+
+
+def _sin_afirmaciones_de_verificacion(nodo):
+    """Copia un subárbol heredado quitándole lo que afirma verificación.
+
+    `motor_implementa_correctamente` va aparte y es ASIMÉTRICO a propósito:
+
+      · `true` es una afirmación optimista sobre el año hijo → no se hereda.
+      · `false` es una ADVERTENCIA sobre el motor, que es el mismo para todos
+        los años → sí se hereda.
+
+    Meterlo entero en CAMPOS_NO_HEREDABLES habría borrado la advertencia al
+    heredar, apagando el ⚠ del encabezado de `calcular` precisamente en el
+    año menos verificado. Es el modo de falla que este repo ya cometió tres
+    veces: arreglar el incidente y crear otro de la misma clase en el arreglo.
+    """
+    if isinstance(nodo, dict):
+        salida = {}
+        for k, v in nodo.items():
+            if k in CAMPOS_NO_HEREDABLES:
+                continue
+            if k == "motor_implementa_correctamente" and v is not False:
+                continue
+            salida[k] = _sin_afirmaciones_de_verificacion(v)
+        return salida
+    if isinstance(nodo, list):
+        return [_sin_afirmaciones_de_verificacion(v) for v in nodo]
+    return nodo
+
 
 def _fusionar(base: dict, encima: dict, raiz: bool = True) -> tuple[dict, set[str]]:
     """Fusiona `encima` sobre `base`. Devuelve el resultado y qué se heredó.
@@ -153,7 +197,7 @@ def _fusionar(base: dict, encima: dict, raiz: bool = True) -> tuple[dict, set[st
     padre, así que reportar sus claves como heredadas es un falso positivo
     que infla la advertencia y le quita valor a la que sí importa.
     """
-    resultado = dict(base)
+    resultado = _sin_afirmaciones_de_verificacion(base)
     if raiz:
         for bloque in NO_HEREDABLES:
             resultado.pop(bloque, None)

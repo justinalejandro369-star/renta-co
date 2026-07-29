@@ -1091,6 +1091,164 @@ class TestCitasNormativas(unittest.TestCase):
                           f"motor no lo advierte al calcular")
 
 
+class TestCitaChequeable(unittest.TestCase):
+    """`url_verificada = true` tiene que ser una afirmación CHEQUEABLE.
+
+    Tal como estaba, la bandera decía «alguien abrió la fuente» y nadie podía
+    volver a comprobarlo sin releer la norma entera a mano. Eso no es una
+    verificación, es una promesa.
+
+    Lo que la vuelve chequeable son tres campos, y cada uno tapa un agujero
+    distinto que este repo ya pisó:
+
+      · `cita_literal` — el texto exacto, como dato y no enterrado en una
+        nota en prosa. `scripts/verificar_citas.py` lo busca en la fuente.
+        En su PRIMERA corrida encontró una cuarta cita inexacta: el decreto
+        dice «reglamentaria: caso en el cual» con dos puntos, y el TOML tenía
+        coma. Ninguna revisión humana de este repo la vio en dos rondas.
+      · `verificado_el` — cuándo. Sin fecha no se puede envejecer una cita.
+      · `sha256_fuente` — contra el *content drift*, que es invisible al
+        estado HTTP: hasta el 75% del contenido citado cambia en tres años
+        sin que la URL muera.
+
+    Estos tests NO tocan la red. La red va en el job semanal aparte: un DNS
+    caído no puede poner en rojo la aritmética del motor.
+    """
+
+    def _bloques(self, anio=2025):
+        import tomllib
+
+        with open(RAIZ / "knowledge" / f"ag{anio}" / "parametros.toml", "rb") as f:
+            datos = tomllib.load(f)
+        bloques = {}
+
+        def recorrer(nodo, ruta=""):
+            if not isinstance(nodo, dict):
+                return
+            if "fuente" in nodo or "nota" in nodo:
+                bloques[ruta] = nodo
+            for k, v in nodo.items():
+                recorrer(v, f"{ruta}.{k}" if ruta else k)
+
+        recorrer(datos)
+        return bloques
+
+    def test_url_verificada_trae_los_tres_campos_que_la_hacen_chequeable(self):
+        incompletos = []
+        for anio in (2025, 2026):
+            for ruta, bloque in self._bloques(anio).items():
+                if bloque.get("url_verificada") is not True:
+                    continue
+                faltan = [c for c in ("cita_literal", "verificado_el",
+                                      "sha256_fuente")
+                          if not bloque.get(c)]
+                if faltan:
+                    incompletos.append(f"ag{anio}:{ruta} → falta {', '.join(faltan)}")
+        self.assertEqual(
+            incompletos, [],
+            "estos bloques afirman estar verificados sin dejar con qué "
+            "volver a comprobarlo. Corre scripts/verificar_citas.py --registrar",
+        )
+
+    def test_la_cita_estructurada_no_puede_divergir_de_la_nota(self):
+        """Dos copias del mismo texto se desincronizan. Siempre.
+
+        La nota en prosa es la que lee el humano; `cita_literal` es la que
+        chequea el script contra la fuente. Si divergen, el script valida un
+        texto que ya nadie lee y el humano lee un texto que nadie valida —
+        que es exactamente cómo se coló la cita fabricada.
+        """
+        import re
+
+        def plano(s: str) -> str:
+            return re.sub(r"\s+", " ", s).strip()
+
+        divergentes = []
+        for anio in (2025, 2026):
+            for ruta, bloque in self._bloques(anio).items():
+                nota = plano(str(bloque.get("nota", "")))
+                citas = bloque.get("cita_literal") or []
+                if isinstance(citas, str):
+                    citas = [citas]
+                for cita in citas:
+                    if plano(str(cita)) not in nota:
+                        divergentes.append(f"ag{anio}:{ruta}: «{plano(cita)[:70]}…»")
+        self.assertEqual(
+            divergentes, [],
+            "estas `cita_literal` no aparecen palabra por palabra en la `nota` "
+            "de su bloque",
+        )
+
+    def test_un_ano_heredado_no_presenta_como_suya_una_verificacion_ajena(self):
+        """ag2026 hereda 23 bloques de ag2025. Heredaba también la bandera.
+
+        O sea: presentaba como verificadas para 2026 citas que nadie abrió
+        para 2026, y `verificar_citas.py` habría reportado ✓ sobre ellas.
+        La bandera que existe justo para impedir una cita fabricada se
+        copiaba sola de año en año.
+        """
+        par = P.cargar(2026)
+        for bloque in ("topes.renta_exenta_25", "topes.costos_por_tipo_de_renta",
+                       "topes.dependientes_10pct"):
+            for campo in P.CAMPOS_NO_HEREDABLES:
+                self.assertIsNone(
+                    par.get(f"{bloque}.{campo}"),
+                    f"ag2026 heredó `{campo}` de ag2025 en {bloque}",
+                )
+            # El control: lo que SÍ debe heredarse para poder verificar.
+            self.assertTrue(par.get(f"{bloque}.fuente"),
+                            f"{bloque} perdió la fuente al heredar; sin ella "
+                            f"el año hijo no tiene por dónde empezar")
+            self.assertTrue(par.get(f"{bloque}.url"))
+
+    def test_la_advertencia_del_motor_SI_sobrevive_a_la_herencia(self):
+        """La asimetría, y es la parte que se puede romper sin notarlo.
+
+        `motor_implementa_correctamente = false` no es una afirmación sobre
+        el año: es una advertencia sobre el MOTOR, que es el mismo para
+        todos los años. Meterla en CAMPOS_NO_HEREDABLES la habría borrado al
+        heredar, apagando el ⚠ del encabezado de `calcular` justo en el año
+        menos verificado — un arreglo que crea un bug de su misma clase.
+        """
+        avisos = " ".join(P.cargar(2026).advertencias())
+        for bloque in ("topes.costos_por_tipo_de_renta", "topes.dependientes_10pct"):
+            self.assertIn(bloque, avisos,
+                          f"ag2026 perdió la advertencia de {bloque} al heredar")
+
+    def test_un_true_optimista_tampoco_se_hereda(self):
+        """El otro lado de la asimetría: `= true` afirma que el motor sigue
+        la norma DE ESE AÑO, y eso sí es específico del año."""
+        datos, heredados = P._fusionar(
+            {"x": {"motor_implementa_correctamente": True, "fuente": "f"}},
+            {"x": {}},
+        )
+        self.assertNotIn("motor_implementa_correctamente", datos["x"])
+        datos, _ = P._fusionar(
+            {"x": {"motor_implementa_correctamente": False, "fuente": "f"}},
+            {"x": {}},
+        )
+        self.assertIs(datos["x"]["motor_implementa_correctamente"], False)
+
+    def test_el_chequeo_de_citas_no_esta_en_la_suite_normal(self):
+        """Una prueba con red no puede poner en rojo la aritmética.
+
+        Si `verificar_citas.py` corriera en `make test`, un DNS caído o un
+        portal de la DIAN en mantenimiento dejarían el repo rojo por algo que
+        no es un error de liquidación. Un rojo que no significa nada se
+        empieza a ignorar, y ahí se apaga la defensa entera. Es la tercera
+        vez en este proyecto que un falso positivo masivo apaga una
+        detección: va en su propio job semanal.
+        """
+        mk = (RAIZ / "Makefile").read_text(encoding="utf-8")
+        cuerpo_test = mk.split("\ntest:")[1].split("\n\n")[0] if "\ntest:" in mk else ""
+        self.assertNotIn("verificar_citas", cuerpo_test)
+        wf = RAIZ / ".github" / "workflows" / "citas.yml"
+        self.assertTrue(wf.exists(), "falta el job semanal de citas")
+        texto = wf.read_text(encoding="utf-8")
+        self.assertIn("schedule", texto)
+        self.assertIn("verificar_citas.py", texto)
+
+
 class TestCatalogoDeRiesgos(unittest.TestCase):
     """El catálogo de riesgos vive en cuatro sitios y se desfasó en los cuatro.
 
